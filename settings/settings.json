@@ -1,0 +1,11 @@
+{
+    "model": "BF16",
+    "models": [
+        "BF16",
+        "Q5_K_M"
+    ],
+    "keep_loaded": true,
+    "max_seq": 0,
+    "max_seq_full": 24576,
+    "vae_core": 1024
+}
