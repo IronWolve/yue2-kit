@@ -13,7 +13,8 @@
   "use strict";
 
   /* THEMES:BEGIN (the theme list; its generator is gone, so edit it here, with themes.css) */
-  var THEMES = [{"id": "studio", "name": "Studio (warm)", "family": "classic", "dark": true, "bg": "#14110e", "fg": "#f2eadc", "accent": "#e8a33d", "rule": "#3a3129"},
+  var THEMES = [{"id": "dmm", "name": "DMM", "family": "bold", "dark": true, "bg": "#09090b", "fg": "#e4e4e7", "accent": "#bf00ff", "rule": "#27272a"},
+    {"id": "studio", "name": "Studio (warm)", "family": "classic", "dark": true, "bg": "#14110e", "fg": "#f2eadc", "accent": "#e8a33d", "rule": "#3a3129"},
     {"id": "graphite", "name": "Graphite", "family": "classic", "dark": true, "bg": "#131518", "fg": "#eef1f5", "accent": "#f0b44c", "rule": "#373d45"},
     {"id": "nord", "name": "Nord", "family": "classic", "dark": true, "bg": "#2e3440", "fg": "#eceff4", "accent": "#ebcb8b", "rule": "#4c566a"},
     {"id": "dracula", "name": "Dracula", "family": "classic", "dark": true, "bg": "#21222c", "fg": "#f8f8f2", "accent": "#bd93f9", "rule": "#44475a"},

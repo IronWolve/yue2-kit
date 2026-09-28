@@ -2575,8 +2575,17 @@
 
   function formatExt(format) { return format === "mp3" ? "mp3" : "wav"; }
 
-  // Downloads carry the library name (date, time and title), like the other console
-  function audioFileName(take) { return take.name + "." + formatExt(take.format); }
+  // Downloads are named after the song ("Last Train Home.wav"), as the server names them: the title without
+  // the characters Windows refuses in a file name. The Takes menu can put the date back (the library name,
+  // "20260927-183418-last-train-home"); the server is told too, since its name beats the page's.
+  function libraryNames() { return recall("yue2.dlNames") === "library"; }
+  function fileTitle(take) {
+    if (libraryNames()) return take.name;
+    return displayTitle(take).replace(/[\u0000-\u001f\u007f\\/:*?"<>|\s]+/g, " ").replace(/[\s.]+$/, "").trim() || take.name;
+  }
+  function namesParam() { return libraryNames() ? "&names=library" : ""; }
+  function audioFileName(take) { return fileTitle(take) + "." + formatExt(take.format); }
+  function downloadUrl(take) { return take.session ? take.url : takeAudioUrl(take) + namesParam(); }
 
   // MP3 copies for sharing: made on the server at the bitrate chosen on the song page
   function mp3Rate() {
@@ -2586,7 +2595,7 @@
   }
 
   function mp3Url(take) {
-    return "/library/mp3?name=" + encodeURIComponent(take.name) + "&kbps=" + mp3Rate();
+    return "/library/mp3?name=" + encodeURIComponent(take.name) + "&kbps=" + mp3Rate() + namesParam();
   }
 
   // Conversions need a saved WAV: a song still being made (session) has no library copy yet,
@@ -2597,8 +2606,18 @@
     link.classList.toggle("is-hidden", !convertible(take));
     if (!convertible(take)) return;
     link.href = mp3Url(take);
-    link.setAttribute("download", take.name + ".mp3");
+    link.setAttribute("download", fileTitle(take) + ".mp3");
     link.textContent = label;
+  }
+
+  // the song page's download buttons: named after the song (or with the date), the server told the same
+  function paintTakeDownloads() {
+    var take = STATE.take;
+    if (!take) return;
+    $("dlTakeAudio").href = downloadUrl(take);
+    $("dlTakeAudio").textContent = formatExt(take.format).toUpperCase();
+    $("dlTakeAudio").setAttribute("download", audioFileName(take));
+    paintMp3();
   }
 
   function paintMp3() {
@@ -2608,8 +2627,8 @@
     paintMp3Link($("dlTakeMp3"), take, "MP3");
     flac.classList.toggle("is-hidden", !convertible(take));
     if (convertible(take)) {
-      flac.href = "/library/flac?name=" + encodeURIComponent(take.name);
-      flac.setAttribute("download", take.name + ".flac");
+      flac.href = "/library/flac?name=" + encodeURIComponent(take.name) + namesParam();
+      flac.setAttribute("download", fileTitle(take) + ".flac");
     }
   }
 
@@ -2655,7 +2674,6 @@
     $("scoreAbc").classList.remove("paper-live");
     paintTakeHead();
 
-    var url = takeAudioUrl(take);
     // Looking at a song never cuts off the one that is playing. The player follows
     // the page only while it is idle; a version chip (keep) is an explicit switch.
     var inPlayer = STATE.playerTake && STATE.playerTake.name === take.name;
@@ -2669,10 +2687,7 @@
     } else if (!isPlaying()) {
       loadPlayer(take, false);
     }
-    $("dlTakeAudio").href = url;
-    $("dlTakeAudio").textContent = formatExt(take.format).toUpperCase();
-    $("dlTakeAudio").setAttribute("download", audioFileName(take));
-    paintMp3();
+    paintTakeDownloads();
 
     paintTakeMeta();
     $("metaStyle").textContent = take.style;
@@ -3137,6 +3152,7 @@
     if (STATE.take && STATE.take.name === entry.name) {
       STATE.take = entry;
       paintTakeHead();
+      paintTakeDownloads();   // named after the song: a rename renames them
     }
     if (STATE.playerTake && STATE.playerTake.name === entry.name) {
       STATE.playerTake = entry;
@@ -3243,6 +3259,17 @@
     }).catch(function (error) { toast(error.message, "bad"); return false; });
   }
 
+  function paintDlNames() { $("dlNamesDate").setAttribute("aria-checked", libraryNames() ? "true" : "false"); }
+  $("dlNamesDate").addEventListener("click", function () {
+    store("yue2.dlNames", libraryNames() ? null : "library");
+    paintDlNames();
+    closeMenus();
+    paintTakeDownloads();
+    paintLibrary();
+    toast(libraryNames() ? "Downloads carry the date: 20260927-183418-song-title.wav" : "Downloads are named after the song: Song Title.wav");
+  });
+  paintDlNames();
+
   $("deleteNonFav").addEventListener("click", function () {
     closeMenus();
     var doomed = STATE.takes.filter(function (t) { return !t.favorite; });
@@ -3299,7 +3326,7 @@
         audio.addEventListener("loadedmetadata", pendingSeek);
       } else {
         $("timeNow").textContent = "0:00";
-        $("playGlyph").textContent = "▶";
+        paintPlayButton(false);
       }
     }
     $("playbar").classList.remove("is-empty");
@@ -3364,9 +3391,15 @@
   });
 
   paintVolume();
-  audio.addEventListener("play", function () { $("playGlyph").textContent = "❚❚"; markPlaying(); });
-  audio.addEventListener("pause", function () { $("playGlyph").textContent = "▶"; markPlaying(); });
-  audio.addEventListener("ended", function () { $("playGlyph").textContent = "▶"; markPlaying(); });
+  // The play button's glyph, its state (the DMM theme draws icons from it) and its label for screen readers
+  function paintPlayButton(playing) {
+    $("playGlyph").textContent = playing ? "❚❚" : "▶";
+    $("playBtn").classList.toggle("is-playing", playing);
+    $("playBtn").setAttribute("aria-label", playing ? "Pause" : "Play");
+  }
+  audio.addEventListener("play", function () { paintPlayButton(true); markPlaying(); });
+  audio.addEventListener("pause", function () { paintPlayButton(false); markPlaying(); });
+  audio.addEventListener("ended", function () { paintPlayButton(false); markPlaying(); });
   audio.addEventListener("emptied", markPlaying);
 
   // The card of the song that is playing says so (the list redraws often, so this runs after it too)
@@ -3573,9 +3606,9 @@
         '<button type="button" class="take-fav" data-fav="' + escape(take.name) + '" aria-pressed="' + (take.favorite ? "true" : "false") +
         '" title="' + (take.favorite ? "Remove from favourites" : "Keep as a favourite") + '" aria-label="Favourite">' + (take.favorite ? "★" : "☆") + "</button>" +
         '<button type="button" class="take-del" data-del="' + escape(take.name) + '" title="Delete take" aria-label="Delete take">✕</button>' +
-        '<a class="take-dl" data-dl="1" href="' + escape(takeAudioUrl(take)) + '" download="' + escape(audioFileName(take)) +
+        '<a class="take-dl" data-dl="1" href="' + escape(downloadUrl(take)) + '" download="' + escape(audioFileName(take)) +
         '" title="Download ' + formatExt(take.format).toUpperCase() + '" aria-label="Download">⤓</a>' +
-        (!convertible(take) ? "" : '<a class="take-mp3" data-dl="1" href="' + escape(mp3Url(take)) + '" download="' + escape(take.name) +
+        (!convertible(take) ? "" : '<a class="take-mp3" data-dl="1" href="' + escape(mp3Url(take)) + '" download="' + escape(fileTitle(take)) +
         '.mp3" title="Download MP3 (' + mp3Rate() + ' kbps)" aria-label="Download MP3">mp3</a>') +
         '<div class="take-title">' + escape(title) + "</div>" +
         '<div class="take-style">' + escape(take.style || "") + "</div>" +
@@ -4336,7 +4369,7 @@
     heading: { select: "fontHeading", generic: "sans-serif", own: "" },
     mono: { select: "fontMono", generic: "monospace", own: "IBM Plex Mono" }
   };
-  var APP_FONTS = ["IBM Plex Sans", "IBM Plex Mono", "Bodoni Moda"];
+  var APP_FONTS = ["IBM Plex Sans", "IBM Plex Mono", "Bodoni Moda", "Space Grotesk", "Michroma"];
   var COMMON_FONTS = ["Aptos", "Arial", "Avenir", "Avenir Next", "Bahnschrift", "Baskerville", "Calibri", "Cambria", "Candara",
     "Cantarell", "Cascadia Code", "Cascadia Mono", "Charter", "Consolas", "Constantia", "Corbel", "Courier New", "DejaVu Sans",
     "DejaVu Sans Mono", "DejaVu Serif", "Didot", "Fira Mono", "Fira Sans", "Franklin Gothic Medium", "Futura", "Garamond",

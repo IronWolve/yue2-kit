@@ -61,6 +61,48 @@
   color-scheme: dark;
 }
 
+/* DMM: zinc-950 grounds, electric purple, cyan and neon green, with its own fonts (Michroma headings,
+   Space Grotesk text; a browser fetches them only while this theme shows them). The purple text is lifted
+   from the brand #bf00ff (3.8:1 on the raised panels) to clear 4.5:1; its play button keeps the brand
+   purple through --accent-rgb. */
+[data-theme="dmm"] {
+  --ground: #09090b;
+  --panel: #111114;
+  --raise: #1a1a1f;
+  --sunk: #060608;
+  --line: #27272a;
+  --line-soft: #1e1e22;
+  --line-strong: #3f3f46;
+  --ink: #e4e4e7;
+  --muted: #b4b4bc;
+  --dim: #a1a1aa;
+  --placeholder: #8b8b95;
+  --amber: #c94bff;
+  --amber-dim: #6b21a8;
+  --amber-hi: #d470ff;
+  --amber-hi2: #de8cff;
+  --amber-edge: #9a00cc;
+  --on-amber: #0a0012;
+  --patina: #00f0ff;
+  --patina-dim: #0b5c63;
+  --good: #39ff14;
+  --good-line: #1f5e14;
+  --bad: #ff5c6c;
+  --bad-line: #6b1f28;
+  --bad-ink: #ff9aa4;
+  --take-bg: #0c0c0f;
+  --hover: #1f1f24;
+  --focus-bg: #0f0f12;
+  --field: #060608;
+  --accent-rgb: 191 0 255;
+  --sans: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --heading: "Michroma", "Segoe UI", system-ui, sans-serif;
+  --display: "Michroma", "Segoe UI", system-ui, sans-serif;
+  --shadow-md: rgba(0, 0, 0, .5);
+  --shadow-lg: rgba(0, 0, 0, .9);
+  color-scheme: dark;
+}
+
 /* neutral charcoal, no colour cast */
 [data-theme="graphite"] {
   --ground: #131518;
@@ -599,6 +641,8 @@ body.is-resizing, body.is-resizing * { cursor: col-resize !important; user-selec
   cursor: pointer;
 }
 .menu-pop button:hover, .menu-pop button:focus-visible { background: var(--hover); color: var(--ink); }
+.menu-pop [role="menuitemcheckbox"]::before { content: ""; display: inline-block; width: 1.2em; }
+.menu-pop [role="menuitemcheckbox"][aria-checked="true"]::before { content: "✓"; color: var(--amber); }
 .menu-pop button.danger:hover { color: var(--bad); }
 
 /* ------------------------------------------------------------------ forms */
@@ -1387,6 +1431,23 @@ textarea:hover::-webkit-scrollbar-thumb,
   cursor: pointer;
 }
 .play:hover { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 32%, transparent); }
+.play-icon { display: none; }
+
+/* the DMM theme's play button: a purple ring on a 10% purple tint, drawn play and pause icons, stronger
+   on hover, pressed in on click */
+[data-theme="dmm"] .play {
+  width: 48px; height: 48px;
+  border: 1px solid rgb(var(--accent-rgb) / .3);
+  background: rgb(var(--accent-rgb) / .1);
+  color: rgb(var(--accent-rgb));
+  transition: background-color .15s, border-color .15s, transform .15s;
+}
+[data-theme="dmm"] .play:hover { box-shadow: none; background: rgb(var(--accent-rgb) / .2); border-color: rgb(var(--accent-rgb) / .5); }
+[data-theme="dmm"] .play:active { transform: scale(.95); }
+[data-theme="dmm"] #playGlyph { display: none; }
+[data-theme="dmm"] .play-icon { width: 20px; height: 20px; fill: currentColor; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+[data-theme="dmm"] .play:not(.is-playing) .play-icon-play { display: block; margin-left: 2px; }
+[data-theme="dmm"] .play.is-playing .play-icon-pause { display: block; }
 
 .time { font-size: 12.5px; flex: none; }
 .time.dim { color: var(--dim); }

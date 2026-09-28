@@ -1,0 +1,416 @@
+From 4e720f2d9178972449ac04805a1ff8bba2f59cd9 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Mon, 28 Sep 2026 01:33:57 -0700
+Subject: [PATCH 52/52] Name downloads after the song; add the DMM theme and a
+ Play/Pause label
+
+Downloads (WAV, MP3, FLAC) are named after the song's title, without the characters Windows refuses in a file name, by the server and the page alike, with an ASCII fallback and the full name in UTF-8. The Takes menu can put the date back (the library name); the page asks the server for the same with names=library. A new DMM theme from a friend's copy of the page joins the picker: zinc and electric purple, its own heading and text fonts, and a larger play button with drawn icons. The play button tells screen readers Play or Pause.
+---
+ tools/console/app.css    | 61 +++++++++++++++++++++++++++++++++++
+ tools/console/app.js     | 69 +++++++++++++++++++++++++++++-----------
+ tools/console/index.html |  8 +++--
+ tools/console/themes.js  |  3 +-
+ tools/yue-server.cpp     | 62 +++++++++++++++++++++++++++++++-----
+ 5 files changed, 174 insertions(+), 29 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index 1950a8b..7b17160 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -61,6 +61,48 @@
+   color-scheme: dark;
+ }
+ 
++/* DMM: zinc-950 grounds, electric purple, cyan and neon green, with its own fonts (Michroma headings,
++   Space Grotesk text; a browser fetches them only while this theme shows them). The purple text is lifted
++   from the brand #bf00ff (3.8:1 on the raised panels) to clear 4.5:1; its play button keeps the brand
++   purple through --accent-rgb. */
++[data-theme="dmm"] {
++  --ground: #09090b;
++  --panel: #111114;
++  --raise: #1a1a1f;
++  --sunk: #060608;
++  --line: #27272a;
++  --line-soft: #1e1e22;
++  --line-strong: #3f3f46;
++  --ink: #e4e4e7;
++  --muted: #b4b4bc;
++  --dim: #a1a1aa;
++  --placeholder: #8b8b95;
++  --amber: #c94bff;
++  --amber-dim: #6b21a8;
++  --amber-hi: #d470ff;
++  --amber-hi2: #de8cff;
++  --amber-edge: #9a00cc;
++  --on-amber: #0a0012;
++  --patina: #00f0ff;
++  --patina-dim: #0b5c63;
++  --good: #39ff14;
++  --good-line: #1f5e14;
++  --bad: #ff5c6c;
++  --bad-line: #6b1f28;
++  --bad-ink: #ff9aa4;
++  --take-bg: #0c0c0f;
++  --hover: #1f1f24;
++  --focus-bg: #0f0f12;
++  --field: #060608;
++  --accent-rgb: 191 0 255;
++  --sans: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
++  --heading: "Michroma", "Segoe UI", system-ui, sans-serif;
++  --display: "Michroma", "Segoe UI", system-ui, sans-serif;
++  --shadow-md: rgba(0, 0, 0, .5);
++  --shadow-lg: rgba(0, 0, 0, .9);
++  color-scheme: dark;
++}
++
+ /* neutral charcoal, no colour cast */
+ [data-theme="graphite"] {
+   --ground: #131518;
+@@ -599,6 +641,8 @@ body.is-resizing, body.is-resizing * { cursor: col-resize !important; user-selec
+   cursor: pointer;
+ }
+ .menu-pop button:hover, .menu-pop button:focus-visible { background: var(--hover); color: var(--ink); }
++.menu-pop [role="menuitemcheckbox"]::before { content: ""; display: inline-block; width: 1.2em; }
++.menu-pop [role="menuitemcheckbox"][aria-checked="true"]::before { content: "✓"; color: var(--amber); }
+ .menu-pop button.danger:hover { color: var(--bad); }
+ 
+ /* ------------------------------------------------------------------ forms */
+@@ -1387,6 +1431,23 @@ textarea:hover::-webkit-scrollbar-thumb,
+   cursor: pointer;
+ }
+ .play:hover { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 32%, transparent); }
++.play-icon { display: none; }
++
++/* the DMM theme's play button: a purple ring on a 10% purple tint, drawn play and pause icons, stronger
++   on hover, pressed in on click */
++[data-theme="dmm"] .play {
++  width: 48px; height: 48px;
++  border: 1px solid rgb(var(--accent-rgb) / .3);
++  background: rgb(var(--accent-rgb) / .1);
++  color: rgb(var(--accent-rgb));
++  transition: background-color .15s, border-color .15s, transform .15s;
++}
++[data-theme="dmm"] .play:hover { box-shadow: none; background: rgb(var(--accent-rgb) / .2); border-color: rgb(var(--accent-rgb) / .5); }
++[data-theme="dmm"] .play:active { transform: scale(.95); }
++[data-theme="dmm"] #playGlyph { display: none; }
++[data-theme="dmm"] .play-icon { width: 20px; height: 20px; fill: currentColor; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
++[data-theme="dmm"] .play:not(.is-playing) .play-icon-play { display: block; margin-left: 2px; }
++[data-theme="dmm"] .play.is-playing .play-icon-pause { display: block; }
+ 
+ .time { font-size: 12.5px; flex: none; }
+ .time.dim { color: var(--dim); }
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 22121f0..aaeb4e6 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -2575,8 +2575,17 @@
+ 
+   function formatExt(format) { return format === "mp3" ? "mp3" : "wav"; }
+ 
+-  // Downloads carry the library name (date, time and title), like the other console
+-  function audioFileName(take) { return take.name + "." + formatExt(take.format); }
++  // Downloads are named after the song ("Last Train Home.wav"), as the server names them: the title without
++  // the characters Windows refuses in a file name. The Takes menu can put the date back (the library name,
++  // "20260927-183418-last-train-home"); the server is told too, since its name beats the page's.
++  function libraryNames() { return recall("yue2.dlNames") === "library"; }
++  function fileTitle(take) {
++    if (libraryNames()) return take.name;
++    return displayTitle(take).replace(/[\u0000-\u001f\u007f\\/:*?"<>|\s]+/g, " ").replace(/[\s.]+$/, "").trim() || take.name;
++  }
++  function namesParam() { return libraryNames() ? "&names=library" : ""; }
++  function audioFileName(take) { return fileTitle(take) + "." + formatExt(take.format); }
++  function downloadUrl(take) { return take.session ? take.url : takeAudioUrl(take) + namesParam(); }
+ 
+   // MP3 copies for sharing: made on the server at the bitrate chosen on the song page
+   function mp3Rate() {
+@@ -2586,7 +2595,7 @@
+   }
+ 
+   function mp3Url(take) {
+-    return "/library/mp3?name=" + encodeURIComponent(take.name) + "&kbps=" + mp3Rate();
++    return "/library/mp3?name=" + encodeURIComponent(take.name) + "&kbps=" + mp3Rate() + namesParam();
+   }
+ 
+   // Conversions need a saved WAV: a song still being made (session) has no library copy yet,
+@@ -2597,10 +2606,20 @@
+     link.classList.toggle("is-hidden", !convertible(take));
+     if (!convertible(take)) return;
+     link.href = mp3Url(take);
+-    link.setAttribute("download", take.name + ".mp3");
++    link.setAttribute("download", fileTitle(take) + ".mp3");
+     link.textContent = label;
+   }
+ 
++  // the song page's download buttons: named after the song (or with the date), the server told the same
++  function paintTakeDownloads() {
++    var take = STATE.take;
++    if (!take) return;
++    $("dlTakeAudio").href = downloadUrl(take);
++    $("dlTakeAudio").textContent = formatExt(take.format).toUpperCase();
++    $("dlTakeAudio").setAttribute("download", audioFileName(take));
++    paintMp3();
++  }
++
+   function paintMp3() {
+     var take = STATE.take, flac = $("dlTakeFlac");
+     $("mp3Rate").value = String(mp3Rate());
+@@ -2608,8 +2627,8 @@
+     paintMp3Link($("dlTakeMp3"), take, "MP3");
+     flac.classList.toggle("is-hidden", !convertible(take));
+     if (convertible(take)) {
+-      flac.href = "/library/flac?name=" + encodeURIComponent(take.name);
+-      flac.setAttribute("download", take.name + ".flac");
++      flac.href = "/library/flac?name=" + encodeURIComponent(take.name) + namesParam();
++      flac.setAttribute("download", fileTitle(take) + ".flac");
+     }
+   }
+ 
+@@ -2655,7 +2674,6 @@
+     $("scoreAbc").classList.remove("paper-live");
+     paintTakeHead();
+ 
+-    var url = takeAudioUrl(take);
+     // Looking at a song never cuts off the one that is playing. The player follows
+     // the page only while it is idle; a version chip (keep) is an explicit switch.
+     var inPlayer = STATE.playerTake && STATE.playerTake.name === take.name;
+@@ -2669,10 +2687,7 @@
+     } else if (!isPlaying()) {
+       loadPlayer(take, false);
+     }
+-    $("dlTakeAudio").href = url;
+-    $("dlTakeAudio").textContent = formatExt(take.format).toUpperCase();
+-    $("dlTakeAudio").setAttribute("download", audioFileName(take));
+-    paintMp3();
++    paintTakeDownloads();
+ 
+     paintTakeMeta();
+     $("metaStyle").textContent = take.style;
+@@ -3137,6 +3152,7 @@
+     if (STATE.take && STATE.take.name === entry.name) {
+       STATE.take = entry;
+       paintTakeHead();
++      paintTakeDownloads();   // named after the song: a rename renames them
+     }
+     if (STATE.playerTake && STATE.playerTake.name === entry.name) {
+       STATE.playerTake = entry;
+@@ -3243,6 +3259,17 @@
+     }).catch(function (error) { toast(error.message, "bad"); return false; });
+   }
+ 
++  function paintDlNames() { $("dlNamesDate").setAttribute("aria-checked", libraryNames() ? "true" : "false"); }
++  $("dlNamesDate").addEventListener("click", function () {
++    store("yue2.dlNames", libraryNames() ? null : "library");
++    paintDlNames();
++    closeMenus();
++    paintTakeDownloads();
++    paintLibrary();
++    toast(libraryNames() ? "Downloads carry the date: 20260927-183418-song-title.wav" : "Downloads are named after the song: Song Title.wav");
++  });
++  paintDlNames();
++
+   $("deleteNonFav").addEventListener("click", function () {
+     closeMenus();
+     var doomed = STATE.takes.filter(function (t) { return !t.favorite; });
+@@ -3299,7 +3326,7 @@
+         audio.addEventListener("loadedmetadata", pendingSeek);
+       } else {
+         $("timeNow").textContent = "0:00";
+-        $("playGlyph").textContent = "▶";
++        paintPlayButton(false);
+       }
+     }
+     $("playbar").classList.remove("is-empty");
+@@ -3364,9 +3391,15 @@
+   });
+ 
+   paintVolume();
+-  audio.addEventListener("play", function () { $("playGlyph").textContent = "❚❚"; markPlaying(); });
+-  audio.addEventListener("pause", function () { $("playGlyph").textContent = "▶"; markPlaying(); });
+-  audio.addEventListener("ended", function () { $("playGlyph").textContent = "▶"; markPlaying(); });
++  // The play button's glyph, its state (the DMM theme draws icons from it) and its label for screen readers
++  function paintPlayButton(playing) {
++    $("playGlyph").textContent = playing ? "❚❚" : "▶";
++    $("playBtn").classList.toggle("is-playing", playing);
++    $("playBtn").setAttribute("aria-label", playing ? "Pause" : "Play");
++  }
++  audio.addEventListener("play", function () { paintPlayButton(true); markPlaying(); });
++  audio.addEventListener("pause", function () { paintPlayButton(false); markPlaying(); });
++  audio.addEventListener("ended", function () { paintPlayButton(false); markPlaying(); });
+   audio.addEventListener("emptied", markPlaying);
+ 
+   // The card of the song that is playing says so (the list redraws often, so this runs after it too)
+@@ -3573,9 +3606,9 @@
+         '<button type="button" class="take-fav" data-fav="' + escape(take.name) + '" aria-pressed="' + (take.favorite ? "true" : "false") +
+         '" title="' + (take.favorite ? "Remove from favourites" : "Keep as a favourite") + '" aria-label="Favourite">' + (take.favorite ? "★" : "☆") + "</button>" +
+         '<button type="button" class="take-del" data-del="' + escape(take.name) + '" title="Delete take" aria-label="Delete take">✕</button>' +
+-        '<a class="take-dl" data-dl="1" href="' + escape(takeAudioUrl(take)) + '" download="' + escape(audioFileName(take)) +
++        '<a class="take-dl" data-dl="1" href="' + escape(downloadUrl(take)) + '" download="' + escape(audioFileName(take)) +
+         '" title="Download ' + formatExt(take.format).toUpperCase() + '" aria-label="Download">⤓</a>' +
+-        (!convertible(take) ? "" : '<a class="take-mp3" data-dl="1" href="' + escape(mp3Url(take)) + '" download="' + escape(take.name) +
++        (!convertible(take) ? "" : '<a class="take-mp3" data-dl="1" href="' + escape(mp3Url(take)) + '" download="' + escape(fileTitle(take)) +
+         '.mp3" title="Download MP3 (' + mp3Rate() + ' kbps)" aria-label="Download MP3">mp3</a>') +
+         '<div class="take-title">' + escape(title) + "</div>" +
+         '<div class="take-style">' + escape(take.style || "") + "</div>" +
+@@ -4336,7 +4369,7 @@
+     heading: { select: "fontHeading", generic: "sans-serif", own: "" },
+     mono: { select: "fontMono", generic: "monospace", own: "IBM Plex Mono" }
+   };
+-  var APP_FONTS = ["IBM Plex Sans", "IBM Plex Mono", "Bodoni Moda"];
++  var APP_FONTS = ["IBM Plex Sans", "IBM Plex Mono", "Bodoni Moda", "Space Grotesk", "Michroma"];
+   var COMMON_FONTS = ["Aptos", "Arial", "Avenir", "Avenir Next", "Bahnschrift", "Baskerville", "Calibri", "Cambria", "Candara",
+     "Cantarell", "Cascadia Code", "Cascadia Mono", "Charter", "Consolas", "Constantia", "Corbel", "Courier New", "DejaVu Sans",
+     "DejaVu Sans Mono", "DejaVu Serif", "Didot", "Fira Mono", "Fira Sans", "Franklin Gothic Medium", "Futura", "Garamond",
+diff --git a/tools/console/index.html b/tools/console/index.html
+index 375f1a4..352f8c4 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -7,7 +7,7 @@
+ <link rel="preconnect" href="https://fonts.googleapis.com" />
+ <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+ <!-- the fonts never hold up the first paint: loaded as a print sheet, switched on when they arrive -->
+-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
++<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Michroma&family=Space+Grotesk:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
+ <script>try { var t = localStorage.getItem("yue2.theme"); if (t) document.documentElement.dataset.theme = t;
+   var f = JSON.parse(localStorage.getItem("yue2.fonts") || "{}"), g = { sans: "sans-serif", heading: "sans-serif", mono: "monospace" };
+   for (var k in g) if (typeof f[k] === "string") document.documentElement.style.setProperty("--" + k, JSON.stringify(f[k]) + ", " + g[k]); } catch (e) {}</script>
+@@ -606,6 +606,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+         <button type="button" class="icon-btn" id="libMenuBtn" aria-haspopup="true" aria-expanded="false" aria-label="Library actions" title="Library actions">⋯</button>
+         <div class="menu-pop right is-hidden" id="libMenu" role="menu">
+           <button type="button" role="menuitem" id="refreshLib">Refresh the list</button>
++          <button type="button" role="menuitemcheckbox" aria-checked="false" id="dlNamesDate">Put the date in download names</button>
+           <button type="button" role="menuitem" class="danger" id="deleteNonFav">Delete non-favourites…</button>
+         </div>
+       </div>
+@@ -627,7 +628,10 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+     <strong id="playbarTitle" data-tip="Pick a take on the right">Nothing loaded</strong>
+   </div>
+ 
+-  <button class="play" id="playBtn" aria-label="Play"><span id="playGlyph">▶</span></button>
++  <button class="play" id="playBtn" aria-label="Play"><span id="playGlyph">▶</span>
++    <!-- drawn play and pause icons, shown by the DMM theme -->
++    <svg class="play-icon play-icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3" /></svg>
++    <svg class="play-icon play-icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1" /><rect x="6" y="4" width="4" height="16" rx="1" /></svg></button>
+ 
+   <span class="mono time" id="timeNow">0:00</span>
+   <canvas id="wave" height="40"></canvas>
+diff --git a/tools/console/themes.js b/tools/console/themes.js
+index 1cec5c3..f947ae5 100644
+--- a/tools/console/themes.js
++++ b/tools/console/themes.js
+@@ -13,7 +13,8 @@
+   "use strict";
+ 
+   /* THEMES:BEGIN (the theme list; its generator is gone, so edit it here, with themes.css) */
+-  var THEMES = [{"id": "studio", "name": "Studio (warm)", "family": "classic", "dark": true, "bg": "#14110e", "fg": "#f2eadc", "accent": "#e8a33d", "rule": "#3a3129"},
++  var THEMES = [{"id": "dmm", "name": "DMM", "family": "bold", "dark": true, "bg": "#09090b", "fg": "#e4e4e7", "accent": "#bf00ff", "rule": "#27272a"},
++    {"id": "studio", "name": "Studio (warm)", "family": "classic", "dark": true, "bg": "#14110e", "fg": "#f2eadc", "accent": "#e8a33d", "rule": "#3a3129"},
+     {"id": "graphite", "name": "Graphite", "family": "classic", "dark": true, "bg": "#131518", "fg": "#eef1f5", "accent": "#f0b44c", "rule": "#373d45"},
+     {"id": "nord", "name": "Nord", "family": "classic", "dark": true, "bg": "#2e3440", "fg": "#eceff4", "accent": "#ebcb8b", "rule": "#4c566a"},
+     {"id": "dracula", "name": "Dracula", "family": "classic", "dark": true, "bg": "#21222c", "fg": "#f8f8f2", "accent": "#bd93f9", "rule": "#44475a"},
+diff --git a/tools/yue-server.cpp b/tools/yue-server.cpp
+index b01302a..c26555b 100644
+--- a/tools/yue-server.cpp
++++ b/tools/yue-server.cpp
+@@ -1068,10 +1068,9 @@ static bool work_run_soon(std::function<void()> fn, int wait_ms) {
+ }
+ 
+ // ID3v2.4 tag with the title and the lyrics (UTF-8), for the shareable MP3 copies
+-// A take's title (meta.json, else its library name) and lyrics (request.json), for file tags
+-static void take_title_lyrics(const std::string & dir, const std::string & name, std::string & title, std::string & lyrics) {
+-    title = name;
+-    lyrics.clear();
++// A take's title (meta.json, else its library name), for file tags and download names
++static std::string take_title(const std::string & dir, const std::string & name) {
++    std::string  title    = name;
+     std::string  meta_txt = read_file(dir + "/meta.json");
+     yyjson_doc * meta     = yyjson_read(meta_txt.c_str(), meta_txt.size(), 0);
+     yyjson_val * v        = meta ? yyjson_obj_get(yyjson_doc_get_root(meta), "title") : nullptr;
+@@ -1081,12 +1080,56 @@ static void take_title_lyrics(const std::string & dir, const std::string & name,
+     if (meta) {
+         yyjson_doc_free(meta);
+     }
++    return title;
++}
++
++// A take's title and lyrics (request.json), for file tags
++static void take_title_lyrics(const std::string & dir, const std::string & name, std::string & title, std::string & lyrics) {
++    title = take_title(dir, name);
++    lyrics.clear();
+     Yue2Request r;
+     if (request_parse_json(&r, read_file(dir + "/request.json").c_str())) {
+         lyrics = r.lyrics;
+     }
+ }
+ 
++// Local addition: saved copies are named after the song ("Last Train Home.wav"): the title without the
++// characters Windows refuses in a file name, an ASCII fallback for old clients and the full name in UTF-8.
++// by_title false (the page's "names=library") keeps the library name, with its date and time.
++static std::string download_header(const char * how, const std::string & dir, const std::string & name, const char * ext,
++                                   bool by_title) {
++    std::string title = by_title ? take_title(dir, name) : name, safe;
++    for (unsigned char c : title) {
++        bool bad = c < 0x20 || c == 0x7f || strchr("\\/:*?\"<>|", c);
++        if (bad || c == ' ') {
++            if (!safe.empty() && safe.back() != ' ') {
++                safe += ' ';
++            }
++        } else {
++            safe += (char) c;
++        }
++    }
++    while (!safe.empty() && (safe.back() == ' ' || safe.back() == '.')) {
++        safe.pop_back();
++    }
++    if (safe.empty()) {
++        safe = name;
++    }
++    safe += ext;
++    std::string ascii, encoded;
++    for (unsigned char c : safe) {
++        ascii += c < 0x80 ? (char) c : '_';
++        if ((c < 0x80 && isalnum(c)) || strchr("-._~", c)) {
++            encoded += (char) c;
++        } else {
++            char hex[4];
++            snprintf(hex, sizeof(hex), "%%%02X", c);
++            encoded += hex;
++        }
++    }
++    return std::string(how) + "; filename=\"" + ascii + "\"; filename*=UTF-8''" + encoded;
++}
++
+ static std::string id3_synchsafe(size_t n) {
+     std::string out(4, '\0');
+     for (int i = 3; i >= 0; i--) {
+@@ -1761,8 +1804,9 @@ int main(int argc, char ** argv) {
+             }
+             std::string path = audio_file_of(g_outputs_dir + "/" + name);
+             bool        mp3  = path.size() > 4 && path.substr(path.size() - 4) == ".mp3";
+-            // Saved copies are named after the take (date, time, title), not audio.wav
+-            res.set_header("Content-Disposition", "inline; filename=\"" + name + (mp3 ? ".mp3" : ".wav") + "\"");
++            // Saved copies are named after the song, or the library name with names=library (local change)
++            res.set_header("Content-Disposition", download_header("inline", g_outputs_dir + "/" + name, name, mp3 ? ".mp3" : ".wav",
++                                                                  req.get_param_value("names") != "library"));
+             res.set_file_content(path, mp3 ? "audio/mpeg" : "audio/wav");
+         });
+         // Waveform peaks for the player, read from the audio once and cached
+@@ -1851,7 +1895,8 @@ int main(int argc, char ** argv) {
+                     fprintf(stderr, "[Library] MP3 %d kbps for %s\n", kbps, name.c_str());
+                 }
+             }
+-            res.set_header("Content-Disposition", "attachment; filename=\"" + name + ".mp3\"");
++            res.set_header("Content-Disposition",
++                           download_header("attachment", dir, name, ".mp3", req.get_param_value("names") != "library"));
+             res.set_file_content(cache, "audio/mpeg");
+         });
+         // A lossless FLAC of a WAV take, made on the spot (about a second for a 4-minute song)
+@@ -1888,7 +1933,8 @@ int main(int argc, char ** argv) {
+             fprintf(stderr, "[Library] FLAC %d-bit for %s: %.1f MB (%.0f%% of the WAV), %.0f ms\n", bits, name.c_str(),
+                     (double) flac.size() / 1e6, 100.0 * (double) flac.size() / (double) std::max<size_t>(wav.size(), 1),
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+-            res.set_header("Content-Disposition", "attachment; filename=\"" + name + ".flac\"");
++            res.set_header("Content-Disposition",
++                           download_header("attachment", dir, name, ".flac", req.get_param_value("names") != "library"));
+             res.set_content(std::move(flac), "audio/flac");
+         });
+         svr.Get("/library/request", [](const httplib::Request & req, httplib::Response & res) {

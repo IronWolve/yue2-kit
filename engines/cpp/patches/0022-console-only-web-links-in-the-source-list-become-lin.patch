@@ -1,7 +1,7 @@
 From 0759750f87f7baeba25183cb9011ddd202f52ef5 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 09:51:55 -0700
-Subject: [PATCH 22/51] console: only web links in the source list become links
+Subject: [PATCH 22/52] console: only web links in the source list become links
 
 A link from the LoRA, VAE or slider source list is shown as a link only
 when it starts with http:// or https://; anything else stays plain text.

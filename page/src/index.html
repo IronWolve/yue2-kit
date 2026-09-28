@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <!-- the fonts never hold up the first paint: loaded as a print sheet, switched on when they arrive -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Michroma&family=Space+Grotesk:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
 <script>try { var t = localStorage.getItem("yue2.theme"); if (t) document.documentElement.dataset.theme = t;
   var f = JSON.parse(localStorage.getItem("yue2.fonts") || "{}"), g = { sans: "sans-serif", heading: "sans-serif", mono: "monospace" };
   for (var k in g) if (typeof f[k] === "string") document.documentElement.style.setProperty("--" + k, JSON.stringify(f[k]) + ", " + g[k]); } catch (e) {}</script>
@@ -606,6 +606,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         <button type="button" class="icon-btn" id="libMenuBtn" aria-haspopup="true" aria-expanded="false" aria-label="Library actions" title="Library actions">⋯</button>
         <div class="menu-pop right is-hidden" id="libMenu" role="menu">
           <button type="button" role="menuitem" id="refreshLib">Refresh the list</button>
+          <button type="button" role="menuitemcheckbox" aria-checked="false" id="dlNamesDate">Put the date in download names</button>
           <button type="button" role="menuitem" class="danger" id="deleteNonFav">Delete non-favourites…</button>
         </div>
       </div>
@@ -627,7 +628,10 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     <strong id="playbarTitle" data-tip="Pick a take on the right">Nothing loaded</strong>
   </div>
 
-  <button class="play" id="playBtn" aria-label="Play"><span id="playGlyph">▶</span></button>
+  <button class="play" id="playBtn" aria-label="Play"><span id="playGlyph">▶</span>
+    <!-- drawn play and pause icons, shown by the DMM theme -->
+    <svg class="play-icon play-icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3" /></svg>
+    <svg class="play-icon play-icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1" /><rect x="6" y="4" width="4" height="16" rx="1" /></svg></button>
 
   <span class="mono time" id="timeNow">0:00</span>
   <canvas id="wave" height="40"></canvas>

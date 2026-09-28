@@ -1,7 +1,7 @@
 From 304a2929dcf788cbcf9ba9feb3814325d9f85437 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 14:51:23 -0700
-Subject: [PATCH 30/51] Colour the terminal copy of the server log
+Subject: [PATCH 30/52] Colour the terminal copy of the server log
 
 Whole lines by meaning (errors red, warnings and cancels yellow, a finished song or save green, loading chatter and counters dim), otherwise the tag by stage with stage summaries in bold. Only when stderr is a terminal and NO_COLOR is unset; the page's log stream stays plain.
 ---

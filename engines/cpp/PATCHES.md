@@ -631,3 +631,14 @@ Files:
 - `tools/console/index.html` (+1 −0)
 - `tools/console/themes.css` (+2 −84)
 - `tools/console/themes.js` (+1 −1)
+
+## 0052 Name downloads after the song; add the DMM theme and a Play/Pause label
+
+2026-09-28. Downloads (WAV, MP3, FLAC) are named after the song's title, without the characters Windows refuses in a file name, by the server and the page alike, with an ASCII fallback and the full name in UTF-8. The Takes menu can put the date back (the library name); the page asks the server for the same with names=library. A new DMM theme from a friend's copy of the page joins the picker: zinc and electric purple, its own heading and text fonts, and a larger play button with drawn icons. The play button tells screen readers Play or Pause.
+
+Files:
+- `tools/console/app.css` (+61 −0)
+- `tools/console/app.js` (+51 −18)
+- `tools/console/index.html` (+6 −2)
+- `tools/console/themes.js` (+2 −1)
+- `tools/yue-server.cpp` (+54 −8)
