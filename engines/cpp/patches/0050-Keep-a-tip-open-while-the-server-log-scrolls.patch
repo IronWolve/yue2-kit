@@ -1,0 +1,31 @@
+From 616af6cc698017c7f3318938ee1900def1b9a687 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sun, 27 Sep 2026 20:17:54 -0700
+Subject: [PATCH 50/50] Keep a tip open while the server log scrolls
+
+Every scroll anywhere on the page closed the open tip, so the server log following new lines closed a tip within a second or two. A scroll now closes it only when the box that scrolled holds the tip's target.
+---
+ tools/console/app.js | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 54bad76..5db94f4 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -273,9 +273,13 @@
+     if (target) showTip(target); else if (tipFor) hideTip();
+   });
+   document.addEventListener("focusout", hideTip);
+-  // A scroll moves the target away from its tip; one reached by the keyboard keeps it.
+-  document.addEventListener("scroll", function () {
+-    if (tipFor && tipFor === document.activeElement) showTip(tipFor); else if (tipFor) hideTip();
++  // A scroll moves the target away from its tip; one reached by the keyboard keeps it. A box that scrolls
++  // without holding the target (the server log following new lines) leaves the tip alone.
++  document.addEventListener("scroll", function (event) {
++    if (!tipFor) return;
++    var box = event.target;
++    if (box !== document && !(box.contains && box.contains(tipFor))) return;
++    if (tipFor === document.activeElement) showTip(tipFor); else hideTip();
+   }, true);
+ 
+   // The VAE tip lists what this server actually offers; the versions tip says

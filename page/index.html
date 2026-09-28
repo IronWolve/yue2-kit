@@ -5761,9 +5761,13 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     if (target) showTip(target); else if (tipFor) hideTip();
   });
   document.addEventListener("focusout", hideTip);
-  // A scroll moves the target away from its tip; one reached by the keyboard keeps it.
-  document.addEventListener("scroll", function () {
-    if (tipFor && tipFor === document.activeElement) showTip(tipFor); else if (tipFor) hideTip();
+  // A scroll moves the target away from its tip; one reached by the keyboard keeps it. A box that scrolls
+  // without holding the target (the server log following new lines) leaves the tip alone.
+  document.addEventListener("scroll", function (event) {
+    if (!tipFor) return;
+    var box = event.target;
+    if (box !== document && !(box.contains && box.contains(tipFor))) return;
+    if (tipFor === document.activeElement) showTip(tipFor); else hideTip();
   }, true);
 
   // The VAE tip lists what this server actually offers; the versions tip says

@@ -1,7 +1,7 @@
 From 97c86569d54f82e4db3200a5a5b9e2a94ea6fe1b Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Fri, 25 Sep 2026 20:27:24 -0700
-Subject: [PATCH 09/49] Add a LoRA loader that merges while the model loads
+Subject: [PATCH 09/50] Add a LoRA loader that merges while the model loads
 
 src/lora.h reads the published YuE2 LoRA layouts straight from
 .safetensors (the same rules as the other console's loader: unfused and

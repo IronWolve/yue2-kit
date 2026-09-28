@@ -612,3 +612,10 @@ Files:
 Files:
 - `tools/console/app.js` (+30 −0)
 - `tools/console/index.html` (+2 −0)
+
+## 0050 Keep a tip open while the server log scrolls
+
+2026-09-27. Every scroll anywhere on the page closed the open tip, so the server log following new lines closed a tip within a second or two. A scroll now closes it only when the box that scrolled holds the tip's target.
+
+Files:
+- `tools/console/app.js` (+7 −3)

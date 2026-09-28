@@ -1,7 +1,7 @@
 From ba6cf2880f045424947a492adba27a5718cb8c02 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 14:18:21 -0700
-Subject: [PATCH 26/49] Remove the F32 weight option
+Subject: [PATCH 26/50] Remove the F32 weight option
 
 It widened BF16 weights to F32 at load for a quality gain that was never measured, while doubling the backbone's memory and measuring about 60% slower on the same song. The button, the Engine setting, its tip and the server setting are gone; an older page or settings.json that still sends precision is ignored. Songs made with it keep saying so on their page.
 ---
