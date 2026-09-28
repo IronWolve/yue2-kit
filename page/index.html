@@ -537,8 +537,15 @@ body:has(#view-engine:not(.is-hidden)) #engineToggle { background: var(--amber);
 .engine-grid > .card.wide { flex-basis: 100%; }
 .engine-grid > .card.compute-card { flex: 1.3 1 300px; }
 /* the Appearance card: two parts under a thin line, like the drawers */
-.appearance-card .look-part { display: flex; flex-direction: column; gap: 10px; }
-.appearance-card .look-part + .look-part { padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.appearance-card { container-type: inline-size; }
+.appearance-card .look-parts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 28px; }
+.appearance-card .look-part { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.appearance-card .look-part + .look-part { padding-left: 28px; border-left: 1px solid var(--line-soft); }
+/* a narrow card: the two parts stack, a thin line between them */
+@container (max-width: 700px) {
+  .appearance-card .look-parts { grid-template-columns: minmax(0, 1fr); }
+  .appearance-card .look-part + .look-part { padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--line-soft); }
+}
 .appearance-card .mini { margin: 0; }
 .appearance-card .look-checks { display: flex; flex-direction: column; gap: 7px; }
 .appearance-card select option { font-size: 14px; }
@@ -875,7 +882,7 @@ select:disabled { opacity: .7; }
   padding: 14px 0 0;
   border-top: 1px solid var(--line);
 }
-.submit-actions { margin-left: auto; display: flex; gap: 10px; }
+.submit-actions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px 12px; }
 .submit-actions .btn { height: 32px; min-width: 156px; padding: 0 16px; justify-content: center; font-size: 13px; }
 .submit-note { order: 3; flex-basis: 100%; margin: 0; font-size: 12px; color: var(--dim); }
 .submit-note:empty { display: none; }
@@ -3318,7 +3325,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       <ul class="lora-list slider-list" id="sliderCard"></ul>
     </div>
 
-    <div class="card writer-card">
+    <div class="card wide writer-card">
       <h3>Writer</h3>
       <p class="hint">A local language model turns a one-line idea into a title, style prompt and
         lyrics. The browser talks to the chat server directly.</p>
@@ -3337,8 +3344,9 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     </div>
 
     <!-- the look of the page: the theme and its options, then the fonts; all this browser's own (app.js: appearance) -->
-    <div class="card appearance-card" id="appearanceCard">
+    <div class="card wide appearance-card" id="appearanceCard">
       <h3>Appearance</h3>
+      <div class="look-parts">
       <section class="look-part">
         <h4 class="mini">Theme <em>the top bar's swatches choose it too</em></h4>
         <label class="field"><span class="label">Theme</span>
@@ -3361,6 +3369,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
           <select id="fontMono" data-font="mono"></select></label>
         <p class="row-hint" id="fontsHint"></p>
       </section>
+      </div>
       <div class="card-actions">
         <button type="button" class="btn ghost small" id="fontsAll">List all my fonts</button>
         <button type="button" class="btn ghost small" id="fontsReset">Default look</button>
@@ -3684,11 +3693,11 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         </div>
       </details>
 
-      <!-- how many takes, then the two actions, one size, on the right; a note under them only when it matters -->
+      <!-- how many takes and the two actions (one size) together on the right; a note under them only when it matters -->
       <div class="submit-bar">
-        <label class="versions">
-          <span>Takes <span class="info" tabindex="0" role="img" aria-label="About takes" data-tip-ref="tip-versions">i</span></span><input type="number" id="versions" min="1" max="10" step="1" value="1" /></label>
         <div class="submit-actions">
+          <label class="versions">
+            <span>Takes <span class="info" tabindex="0" role="img" aria-label="About takes" data-tip-ref="tip-versions">i</span></span><input type="number" id="versions" min="1" max="10" step="1" value="1" /></label>
           <button type="button" class="btn ghost" id="planBtn"
             title="Write only the score (seconds, no audio). Check its sections, then Generate renders exactly that score.">Plan score only</button>
           <button type="submit" class="btn primary" id="generateBtn">

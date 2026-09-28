@@ -1,7 +1,7 @@
 From f3e1b4d108fc1188588ee5f566ee4a7bbccbb966 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 19:23:06 -0700
-Subject: [PATCH 45/54] About: credit the page layout's inspiration
+Subject: [PATCH 45/55] About: credit the page layout's inspiration
 
 A line under the owner's credit names the web page whose layout inspired this one, with its link.
 ---

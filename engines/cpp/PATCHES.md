@@ -661,3 +661,11 @@ Files:
 - `tools/console/app.js` (+53 −1)
 - `tools/console/help.js` (+5 −0)
 - `tools/console/index.html` (+32 −13)
+
+## 0055 Takes beside the buttons; Writer and Appearance on rows of their own
+
+2026-09-28. The bottom bar's Takes box joins the two buttons as one group on the right (it wraps above them, still right-aligned, in a narrow column). On the Engine page the Writer card takes a row of its own, and so does Appearance, with its Theme and Fonts parts side by side (stacked when the card is narrow).
+
+Files:
+- `tools/console/app.css` (+10 −3)
+- `tools/console/index.html` (+7 −5)
