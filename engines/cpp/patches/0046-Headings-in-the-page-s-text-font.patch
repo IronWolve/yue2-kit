@@ -1,7 +1,7 @@
 From 3fa48cca5cc273961238f119915d5fe374b857c3 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 19:28:51 -0700
-Subject: [PATCH 46/48] Headings in the page's text font
+Subject: [PATCH 46/49] Headings in the page's text font
 
 Column, card, panel, Engine and About headings move from the display serif to the text font at medium weight, a size smaller to match; the serif stays for the logo and the (i) glyph.
 ---

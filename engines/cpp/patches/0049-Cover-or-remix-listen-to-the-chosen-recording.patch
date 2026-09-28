@@ -1,0 +1,65 @@
+From 8076f8d9b02a3aec65493be14544aeaa4f440658 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sun, 27 Sep 2026 20:00:01 -0700
+Subject: [PATCH 49/49] Cover or remix: listen to the chosen recording
+
+A Listen button beside Transcribe, the same size, plays the chosen file in its own player and shows the time; starting it pauses the player at the bottom and the other way round, and closing the drawer stops it.
+---
+ tools/console/app.js     | 30 ++++++++++++++++++++++++++++++
+ tools/console/index.html |  2 ++
+ 2 files changed, 32 insertions(+)
+
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 9c7ffab..54bad76 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -3707,6 +3707,36 @@
+     return buffer;
+   }
+ 
++  // Listen to the chosen recording before transcribing it. It has its own player, so the one at the bottom
++  // keeps its song; starting either one pauses the other.
++  var preview = new Audio(), previewUrl = "";
++  preview.preload = "metadata";
++  function paintListen() {
++    var button = $("coverListen"), on = !preview.paused;
++    button.disabled = !previewUrl;
++    button.setAttribute("aria-pressed", on ? "true" : "false");
++    button.textContent = on ? "❚❚ " + clock(preview.currentTime) + " / " + clock(isFinite(preview.duration) ? preview.duration : 0) : "▶ Listen";
++  }
++  $("coverFile").addEventListener("change", function () {
++    preview.pause();
++    if (previewUrl) URL.revokeObjectURL(previewUrl);
++    var file = this.files[0];
++    previewUrl = file ? URL.createObjectURL(file) : "";
++    if (previewUrl) preview.src = previewUrl; else preview.removeAttribute("src");
++    paintListen();
++  });
++  $("coverListen").addEventListener("click", function () {
++    if (!previewUrl) return;
++    if (!preview.paused) { preview.pause(); return; }
++    if (!audio.paused) audio.pause();
++    preview.play().catch(function () {
++      toast("This browser cannot play " + (($("coverFile").files[0] || {}).name || "this file") + "; it can still be transcribed", "bad");
++    });
++  });
++  ["play", "pause", "ended", "timeupdate", "loadedmetadata"].forEach(function (name) { preview.addEventListener(name, paintListen); });
++  audio.addEventListener("play", function () { preview.pause(); });
++  $("coverDrawer").addEventListener("toggle", function () { if (!this.open) preview.pause(); });
++
+   var coverTicker = 0;
+ 
+   $("coverFromAudio").addEventListener("click", function () {
+diff --git a/tools/console/index.html b/tools/console/index.html
+index 8846e49..e826465 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -369,6 +369,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+                 <option value="full">Melody and chords</option>
+               </select></label>
+             <div class="cover-act">
++              <button type="button" class="btn ghost" id="coverListen" aria-pressed="false" disabled
++                      data-tip="Listen to the chosen recording here; the player at the bottom pauses while it plays">▶ Listen</button>
+               <button type="button" class="btn ghost" id="coverFromAudio">Transcribe</button>
+               <p class="cover-status" id="coverAudioStatus"></p>
+             </div>

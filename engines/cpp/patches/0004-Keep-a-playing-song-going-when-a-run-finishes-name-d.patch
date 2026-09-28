@@ -1,7 +1,7 @@
 From 88b27d29e589d27a5cb9d9b1a82790bae46cf215 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Thu, 24 Sep 2026 19:02:24 -0700
-Subject: [PATCH 04/48] Keep a playing song going when a run finishes, name
+Subject: [PATCH 04/49] Keep a playing song going when a run finishes, name
  downloads after the take
 
 A finished song no longer replaces the one that is playing; it waits first

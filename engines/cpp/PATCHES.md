@@ -604,3 +604,11 @@ Files:
 - `tools/console/app.css` (+0 −2)
 - `tools/console/app.js` (+7 −1)
 - `tools/console/index.html` (+38 −35)
+
+## 0049 Cover or remix: listen to the chosen recording
+
+2026-09-27. A Listen button beside Transcribe, the same size, plays the chosen file in its own player and shows the time; starting it pauses the player at the bottom and the other way round, and closing the drawer stops it.
+
+Files:
+- `tools/console/app.js` (+30 −0)
+- `tools/console/index.html` (+2 −0)

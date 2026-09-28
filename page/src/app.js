@@ -3707,6 +3707,36 @@
     return buffer;
   }
 
+  // Listen to the chosen recording before transcribing it. It has its own player, so the one at the bottom
+  // keeps its song; starting either one pauses the other.
+  var preview = new Audio(), previewUrl = "";
+  preview.preload = "metadata";
+  function paintListen() {
+    var button = $("coverListen"), on = !preview.paused;
+    button.disabled = !previewUrl;
+    button.setAttribute("aria-pressed", on ? "true" : "false");
+    button.textContent = on ? "❚❚ " + clock(preview.currentTime) + " / " + clock(isFinite(preview.duration) ? preview.duration : 0) : "▶ Listen";
+  }
+  $("coverFile").addEventListener("change", function () {
+    preview.pause();
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    var file = this.files[0];
+    previewUrl = file ? URL.createObjectURL(file) : "";
+    if (previewUrl) preview.src = previewUrl; else preview.removeAttribute("src");
+    paintListen();
+  });
+  $("coverListen").addEventListener("click", function () {
+    if (!previewUrl) return;
+    if (!preview.paused) { preview.pause(); return; }
+    if (!audio.paused) audio.pause();
+    preview.play().catch(function () {
+      toast("This browser cannot play " + (($("coverFile").files[0] || {}).name || "this file") + "; it can still be transcribed", "bad");
+    });
+  });
+  ["play", "pause", "ended", "timeupdate", "loadedmetadata"].forEach(function (name) { preview.addEventListener(name, paintListen); });
+  audio.addEventListener("play", function () { preview.pause(); });
+  $("coverDrawer").addEventListener("toggle", function () { if (!this.open) preview.pause(); });
+
   var coverTicker = 0;
 
   $("coverFromAudio").addEventListener("click", function () {
