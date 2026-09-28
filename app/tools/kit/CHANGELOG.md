@@ -3,6 +3,13 @@
 Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
 `d48e6e2e4a4e9bff24f8f60c943eddd976358df1`. v5 is the first kit that changes the app itself.
 
+## v7 (2026-09-27)
+
+The app is the same as in v6: 36 patches, tree `46618fde37a376e5c80eb46d5ce3fef9334e6456`.
+
+- **Install guide**: `git am` may warn about whitespace ("new blank line at EOF") while applying the
+  patches; the guide now says that is harmless and that the tree check decides.
+
 ## v6 (2026-09-27)
 
 The app: 36 patches (14 new), tree `46618fde37a376e5c80eb46d5ce3fef9334e6456`.
