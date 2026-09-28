@@ -51,7 +51,8 @@ def files_of(repo):
 def size(n):
     if n is None:
         return "?"
-    return f"{n / 1024 ** 3:.1f} GB" if n >= 1024 ** 3 else f"{max(1, round(n / 1024 ** 2))} MB"
+    # no-break spaces and hyphens: a narrow table column must not split "6.8 GB" or "add-on" in two
+    return f"{n / 1024 ** 3:.1f}\u00a0GB" if n >= 1024 ** 3 else f"{max(1, round(n / 1024 ** 2))}\u00a0MB"
 
 
 def hf(repo, url=None):
@@ -88,19 +89,19 @@ for name, repo, only in entries("download-checkpoints.sh", "REPOS"):
     count(n)
     if repo in vae_by_repo:
         key, v = vae_by_repo[repo]
-        kind = "stock" if v.get("official") else "add-on"
+        kind = "stock" if v.get("official") else "add\u2011on"
         vaes.append(f"| **{key.capitalize()}** | {kind} | {first_sentence(v.get('about'))}. | {hf(repo)} | {size(n)} |")
     elif repo == sources.get("sliders", {}).get("repo"):
         labels = [s.get("label", s.get("id")) for s in props.get("sliders", [])]
         what = (", ".join(labels) + ".") if labels else first_sentence(sources["sliders"].get("about")) + "."
-        sliders.append(f"| **{str(len(labels)) + ' sliders' if labels else 'Sliders'}** | add-on | {what} | {hf(repo)} | {size(n)} |")
+        sliders.append(f"| **{str(len(labels)) + chr(0xa0) + 'sliders' if labels else 'Sliders'}** | add\u2011on | {what} | {hf(repo)} | {size(n)} |")
     else:
         title, what = ROLES.get(repo, (name, ""))
         models.append(f"| **{title}** | {what} | {hf(repo)} | {size(n)} |")
 
 # --- the LoRAs: download-loras.sh's list, named and described by sources.json
 halves = {l["id"]: l.get("halves", []) for l in props.get("loras", [])}
-HALF = {("ar",): "music", ("nar",): "sound", ("ar", "nar"): "music + sound"}
+HALF = {("ar",): "music", ("nar",): "sound", ("ar", "nar"): "music\u00a0+\u00a0sound"}
 loras = []
 lora_repos = {}
 for folder, repo, sub, names in entries("download-loras.sh", "LORAS"):

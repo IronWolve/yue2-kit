@@ -85,45 +85,45 @@ What changed in each version: [CHANGELOG.md](CHANGELOG.md).
 
 ## What it downloads
 
-Everything comes at a pinned revision, the exact files this kit was made from, and stays inside the install's folder: about **12.4 GB** from Hugging Face, plus the code from GitHub.
+Everything comes at a pinned revision, the exact files this kit was made from, and stays inside the install's folder: about **12.4 GB** from Hugging Face, plus the code from GitHub.
 
 ### The model
 
 | | What it does | From | Size |
 |---|---|---|---:|
-| **YuE2 3B** | The song model: writes the music, then the sound. Converted to GGUF on your machine. | [m-a-p/YuE2-3B](https://huggingface.co/m-a-p/YuE2-3B) <sub>`29b3558`</sub> | 6.8 GB |
-| **SheetSage2** | The transcriber, for covers from a recording. | [m-a-p/SheetSage2](https://huggingface.co/m-a-p/SheetSage2) <sub>`488abe2`</sub> | 222 MB |
-| **MERT v2** | The audio encoder the transcriber listens with. | [m-a-p/MERT-v2-FullSong](https://huggingface.co/m-a-p/MERT-v2-FullSong) <sub>`d8ba1c7`</sub> | 2.4 GB |
+| **YuE2 3B** | The song model: writes the music, then the sound. Converted to GGUF on your machine. | [m-a-p/YuE2-3B](https://huggingface.co/m-a-p/YuE2-3B) <sub>`29b3558`</sub> | 6.8 GB |
+| **SheetSage2** | The transcriber, for covers from a recording. | [m-a-p/SheetSage2](https://huggingface.co/m-a-p/SheetSage2) <sub>`488abe2`</sub> | 222 MB |
+| **MERT v2** | The audio encoder the transcriber listens with. | [m-a-p/MERT-v2-FullSong](https://huggingface.co/m-a-p/MERT-v2-FullSong) <sub>`d8ba1c7`</sub> | 2.4 GB |
 
 ### Sound decoders (VAEs)
 
 | | | What it is | From | Size |
 |---|---|---|---|---:|
-| **Standard** | stock | The current official decoder, and the default. | [m-a-p/YuE2-Vae](https://huggingface.co/m-a-p/YuE2-Vae) <sub>`9a94e1d`</sub> | 507 MB |
-| **Legacy** | stock | The older official decoder. | [m-a-p/YuE2-Vae-legacy](https://huggingface.co/m-a-p/YuE2-Vae-legacy) <sub>`5ddd12f`</sub> | 507 MB |
-| **Blend** | add-on | A community weight mix of the two official decoders: 2/3 Standard + 1/3 Legacy. | [Mothersuperior/YuE2-Vae-merge-0.666](https://huggingface.co/Mothersuperior/YuE2-Vae-merge-0.666) <sub>`b00bdfc`</sub> | 506 MB |
+| **Standard** | stock | The current official decoder, and the default. | [m-a-p/YuE2-Vae](https://huggingface.co/m-a-p/YuE2-Vae) <sub>`9a94e1d`</sub> | 507 MB |
+| **Legacy** | stock | The older official decoder. | [m-a-p/YuE2-Vae-legacy](https://huggingface.co/m-a-p/YuE2-Vae-legacy) <sub>`5ddd12f`</sub> | 507 MB |
+| **Blend** | add‑on | A community weight mix of the two official decoders: 2/3 Standard + 1/3 Legacy. | [Mothersuperior/YuE2-Vae-merge-0.666](https://huggingface.co/Mothersuperior/YuE2-Vae-merge-0.666) <sub>`b00bdfc`</sub> | 506 MB |
 
 ### Voice and genre sliders
 
 | | | Which | From | Size |
 |---|---|---|---|---:|
-| **16 sliders** | add-on | Female, Male, Pop, Hip-Hop, R&B, Indie Rock, Pop Punk, Metal, Country, Acoustic Folk, House, Disco Funk, K-pop, Reggaeton, Afrobeats, Lo-fi. | [ntc-ai/yue2-particle-sliders](https://huggingface.co/ntc-ai/yue2-particle-sliders) <sub>`33cf42f`</sub> | 246 MB |
+| **16 sliders** | add‑on | Female, Male, Pop, Hip-Hop, R&B, Indie Rock, Pop Punk, Metal, Country, Acoustic Folk, House, Disco Funk, K-pop, Reggaeton, Afrobeats, Lo-fi. | [ntc-ai/yue2-particle-sliders](https://huggingface.co/ntc-ai/yue2-particle-sliders) <sub>`33cf42f`</sub> | 246 MB |
 
 ### LoRAs (11)
 
 | LoRA | Sound | Steers | From | Size |
 |---|---|---|---|---:|
-| **sv-billie** | hushed bedroom pop | music + sound | [HaileyStorm/sv-billie-yue2-lora](https://huggingface.co/HaileyStorm/sv-billie-yue2-lora) <sub>`94fe9fb`</sub> | 112 MB |
-| **DreamPop v2** | hazy dream pop | music + sound | [atomtanstudio/lora-library](https://huggingface.co/atomtanstudio/lora-library/tree/main/yue2/dreampop) <sub>`b572762`</sub> | 224 MB |
-| **Industrial rock** | riffs, structure, drive | music | [monsterovich/yue2-industrial-rock-lora](https://huggingface.co/monsterovich/yue2-industrial-rock-lora) <sub>`a71706d`</sub> | 33 MB |
-| **Industrial rock** | distorted, mechanical tone | sound | [monsterovich/yue2-industrial-rock-lora](https://huggingface.co/monsterovich/yue2-industrial-rock-lora) <sub>`a71706d`</sub> | 134 MB |
-| **J-pop** | bright modern J-pop sound | sound | [storagejuju/yue2-jpop-t4-lora](https://huggingface.co/storagejuju/yue2-jpop-t4-lora) <sub>`16c181c`</sub> | 102 MB |
-| **Real audio v4** | real-audio sound, older | sound | [Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4](https://huggingface.co/Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4) <sub>`e2e63d8`</sub> | 67 MB |
-| **Real audio v9** | real-audio sound, newest | sound | [Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4](https://huggingface.co/Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4) <sub>`e2e63d8`</sub> | 67 MB |
-| **Epic trailer** | orchestral structure, drama | music | [monsterovich/yue2-steps-from-hell](https://huggingface.co/monsterovich/yue2-steps-from-hell) <sub>`bc84ad1`</sub> | 33 MB |
-| **Epic trailer** | big orchestra and choir tone | sound | [monsterovich/yue2-steps-from-hell](https://huggingface.co/monsterovich/yue2-steps-from-hell) <sub>`bc84ad1`</sub> | 134 MB |
-| **Instrumental** | no vocals, planned sections | music | [Mothersuperior/YuE2-instrumental-cot-full-loras](https://huggingface.co/Mothersuperior/YuE2-instrumental-cot-full-loras) <sub>`947f2f4`</sub> | 133 MB |
-| **Death metal** | melodic death metal | music | [pduncan/YuE2_Deathmetalv1_lora](https://huggingface.co/pduncan/YuE2_Deathmetalv1_lora) <sub>`84ff5f6`</sub> | 266 MB |
+| **sv-billie** | hushed bedroom pop | music + sound | [HaileyStorm/sv-billie-yue2-lora](https://huggingface.co/HaileyStorm/sv-billie-yue2-lora) <sub>`94fe9fb`</sub> | 112 MB |
+| **DreamPop v2** | hazy dream pop | music + sound | [atomtanstudio/lora-library](https://huggingface.co/atomtanstudio/lora-library/tree/main/yue2/dreampop) <sub>`b572762`</sub> | 224 MB |
+| **Industrial rock** | riffs, structure, drive | music | [monsterovich/yue2-industrial-rock-lora](https://huggingface.co/monsterovich/yue2-industrial-rock-lora) <sub>`a71706d`</sub> | 33 MB |
+| **Industrial rock** | distorted, mechanical tone | sound | [monsterovich/yue2-industrial-rock-lora](https://huggingface.co/monsterovich/yue2-industrial-rock-lora) <sub>`a71706d`</sub> | 134 MB |
+| **J-pop** | bright modern J-pop sound | sound | [storagejuju/yue2-jpop-t4-lora](https://huggingface.co/storagejuju/yue2-jpop-t4-lora) <sub>`16c181c`</sub> | 102 MB |
+| **Real audio v4** | real-audio sound, older | sound | [Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4](https://huggingface.co/Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4) <sub>`e2e63d8`</sub> | 67 MB |
+| **Real audio v9** | real-audio sound, newest | sound | [Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4](https://huggingface.co/Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4) <sub>`e2e63d8`</sub> | 67 MB |
+| **Epic trailer** | orchestral structure, drama | music | [monsterovich/yue2-steps-from-hell](https://huggingface.co/monsterovich/yue2-steps-from-hell) <sub>`bc84ad1`</sub> | 33 MB |
+| **Epic trailer** | big orchestra and choir tone | sound | [monsterovich/yue2-steps-from-hell](https://huggingface.co/monsterovich/yue2-steps-from-hell) <sub>`bc84ad1`</sub> | 134 MB |
+| **Instrumental** | no vocals, planned sections | music | [Mothersuperior/YuE2-instrumental-cot-full-loras](https://huggingface.co/Mothersuperior/YuE2-instrumental-cot-full-loras) <sub>`947f2f4`</sub> | 133 MB |
+| **Death metal** | melodic death metal | music | [pduncan/YuE2_Deathmetalv1_lora](https://huggingface.co/pduncan/YuE2_Deathmetalv1_lora) <sub>`84ff5f6`</sub> | 266 MB |
 
 ### Code
 
