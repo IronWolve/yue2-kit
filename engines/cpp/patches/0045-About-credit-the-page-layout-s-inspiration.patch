@@ -1,0 +1,37 @@
+From f3e1b4d108fc1188588ee5f566ee4a7bbccbb966 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sun, 27 Sep 2026 19:23:06 -0700
+Subject: [PATCH 45/45] About: credit the page layout's inspiration
+
+A line under the owner's credit names the web page whose layout inspired this one, with its link.
+---
+ tools/console/app.css    | 2 ++
+ tools/console/index.html | 2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index 841e0f0..e5a6321 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -423,6 +423,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
+ .about-credit strong { color: var(--ink); font-weight: 600; }
+ .about-gh { color: var(--muted); font: 12px var(--mono); text-decoration: none; border-bottom: 1px solid var(--line); }
+ .about-gh:hover { color: var(--ink); border-color: var(--line-strong); }
++.about-inspired { flex-basis: 100%; margin: 0; color: var(--dim); font-size: 12px; }
++.about-inspired .about-gh { margin-left: 6px; }
+ /* two bands: the three projects (the model, the engine, the tensor library), then the add-ons */
+ .about-grid { display: flex; flex-direction: column; gap: 16px; container-type: inline-size; }
+ .about-projects, .about-addons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 28px; }
+diff --git a/tools/console/index.html b/tools/console/index.html
+index 84e7c73..40a966b 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -165,6 +165,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+         <h3>About</h3>
+         <p class="about-credit">Customized Collection by <strong>SeattleSysop</strong>
+           <a class="about-gh" href="https://github.com/IronWolve" target="_blank" rel="noopener noreferrer">github.com/IronWolve</a></p>
++        <p class="about-inspired">HTML layout inspired by
++          <a class="about-gh" href="https://github.com/Ladypoly/YuE2_WebUI" target="_blank" rel="noopener noreferrer">Ladypoly/YuE2_WebUI</a></p>
+       </div>
+       <div class="about-grid">
+         <div class="about-projects">

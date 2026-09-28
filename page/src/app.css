@@ -423,6 +423,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .about-credit strong { color: var(--ink); font-weight: 600; }
 .about-gh { color: var(--muted); font: 12px var(--mono); text-decoration: none; border-bottom: 1px solid var(--line); }
 .about-gh:hover { color: var(--ink); border-color: var(--line-strong); }
+.about-inspired { flex-basis: 100%; margin: 0; color: var(--dim); font-size: 12px; }
+.about-inspired .about-gh { margin-left: 6px; }
 /* two bands: the three projects (the model, the engine, the tensor library), then the add-ons */
 .about-grid { display: flex; flex-direction: column; gap: 16px; container-type: inline-size; }
 .about-projects, .about-addons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 28px; }
@@ -783,6 +785,9 @@ select:disabled { opacity: .7; }
 .cover-act .btn { flex: none; width: 172px; height: 30px; box-sizing: border-box; justify-content: center; padding: 0 12px; font-size: 12.5px; }
 .cover-status { flex: 1 1 200px; margin: 0; font-size: 11.5px; color: var(--dim); }
 .cover-status:empty { display: none; }
+/* a drawer's action buttons: under a thin line, on the left, all one size */
+.drawer-act { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 13px; border-top: 1px solid var(--line-soft); }
+.drawer-act .btn { flex: none; width: 172px; height: 30px; box-sizing: border-box; justify-content: center; padding: 0 12px; font-size: 12.5px; }
 
 .check { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
 .check input { width: auto; accent-color: var(--amber); }
@@ -981,6 +986,7 @@ select:disabled { opacity: .7; }
   max-width: 62ch;
 }
 .take-empty p { margin: 0; }
+.take-empty .take-empty-title { margin-bottom: 6px; font-size: 14px; font-weight: 500; color: var(--ink); }
 .take-empty strong { color: var(--muted); }
 
 .take-body { display: flex; flex-direction: column; gap: 20px; }

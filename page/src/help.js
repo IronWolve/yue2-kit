@@ -41,7 +41,8 @@
       "A supplied score needs Full or Melody.",
     abc: "A score in YuE2's own notation: two voices, Vocal and Ins (instrument), in bars of 1/32 notes, with chord symbols on the Vocal line " +
       "and section comments (% verse). In Full or Melody mode the song follows it in time and pitch.\n" +
-      "Plan score only writes one here to check or edit; a transcription or an older take can fill it too.",
+      "Plan score only writes one here to check or edit; a transcription or an older take can fill it too. " +
+      "For a cover, use Melody only with a score that has no chord symbols.",
     versions: "Renders this prompt several times, each extra version with a fresh seed. " +
       "Picking the best of several is the most reliable way to a better song: the model card's own benchmark compared best-of-2 and best-of-8 picks.",
     cfg: "Classifier-free guidance, for the music stage only (the score planner never uses it). " +
@@ -178,7 +179,6 @@
       el.closest("label.versions") ? el.closest("label.versions").querySelector("span") :
       el.closest(".field") ? el.closest(".field").querySelector(".label") : null;
     if (el.id === "modes") host = el.closest("fieldset").querySelector(".label");
-    if (el.id === "abc") host = document.querySelector("#scoreDrawer .hint");
     if (host && host.querySelector(".info")) return;      // it already has one
     var info = makeInfo(text, name);
     if (!host) {
@@ -219,7 +219,6 @@
     if (el.dataset.tip || el.dataset.tipRef) return true;
     var scope = el.closest("label.knob, label.shape-row, label.check, label.versions, .field, fieldset") || el.parentNode;
     if (scope && scope.querySelector(".info")) return true;
-    if (el.id === "abc") return !!document.querySelector("#scoreDrawer .hint .info");
     if (el.nextElementSibling && el.nextElementSibling.classList.contains("info")) return true;
     var row = el.closest(".check-row");
     return !!(row && row.querySelector(".info"));

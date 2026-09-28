@@ -434,6 +434,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .about-credit strong { color: var(--ink); font-weight: 600; }
 .about-gh { color: var(--muted); font: 12px var(--mono); text-decoration: none; border-bottom: 1px solid var(--line); }
 .about-gh:hover { color: var(--ink); border-color: var(--line-strong); }
+.about-inspired { flex-basis: 100%; margin: 0; color: var(--dim); font-size: 12px; }
+.about-inspired .about-gh { margin-left: 6px; }
 /* two bands: the three projects (the model, the engine, the tensor library), then the add-ons */
 .about-grid { display: flex; flex-direction: column; gap: 16px; container-type: inline-size; }
 .about-projects, .about-addons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 28px; }
@@ -794,6 +796,9 @@ select:disabled { opacity: .7; }
 .cover-act .btn { flex: none; width: 172px; height: 30px; box-sizing: border-box; justify-content: center; padding: 0 12px; font-size: 12.5px; }
 .cover-status { flex: 1 1 200px; margin: 0; font-size: 11.5px; color: var(--dim); }
 .cover-status:empty { display: none; }
+/* a drawer's action buttons: under a thin line, on the left, all one size */
+.drawer-act { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 13px; border-top: 1px solid var(--line-soft); }
+.drawer-act .btn { flex: none; width: 172px; height: 30px; box-sizing: border-box; justify-content: center; padding: 0 12px; font-size: 12.5px; }
 
 .check { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
 .check input { width: auto; accent-color: var(--amber); }
@@ -992,6 +997,7 @@ select:disabled { opacity: .7; }
   max-width: 62ch;
 }
 .take-empty p { margin: 0; }
+.take-empty .take-empty-title { margin-bottom: 6px; font-size: 14px; font-weight: 500; color: var(--ink); }
 .take-empty strong { color: var(--muted); }
 
 .take-body { display: flex; flex-direction: column; gap: 20px; }
@@ -3382,6 +3388,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         <h3>About</h3>
         <p class="about-credit">Customized Collection by <strong>SeattleSysop</strong>
           <a class="about-gh" href="https://github.com/IronWolve" target="_blank" rel="noopener noreferrer">github.com/IronWolve</a></p>
+        <p class="about-inspired">HTML layout inspired by
+          <a class="about-gh" href="https://github.com/Ladypoly/YuE2_WebUI" target="_blank" rel="noopener noreferrer">Ladypoly/YuE2_WebUI</a></p>
       </div>
       <div class="about-grid">
         <div class="about-projects">
@@ -3588,16 +3596,23 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
 
       <details class="drawer" id="scoreDrawer">
         <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Supply your own score</span><span class="sum-say">Bring an ABC score, for covers and edits.</span></span></summary>
-        <div class="drawer-body">
-          <p class="hint">Paste an ABC score to condition the song on a melody you already have. Available in full and melody modes; for covers, use melody mode with a score that carries no chord symbols.</p>
-          <div class="chiprow">
-            <button type="button" class="chip" data-abc="melody">Example melody</button>
-            <button type="button" class="chip" data-abc="score">Example score</button>
-            <button type="button" class="chip" data-abc="jazz">Jazz reharmonization</button>
-            <button type="button" class="chip" id="abcInstrumental" data-tip="Move the vocal melody of this score to the instrument (the official instrumental recipe) and tick Instrumental">Make instrumental</button>
-            <button type="button" class="chip danger" data-abc="">Remove score</button>
+        <div class="drawer-body score-body">
+          <label class="field">
+            <span class="label">Score <em>ABC notation, followed in Full plan and Melody only</em></span>
+            <textarea id="abc" rows="8" spellcheck="false" class="mono" placeholder="X:1&#10;L:1/8&#10;M:4/4&#10;K:C"></textarea>
+          </label>
+          <div class="field">
+            <span class="label">Load an example</span>
+            <div class="chiprow">
+              <button type="button" class="chip" data-abc="melody">Melody only</button>
+              <button type="button" class="chip" data-abc="score">Melody and chords</button>
+              <button type="button" class="chip" data-abc="jazz">Jazz chords</button>
+            </div>
           </div>
-          <textarea id="abc" rows="8" spellcheck="false" class="mono" placeholder="X:1&#10;L:1/8&#10;M:4/4&#10;K:C"></textarea>
+          <div class="drawer-act">
+            <button type="button" class="btn ghost" id="abcInstrumental" data-tip="Move the vocal melody of this score to the instrument (the official instrumental recipe) and tick Instrumental">Make instrumental</button>
+            <button type="button" class="btn ghost danger" id="abcRemove" data-abc="">Remove score</button>
+          </div>
         </div>
       </details>
 
@@ -3709,8 +3724,10 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     </div>
 
     <div class="take-empty" id="takeEmpty">
-      <p>Start a song on the left. The run appears here as it happens: the score is written
-        first, then the music tokens, then the sound, then the decode.</p>
+      <p class="take-empty-title">Your next song starts here</p>
+      <p>Describe it on the left and press <strong>Generate song</strong>, then watch it take shape: the score is
+        written, the music is composed, and the sound is rendered into your finished track. Any song you pick
+        from Takes opens here too.</p>
     </div>
 
     <div class="take-body is-hidden" id="takeBody">
@@ -4487,7 +4504,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       "A supplied score needs Full or Melody.",
     abc: "A score in YuE2's own notation: two voices, Vocal and Ins (instrument), in bars of 1/32 notes, with chord symbols on the Vocal line " +
       "and section comments (% verse). In Full or Melody mode the song follows it in time and pitch.\n" +
-      "Plan score only writes one here to check or edit; a transcription or an older take can fill it too.",
+      "Plan score only writes one here to check or edit; a transcription or an older take can fill it too. " +
+      "For a cover, use Melody only with a score that has no chord symbols.",
     versions: "Renders this prompt several times, each extra version with a fresh seed. " +
       "Picking the best of several is the most reliable way to a better song: the model card's own benchmark compared best-of-2 and best-of-8 picks.",
     cfg: "Classifier-free guidance, for the music stage only (the score planner never uses it). " +
@@ -4624,7 +4642,6 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       el.closest("label.versions") ? el.closest("label.versions").querySelector("span") :
       el.closest(".field") ? el.closest(".field").querySelector(".label") : null;
     if (el.id === "modes") host = el.closest("fieldset").querySelector(".label");
-    if (el.id === "abc") host = document.querySelector("#scoreDrawer .hint");
     if (host && host.querySelector(".info")) return;      // it already has one
     var info = makeInfo(text, name);
     if (!host) {
@@ -4665,7 +4682,6 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     if (el.dataset.tip || el.dataset.tipRef) return true;
     var scope = el.closest("label.knob, label.shape-row, label.check, label.versions, .field, fieldset") || el.parentNode;
     if (scope && scope.querySelector(".info")) return true;
-    if (el.id === "abc") return !!document.querySelector("#scoreDrawer .hint .info");
     if (el.nextElementSibling && el.nextElementSibling.classList.contains("info")) return true;
     var row = el.closest(".check-row");
     return !!(row && row.querySelector(".info"));

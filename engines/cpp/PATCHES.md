@@ -561,3 +561,20 @@ Files:
 Files:
 - `tools/console/app.css` (+11 −1)
 - `tools/console/index.html` (+23 −27)
+
+## 0044 Clean up Supply your own score; a friendlier empty song page
+
+2026-09-27. The score drawer gets a labelled Score box with its (i) (the paragraph moves into the tip), the examples as chips named for what they hold, and Make instrumental and Remove score as square buttons of one size on the left under a thin line. The empty song page gets a title and a friendlier paragraph.
+
+Files:
+- `tools/console/app.css` (+4 −0)
+- `tools/console/help.js` (+2 −3)
+- `tools/console/index.html` (+20 −11)
+
+## 0045 About: credit the page layout's inspiration
+
+2026-09-27. A line under the owner's credit names the web page whose layout inspired this one, with its link.
+
+Files:
+- `tools/console/app.css` (+2 −0)
+- `tools/console/index.html` (+2 −0)

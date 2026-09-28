@@ -165,6 +165,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         <h3>About</h3>
         <p class="about-credit">Customized Collection by <strong>SeattleSysop</strong>
           <a class="about-gh" href="https://github.com/IronWolve" target="_blank" rel="noopener noreferrer">github.com/IronWolve</a></p>
+        <p class="about-inspired">HTML layout inspired by
+          <a class="about-gh" href="https://github.com/Ladypoly/YuE2_WebUI" target="_blank" rel="noopener noreferrer">Ladypoly/YuE2_WebUI</a></p>
       </div>
       <div class="about-grid">
         <div class="about-projects">
@@ -371,16 +373,23 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
 
       <details class="drawer" id="scoreDrawer">
         <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Supply your own score</span><span class="sum-say">Bring an ABC score, for covers and edits.</span></span></summary>
-        <div class="drawer-body">
-          <p class="hint">Paste an ABC score to condition the song on a melody you already have. Available in full and melody modes; for covers, use melody mode with a score that carries no chord symbols.</p>
-          <div class="chiprow">
-            <button type="button" class="chip" data-abc="melody">Example melody</button>
-            <button type="button" class="chip" data-abc="score">Example score</button>
-            <button type="button" class="chip" data-abc="jazz">Jazz reharmonization</button>
-            <button type="button" class="chip" id="abcInstrumental" data-tip="Move the vocal melody of this score to the instrument (the official instrumental recipe) and tick Instrumental">Make instrumental</button>
-            <button type="button" class="chip danger" data-abc="">Remove score</button>
+        <div class="drawer-body score-body">
+          <label class="field">
+            <span class="label">Score <em>ABC notation, followed in Full plan and Melody only</em></span>
+            <textarea id="abc" rows="8" spellcheck="false" class="mono" placeholder="X:1&#10;L:1/8&#10;M:4/4&#10;K:C"></textarea>
+          </label>
+          <div class="field">
+            <span class="label">Load an example</span>
+            <div class="chiprow">
+              <button type="button" class="chip" data-abc="melody">Melody only</button>
+              <button type="button" class="chip" data-abc="score">Melody and chords</button>
+              <button type="button" class="chip" data-abc="jazz">Jazz chords</button>
+            </div>
           </div>
-          <textarea id="abc" rows="8" spellcheck="false" class="mono" placeholder="X:1&#10;L:1/8&#10;M:4/4&#10;K:C"></textarea>
+          <div class="drawer-act">
+            <button type="button" class="btn ghost" id="abcInstrumental" data-tip="Move the vocal melody of this score to the instrument (the official instrumental recipe) and tick Instrumental">Make instrumental</button>
+            <button type="button" class="btn ghost danger" id="abcRemove" data-abc="">Remove score</button>
+          </div>
         </div>
       </details>
 
@@ -492,8 +501,10 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     </div>
 
     <div class="take-empty" id="takeEmpty">
-      <p>Start a song on the left. The run appears here as it happens: the score is written
-        first, then the music tokens, then the sound, then the decode.</p>
+      <p class="take-empty-title">Your next song starts here</p>
+      <p>Describe it on the left and press <strong>Generate song</strong>, then watch it take shape: the score is
+        written, the music is composed, and the sound is rendered into your finished track. Any song you pick
+        from Takes opens here too.</p>
     </div>
 
     <div class="take-body is-hidden" id="takeBody">
