@@ -546,3 +546,10 @@ Files:
 Files:
 - `tools/console/app.css` (+9 −5)
 - `tools/console/index.html` (+6 −6)
+
+## 0042 Idea drawer: the writer model under Structure, each on its own line
+
+2026-09-27. Structure gets the full width, so its longest choice (Full arc: intro, pre-chorus, bridge, outro) fits.
+
+Files:
+- `tools/console/index.html` (+5 −7)

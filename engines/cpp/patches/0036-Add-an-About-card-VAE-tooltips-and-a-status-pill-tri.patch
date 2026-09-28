@@ -1,7 +1,7 @@
 From a93af9875a3923f0bbe888782248c97607c1840c Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 17:32:10 -0700
-Subject: [PATCH 36/41] Add an About card, VAE tooltips and a status pill; trim
+Subject: [PATCH 36/42] Add an About card, VAE tooltips and a status pill; trim
  the player bar
 
 About closes the Engine page: the credit, then YuE2 (project page, code, weights, decoder, covers, report, paper), the C++ engine and ggml (and its fork), then every add-on from sources.json. Standard, Legacy and Blend explain themselves on hover (Standard: the quality choice and the newer model; Blend: two thirds Standard, one third Legacy) instead of Blend spelling the mix out. The player bar drops its WAV and MP3 buttons and the style line (the style is on hover of the name) and gains a fixed-size status: Rendering, Queued, Playing, Paused or Idle; a click shows the run or opens the song.

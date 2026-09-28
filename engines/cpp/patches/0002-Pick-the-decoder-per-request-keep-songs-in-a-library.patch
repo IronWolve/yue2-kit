@@ -1,7 +1,7 @@
 From c18128199e077180dc1d20334629a107705700fb Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Thu, 24 Sep 2026 13:52:16 -0700
-Subject: [PATCH 02/41] Pick the decoder per request, keep songs in a library,
+Subject: [PATCH 02/42] Pick the decoder per request, keep songs in a library,
  change engine settings live
 
 Requests may name a decoder, a set of sliders with strengths, ask for the

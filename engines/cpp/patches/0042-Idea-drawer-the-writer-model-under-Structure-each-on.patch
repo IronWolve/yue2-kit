@@ -1,0 +1,41 @@
+From d9afb25907d2eda3d760c76a29af849f530851f6 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sun, 27 Sep 2026 18:58:11 -0700
+Subject: [PATCH 42/42] Idea drawer: the writer model under Structure, each on
+ its own line
+
+Structure gets the full width, so its longest choice (Full arc: intro, pre-chorus, bridge, outro) fits.
+---
+ tools/console/index.html | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
+
+diff --git a/tools/console/index.html b/tools/console/index.html
+index fd60179..a083ddb 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -214,8 +214,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+         <textarea id="idea" rows="1" autocomplete="off"
+                   placeholder="a slow song about missing the last train home"></textarea>
+       </label>
+-      <div class="field-row">
+-        <label class="field grow">
++      <label class="field">
+           <span class="label">Structure</span>
+           <select id="structure">
+             <option value="simple">Verse · Chorus</option>
+@@ -223,11 +222,10 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+             <option value="prechorus">With a pre-chorus</option>
+             <option value="full">Full arc — intro, pre-chorus, bridge, outro</option>
+           </select>
+-        </label>
+-        <div class="field grow">
+-          <span class="label">Writer model</span>
+-          <div class="static-field" id="museModel"><span class="dim">none yet</span></div>
+-        </div>
++      </label>
++      <div class="field">
++        <span class="label">Writer model</span>
++        <div class="static-field" id="museModel"><span class="dim">none yet</span></div>
+       </div>
+       <div class="muse-foot">
+         <button type="button" class="chat-link" id="chatLink" data-s="off" data-tip="Set the chat server address under Engine">
