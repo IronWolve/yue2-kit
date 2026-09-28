@@ -90,8 +90,9 @@ out.append(html[at:])
 result = "".join(out)
 
 # The folder name is data: the page must not carry it, nor an absolute home path. External links whose
-# name happens to match (upstream's own repo, which the CPP badge opens) are not paths, so they are left out.
-EXTERNAL = ("https://github.com/ServeurpersoCom/yue2.cpp",)
+# name happens to match (upstream's own repo, which the CPP badge opens, and the collection's own repo, which
+# the status note opens) are not paths, so they are left out.
+EXTERNAL = ("https://github.com/ServeurpersoCom/yue2.cpp", "https://github.com/IronWolve/yue2-kit")
 checked = re.sub(r"<!-- credits:.*?<!-- /credits -->", "", result, flags=re.S)   # the About card's upstream names
 for url in EXTERNAL:   # the whole link (its text names the project too), then any bare mention of the URL
     checked = re.sub(r'<a\b[^>]*href="' + re.escape(url) + r'"[^>]*>.*?</a>', "", checked, flags=re.S)

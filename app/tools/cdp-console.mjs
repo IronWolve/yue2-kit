@@ -167,12 +167,14 @@ for (const [w, h] of [[1536, 730], [1920, 960]]) {
         inspired: [...c.querySelectorAll(".about-project")].find(e => e.querySelector("h4").textContent === "YuE2_WebUI")?.querySelector(".about-what").textContent,
         inspiredLink: links.some(a => a.href === "https://github.com/Ladypoly/YuE2_WebUI"),
         projects: [...c.querySelectorAll(".about-project h4")].map(e => e.textContent).join(),
+        oneColumn: (() => { const r = [...c.querySelectorAll(".about-project")].map(e => e.getBoundingClientRect()); return r.every(x => Math.abs(x.left - r[0].left) < 1) &&
+          r.every((x, i) => i === 0 || x.top >= r[i - 1].bottom - 1); })(),
         newTab: links.every(a => a.target === "_blank" && /noopener/.test(a.rel)), web: links.every(a => /^https?:/.test(a.getAttribute("href"))),
         addons: [...c.querySelectorAll("#aboutAddons a")].map(a => a.textContent).join(","),
         plain: [...c.querySelectorAll("#aboutAddons .about-name")].map(e => e.textContent).join(","), shown: onScreen.bottom <= innerHeight && onScreen.top < innerHeight }; })()`);
     check("About closes the Engine page: your credit and GitHub, the model's and the engine's pages, all in new tabs", !!about && about.last &&
       about.credit === "Customized Collection by SeattleSysop github.com/IronWolve" && about.kit === "https://github.com/IronWolve/yue2-kit" &&
-      about.inspired === "HTML layout inspired by Ladypoly/YuE2_WebUI" && about.inspiredLink && about.gh && about.yue && about.cpp && about.weights && about.page && about.ggml && about.projects === "YuE2,yue2.cpp,YuE2_WebUI,ggml" && about.newTab && about.web,
+      about.inspired === "HTML layout inspired by Ladypoly/YuE2_WebUI" && about.inspiredLink && about.gh && about.yue && about.cpp && about.weights && about.page && about.ggml && about.projects === "YuE2,yue2.cpp,YuE2_WebUI,ggml" && about.oneColumn && about.newTab && about.web,
       JSON.stringify(about));
     check("  the add-ons come from sources.json; a non-web link stays plain text", about?.addons === "Standard VAE,Blend VAE,Voice and genre sliders,sv-billie,Industrial rock" &&
       about.plain === "Legacy VAE", JSON.stringify({ addons: about?.addons, plain: about?.plain }));
@@ -1058,6 +1060,11 @@ const staleSettings = await mockGet("settings");
 check("a stale precision from an older page is ignored (no error, not stored)", stale.ok && !("precision" in staleSettings), JSON.stringify(staleSettings));
 check("  the top bar has no precision next to the backbone", !/Precision/.test(await ev(`document.getElementById("hwStats").innerText`)));
 const strip = await ev(`document.getElementById("hwStats").innerText.replace(/\\s+/g, " ")`);
+const topbar = await ev(`(() => { const h = document.getElementById("hwStats").getBoundingClientRect(), m = document.getElementById("modelPick").getBoundingClientRect();
+  const chip = document.querySelector(".engine-chip"); return { gap: Math.round(m.left - h.right), sameRow: Math.abs((h.top + h.bottom) / 2 - (m.top + m.bottom) / 2) < 4,
+    chipLink: chip.tagName === "A" ? chip.href : "", newTab: chip.target === "_blank" && /noopener/.test(chip.rel) }; })()`);
+check("top bar: the GPU readout sits right beside the Model menu, on its left", topbar.sameRow && topbar.gap >= 0 && topbar.gap <= 16, JSON.stringify(topbar));
+check("  the status note top left opens the yue2-kit repository in a new tab", topbar.chipLink === "https://github.com/IronWolve/yue2-kit" && topbar.newTab, JSON.stringify(topbar));
 const stripTip = await ev(`document.getElementById("hwStats").dataset.tip`);
 check("top bar shows two small lines, the GPU and its memory from /hardware; the rest is in its tip", /^GPU Mock GPU VRAM \d+\.\d \/ 31\.8 GB$/.test(strip.trim()) &&
   /Mock GPU \(32 GB\) · backbone BF16 · context whole · batch 4/.test(stripTip), strip + " | " + stripTip);
