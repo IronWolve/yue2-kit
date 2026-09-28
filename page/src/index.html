@@ -10,7 +10,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Michroma&family=Space+Grotesk:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
 <script>try { var t = localStorage.getItem("yue2.theme"); if (t) document.documentElement.dataset.theme = t;
   var f = JSON.parse(localStorage.getItem("yue2.fonts") || "{}"), g = { sans: "sans-serif", heading: "sans-serif", mono: "monospace" };
-  for (var k in g) if (typeof f[k] === "string") document.documentElement.style.setProperty("--" + k, JSON.stringify(f[k]) + ", " + g[k]); } catch (e) {}</script>
+  for (var k in g) if (typeof f[k] === "string") document.documentElement.style.setProperty("--" + k, JSON.stringify(f[k]) + ", " + g[k]);
+  var L = JSON.parse(localStorage.getItem("yue2.look") || "{}"), o = ["hover", "glow", "motion", "corners"];
+  for (var i = 0; i < o.length; i++) if (typeof L[o[i]] === "string") document.documentElement.dataset[o[i]] = L[o[i]]; } catch (e) {}</script>
 <link rel="stylesheet" href="app.css" />
 <link rel="stylesheet" href="themes.css" />
 </head>
@@ -150,18 +152,34 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       </div>
     </div>
 
-    <div class="card fonts-card" id="fontsCard">
-      <h3>Fonts</h3>
-      <label class="field"><span class="label">Text <em>labels, fields and paragraphs</em></span>
-        <select id="fontSans" data-font="sans"></select></label>
-      <label class="field"><span class="label">Headings</span>
-        <select id="fontHeading" data-font="heading"></select></label>
-      <label class="field"><span class="label">Numbers and code <em>seeds, scores, the log</em></span>
-        <select id="fontMono" data-font="mono"></select></label>
-      <p class="row-hint" id="fontsHint"></p>
+    <!-- the look of the page: the theme and its options, then the fonts; all this browser's own (app.js: appearance) -->
+    <div class="card appearance-card" id="appearanceCard">
+      <h3>Appearance</h3>
+      <section class="look-part">
+        <h4 class="mini">Theme <em>the top bar's swatches choose it too</em></h4>
+        <label class="field"><span class="label">Theme</span>
+          <select id="lookTheme"></select></label>
+        <label class="field"><span class="label">Corners</span>
+          <select id="lookCorners"><option value="">Rounded</option><option value="soft">Softer</option><option value="square">Square</option></select></label>
+        <div class="look-checks">
+          <label class="check"><input type="checkbox" id="lookHover" /> <span>Hover highlights in the theme's colour</span></label>
+          <label class="check"><input type="checkbox" id="lookGlow" /> <span>A soft accent glow around cards</span></label>
+          <label class="check"><input type="checkbox" id="lookMotion" /> <span>A calmer page: no animations</span></label>
+        </div>
+      </section>
+      <section class="look-part">
+        <h4 class="mini">Fonts</h4>
+        <label class="field"><span class="label">Text <em>labels, fields and paragraphs</em></span>
+          <select id="fontSans" data-font="sans"></select></label>
+        <label class="field"><span class="label">Headings</span>
+          <select id="fontHeading" data-font="heading"></select></label>
+        <label class="field"><span class="label">Numbers and code <em>seeds, scores, the log</em></span>
+          <select id="fontMono" data-font="mono"></select></label>
+        <p class="row-hint" id="fontsHint"></p>
+      </section>
       <div class="card-actions">
         <button type="button" class="btn ghost small" id="fontsAll">List all my fonts</button>
-        <button type="button" class="btn ghost small" id="fontsReset">Default fonts</button>
+        <button type="button" class="btn ghost small" id="fontsReset">Default look</button>
       </div>
     </div>
 
@@ -183,8 +201,6 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         <h3>About</h3>
         <p class="about-credit">Customized Collection by <strong>SeattleSysop</strong>
           <a class="about-gh" href="https://github.com/IronWolve" target="_blank" rel="noopener noreferrer">github.com/IronWolve</a></p>
-        <p class="about-inspired">HTML layout inspired by
-          <a class="about-gh" href="https://github.com/Ladypoly/YuE2_WebUI" target="_blank" rel="noopener noreferrer">Ladypoly/YuE2_WebUI</a></p>
       </div>
       <div class="about-grid">
         <div class="about-projects">
@@ -201,6 +217,9 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
           <section class="about-project"><h4>yue2.cpp</h4><p class="about-what">the C++ engine and server this app runs on</p><ul class="about-links">
             <li><a href="https://github.com/ServeurpersoCom/yue2.cpp" target="_blank" rel="noopener noreferrer">Code</a><span class="about-where">github · ServeurpersoCom/yue2.cpp</span></li>
             <li><a href="https://huggingface.co/Serveurperso/YuE2-GGUF" target="_blank" rel="noopener noreferrer">Ready-made model files</a><span class="about-where">hugging face · Serveurperso/YuE2-GGUF</span></li>
+          </ul></section>
+          <section class="about-project"><h4>YuE2_WebUI</h4><p class="about-what">HTML layout inspired by Ladypoly/YuE2_WebUI</p><ul class="about-links">
+            <li><a href="https://github.com/Ladypoly/YuE2_WebUI" target="_blank" rel="noopener noreferrer">Code</a><span class="about-where">github · Ladypoly/YuE2_WebUI</span></li>
           </ul></section>
           <section class="about-project"><h4>ggml</h4><p class="about-what">the tensor library underneath</p><ul class="about-links">
             <li><a href="https://github.com/ggml-org/ggml" target="_blank" rel="noopener noreferrer">Code</a><span class="about-where">github · ggml-org/ggml</span></li>

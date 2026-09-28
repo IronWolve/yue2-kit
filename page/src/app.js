@@ -321,6 +321,7 @@
   // what the page paints itself from the theme's colours
   YueThemes.mount($("themeButton"), {
     onChange: function () {
+      if ($("lookTheme").value !== YueThemes.current()) $("lookTheme").value = YueThemes.current();   // the Appearance card follows
       themeCache = {};
       drawWave();
       if (STATE.abcRendered) renderScore(STATE.abcRendered);
@@ -4356,6 +4357,53 @@
   else window.addEventListener("resize", applyCols);
   applyCols();
 
+  // ------------------------------------------------------------- appearance
+  // The Engine page's Appearance card: the theme (the same choice as the top bar's swatches), options that
+  // work with any theme, and the fonts below. The options are this browser's ("yue2.look"); the <head>
+  // script puts them on <html> before the first paint, and app.css reads them there.
+  var LOOK_CHECKS = { hover: ["lookHover", "accent"], glow: ["lookGlow", "on"], motion: ["lookMotion", "reduced"] };
+  function savedLook() {
+    var look;
+    try { look = JSON.parse(recall("yue2.look") || "{}") || {}; } catch (error) { look = {}; }
+    return look;
+  }
+  function applyLook() {
+    var look = savedLook(), root = document.documentElement;
+    ["hover", "glow", "motion", "corners"].forEach(function (key) {
+      if (typeof look[key] === "string") root.dataset[key] = look[key]; else delete root.dataset[key];
+    });
+  }
+  function saveLook(key, value) {
+    var look = savedLook();
+    if (value) look[key] = value; else delete look[key];
+    store("yue2.look", Object.keys(look).length ? JSON.stringify(look) : null);
+    applyLook();
+  }
+  function paintLook() {
+    var look = savedLook();
+    Object.keys(LOOK_CHECKS).forEach(function (key) { $(LOOK_CHECKS[key][0]).checked = look[key] === LOOK_CHECKS[key][1]; });
+    $("lookCorners").value = look.corners || "";
+    $("lookTheme").value = YueThemes.current();
+  }
+  (function fillThemes() {
+    var families = { classic: "Classic", bold: "Bold", soft: "Soft" }, groups = {};
+    YueThemes.list.forEach(function (theme) {
+      var family = families[theme.family] ? theme.family : "classic";
+      if (!groups[family]) {
+        groups[family] = document.createElement("optgroup");
+        groups[family].label = families[family];
+      }
+      groups[family].appendChild(fontOption(theme.id, theme.name));
+      groups[family].lastChild.style.fontFamily = "";
+    });
+    ["classic", "bold", "soft"].forEach(function (family) { if (groups[family]) $("lookTheme").appendChild(groups[family]); });
+  })();
+  $("lookTheme").addEventListener("change", function () { YueThemes.set(this.value); });
+  $("lookCorners").addEventListener("change", function () { saveLook("corners", this.value || null); });
+  Object.keys(LOOK_CHECKS).forEach(function (key) {
+    $(LOOK_CHECKS[key][0]).addEventListener("change", function () { saveLook(key, this.checked ? LOOK_CHECKS[key][1] : null); });
+  });
+
   // ------------------------------------------------------------------ fonts
   // Three fonts this browser can change ("yue2.fonts"; the <head> script applies them before the first paint):
   // the text (--sans), the headings (--heading, the text font unless picked) and numbers and code (--mono).
@@ -4432,9 +4480,12 @@
   });
   $("fontsReset").addEventListener("click", function () {
     store("yue2.fonts", null);
+    store("yue2.look", null);
     applyFonts();
+    applyLook();
     paintFonts();
-    toast("Fonts are back to the app's own");
+    paintLook();
+    toast("The look options and fonts are back to the app's own (the theme stays)");
   });
   $("fontsAll").classList.toggle("is-hidden", typeof window.queryLocalFonts !== "function");
   $("fontsAll").addEventListener("click", function () {
@@ -4449,6 +4500,7 @@
     }).catch(function (error) { toast("The browser did not list the fonts: " + error.message, "bad"); });
   });
   paintFonts();
+  paintLook();
   (window.requestIdleCallback || function (fn) { return setTimeout(fn, 200); })(function () {
     systemFonts = COMMON_FONTS.filter(hasFont);
     paintFonts();

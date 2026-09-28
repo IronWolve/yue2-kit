@@ -70,6 +70,11 @@
       "(default 10: the top 0.001% are clipped, which also lifts quiet songs). 0 normalises to the true peak: no clipping, a little quieter. " +
       "WAV 32-bit float is not normalised.",
     instrumental: null,   // has its own (i)
+    lookTheme: "The page's colours. The same choice as the swatches behind the theme button in the top bar; this browser keeps it.",
+    lookCorners: "How round the corners of buttons, fields and cards are: Rounded (the default), Softer or Square.",
+    lookHover: "Hover highlights take the theme's accent colour instead of a neutral grey (the DMM theme does this on its own).",
+    lookGlow: "A faint ring and glow in the theme's accent around cards, drawers and panels.",
+    lookMotion: "Turns the page's animations and fades off (spinners, sliding bars, tips fading in), whatever the system setting.",
     fontSans: "The font for labels, fields and paragraphs. The app's own fonts come first; under the line, fonts installed on this computer. " +
       "Each browser keeps its own choice.",
     fontHeading: "The font for headings: Compose, Takes, the song's title, the cards. Medium weight.",

@@ -10,7 +10,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Michroma&family=Space+Grotesk:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
 <script>try { var t = localStorage.getItem("yue2.theme"); if (t) document.documentElement.dataset.theme = t;
   var f = JSON.parse(localStorage.getItem("yue2.fonts") || "{}"), g = { sans: "sans-serif", heading: "sans-serif", mono: "monospace" };
-  for (var k in g) if (typeof f[k] === "string") document.documentElement.style.setProperty("--" + k, JSON.stringify(f[k]) + ", " + g[k]); } catch (e) {}</script>
+  for (var k in g) if (typeof f[k] === "string") document.documentElement.style.setProperty("--" + k, JSON.stringify(f[k]) + ", " + g[k]);
+  var L = JSON.parse(localStorage.getItem("yue2.look") || "{}"), o = ["hover", "glow", "motion", "corners"];
+  for (var i = 0; i < o.length; i++) if (typeof L[o[i]] === "string") document.documentElement.dataset[o[i]] = L[o[i]]; } catch (e) {}</script>
 <style>
 /* YuE2 Console for the C++ server — the same tape-machine console as the
    PyTorch page, in warm near-black, with the score set on manuscript paper:
@@ -455,11 +457,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .about-credit strong { color: var(--ink); font-weight: 600; }
 .about-gh { color: var(--muted); font: 12px var(--mono); text-decoration: none; border-bottom: 1px solid var(--line); }
 .about-gh:hover { color: var(--ink); border-color: var(--line-strong); }
-.about-inspired { flex-basis: 100%; margin: 0; color: var(--dim); font-size: 12px; }
-.about-inspired .about-gh { margin-left: 6px; }
 /* two bands: the three projects (the model, the engine, the tensor library), then the add-ons */
 .about-grid { display: flex; flex-direction: column; gap: 16px; container-type: inline-size; }
 .about-projects, .about-addons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 28px; }
+.about-projects { grid-template-columns: repeat(4, minmax(0, 1fr)); }   /* the model, the engine, the layout and the tensor library */
 .about-addons { padding-top: 14px; border-top: 1px solid var(--line-soft); }
 .about-project h4 { margin: 0; font: 500 15px/1.2 var(--heading); color: var(--ink); letter-spacing: 0; text-transform: none; }
 .about-what { margin: 2px 0 9px; color: var(--muted); font-size: 12px; }
@@ -535,7 +536,27 @@ body:has(#view-engine:not(.is-hidden)) #engineToggle { background: var(--amber);
 .engine-grid > .card.writer-card { flex: 2 1 400px; }
 .engine-grid > .card.wide { flex-basis: 100%; }
 .engine-grid > .card.compute-card { flex: 1.3 1 300px; }
-.fonts-card select option { font-size: 14px; }
+/* the Appearance card: two parts under a thin line, like the drawers */
+.appearance-card .look-part { display: flex; flex-direction: column; gap: 10px; }
+.appearance-card .look-part + .look-part { padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.appearance-card .mini { margin: 0; }
+.appearance-card .look-checks { display: flex; flex-direction: column; gap: 7px; }
+.appearance-card select option { font-size: 14px; }
+
+/* Appearance options, on <html> (the <head> script sets them before the first paint) */
+html[data-hover="accent"] {
+  --hover: color-mix(in srgb, var(--amber) 14%, transparent);
+  --hover-soft: color-mix(in srgb, var(--amber) 9%, transparent);
+  --hover-line: color-mix(in srgb, var(--amber) 55%, transparent);
+}
+html[data-corners="soft"] { --r-sm: 3px; --r-md: 5px; --r-lg: 8px; }
+html[data-corners="square"] { --r-sm: 1px; --r-md: 2px; --r-lg: 3px; }
+html[data-glow="on"] :is(.card, .drawer, .panel, .meta-card) {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--amber) 22%, transparent), 0 10px 30px -16px color-mix(in srgb, var(--amber) 50%, transparent);
+}
+html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-motion="reduced"] *::after {
+  animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important;
+}
 .check-row { display: flex; align-items: center; gap: 2px; }
 .card.is-off .field, .card.is-off .check-row { opacity: .5; }
 .card-actions { margin-top: auto; display: flex; gap: 8px; justify-content: flex-end; }
@@ -3315,18 +3336,34 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       </div>
     </div>
 
-    <div class="card fonts-card" id="fontsCard">
-      <h3>Fonts</h3>
-      <label class="field"><span class="label">Text <em>labels, fields and paragraphs</em></span>
-        <select id="fontSans" data-font="sans"></select></label>
-      <label class="field"><span class="label">Headings</span>
-        <select id="fontHeading" data-font="heading"></select></label>
-      <label class="field"><span class="label">Numbers and code <em>seeds, scores, the log</em></span>
-        <select id="fontMono" data-font="mono"></select></label>
-      <p class="row-hint" id="fontsHint"></p>
+    <!-- the look of the page: the theme and its options, then the fonts; all this browser's own (app.js: appearance) -->
+    <div class="card appearance-card" id="appearanceCard">
+      <h3>Appearance</h3>
+      <section class="look-part">
+        <h4 class="mini">Theme <em>the top bar's swatches choose it too</em></h4>
+        <label class="field"><span class="label">Theme</span>
+          <select id="lookTheme"></select></label>
+        <label class="field"><span class="label">Corners</span>
+          <select id="lookCorners"><option value="">Rounded</option><option value="soft">Softer</option><option value="square">Square</option></select></label>
+        <div class="look-checks">
+          <label class="check"><input type="checkbox" id="lookHover" /> <span>Hover highlights in the theme's colour</span></label>
+          <label class="check"><input type="checkbox" id="lookGlow" /> <span>A soft accent glow around cards</span></label>
+          <label class="check"><input type="checkbox" id="lookMotion" /> <span>A calmer page: no animations</span></label>
+        </div>
+      </section>
+      <section class="look-part">
+        <h4 class="mini">Fonts</h4>
+        <label class="field"><span class="label">Text <em>labels, fields and paragraphs</em></span>
+          <select id="fontSans" data-font="sans"></select></label>
+        <label class="field"><span class="label">Headings</span>
+          <select id="fontHeading" data-font="heading"></select></label>
+        <label class="field"><span class="label">Numbers and code <em>seeds, scores, the log</em></span>
+          <select id="fontMono" data-font="mono"></select></label>
+        <p class="row-hint" id="fontsHint"></p>
+      </section>
       <div class="card-actions">
         <button type="button" class="btn ghost small" id="fontsAll">List all my fonts</button>
-        <button type="button" class="btn ghost small" id="fontsReset">Default fonts</button>
+        <button type="button" class="btn ghost small" id="fontsReset">Default look</button>
       </div>
     </div>
 
@@ -3348,8 +3385,6 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         <h3>About</h3>
         <p class="about-credit">Customized Collection by <strong>SeattleSysop</strong>
           <a class="about-gh" href="https://github.com/IronWolve" target="_blank" rel="noopener noreferrer">github.com/IronWolve</a></p>
-        <p class="about-inspired">HTML layout inspired by
-          <a class="about-gh" href="https://github.com/Ladypoly/YuE2_WebUI" target="_blank" rel="noopener noreferrer">Ladypoly/YuE2_WebUI</a></p>
       </div>
       <div class="about-grid">
         <div class="about-projects">
@@ -3366,6 +3401,9 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
           <section class="about-project"><h4>yue2.cpp</h4><p class="about-what">the C++ engine and server this app runs on</p><ul class="about-links">
             <li><a href="https://github.com/ServeurpersoCom/yue2.cpp" target="_blank" rel="noopener noreferrer">Code</a><span class="about-where">github · ServeurpersoCom/yue2.cpp</span></li>
             <li><a href="https://huggingface.co/Serveurperso/YuE2-GGUF" target="_blank" rel="noopener noreferrer">Ready-made model files</a><span class="about-where">hugging face · Serveurperso/YuE2-GGUF</span></li>
+          </ul></section>
+          <section class="about-project"><h4>YuE2_WebUI</h4><p class="about-what">HTML layout inspired by Ladypoly/YuE2_WebUI</p><ul class="about-links">
+            <li><a href="https://github.com/Ladypoly/YuE2_WebUI" target="_blank" rel="noopener noreferrer">Code</a><span class="about-where">github · Ladypoly/YuE2_WebUI</span></li>
           </ul></section>
           <section class="about-project"><h4>ggml</h4><p class="about-what">the tensor library underneath</p><ul class="about-links">
             <li><a href="https://github.com/ggml-org/ggml" target="_blank" rel="noopener noreferrer">Code</a><span class="about-where">github · ggml-org/ggml</span></li>
@@ -4505,6 +4543,11 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       "(default 10: the top 0.001% are clipped, which also lifts quiet songs). 0 normalises to the true peak: no clipping, a little quieter. " +
       "WAV 32-bit float is not normalised.",
     instrumental: null,   // has its own (i)
+    lookTheme: "The page's colours. The same choice as the swatches behind the theme button in the top bar; this browser keeps it.",
+    lookCorners: "How round the corners of buttons, fields and cards are: Rounded (the default), Softer or Square.",
+    lookHover: "Hover highlights take the theme's accent colour instead of a neutral grey (the DMM theme does this on its own).",
+    lookGlow: "A faint ring and glow in the theme's accent around cards, drawers and panels.",
+    lookMotion: "Turns the page's animations and fades off (spinners, sliding bars, tips fading in), whatever the system setting.",
     fontSans: "The font for labels, fields and paragraphs. The app's own fonts come first; under the line, fonts installed on this computer. " +
       "Each browser keeps its own choice.",
     fontHeading: "The font for headings: Compose, Takes, the song's title, the cards. Medium weight.",
@@ -5763,6 +5806,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   // what the page paints itself from the theme's colours
   YueThemes.mount($("themeButton"), {
     onChange: function () {
+      if ($("lookTheme").value !== YueThemes.current()) $("lookTheme").value = YueThemes.current();   // the Appearance card follows
       themeCache = {};
       drawWave();
       if (STATE.abcRendered) renderScore(STATE.abcRendered);
@@ -9798,6 +9842,53 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   else window.addEventListener("resize", applyCols);
   applyCols();
 
+  // ------------------------------------------------------------- appearance
+  // The Engine page's Appearance card: the theme (the same choice as the top bar's swatches), options that
+  // work with any theme, and the fonts below. The options are this browser's ("yue2.look"); the <head>
+  // script puts them on <html> before the first paint, and app.css reads them there.
+  var LOOK_CHECKS = { hover: ["lookHover", "accent"], glow: ["lookGlow", "on"], motion: ["lookMotion", "reduced"] };
+  function savedLook() {
+    var look;
+    try { look = JSON.parse(recall("yue2.look") || "{}") || {}; } catch (error) { look = {}; }
+    return look;
+  }
+  function applyLook() {
+    var look = savedLook(), root = document.documentElement;
+    ["hover", "glow", "motion", "corners"].forEach(function (key) {
+      if (typeof look[key] === "string") root.dataset[key] = look[key]; else delete root.dataset[key];
+    });
+  }
+  function saveLook(key, value) {
+    var look = savedLook();
+    if (value) look[key] = value; else delete look[key];
+    store("yue2.look", Object.keys(look).length ? JSON.stringify(look) : null);
+    applyLook();
+  }
+  function paintLook() {
+    var look = savedLook();
+    Object.keys(LOOK_CHECKS).forEach(function (key) { $(LOOK_CHECKS[key][0]).checked = look[key] === LOOK_CHECKS[key][1]; });
+    $("lookCorners").value = look.corners || "";
+    $("lookTheme").value = YueThemes.current();
+  }
+  (function fillThemes() {
+    var families = { classic: "Classic", bold: "Bold", soft: "Soft" }, groups = {};
+    YueThemes.list.forEach(function (theme) {
+      var family = families[theme.family] ? theme.family : "classic";
+      if (!groups[family]) {
+        groups[family] = document.createElement("optgroup");
+        groups[family].label = families[family];
+      }
+      groups[family].appendChild(fontOption(theme.id, theme.name));
+      groups[family].lastChild.style.fontFamily = "";
+    });
+    ["classic", "bold", "soft"].forEach(function (family) { if (groups[family]) $("lookTheme").appendChild(groups[family]); });
+  })();
+  $("lookTheme").addEventListener("change", function () { YueThemes.set(this.value); });
+  $("lookCorners").addEventListener("change", function () { saveLook("corners", this.value || null); });
+  Object.keys(LOOK_CHECKS).forEach(function (key) {
+    $(LOOK_CHECKS[key][0]).addEventListener("change", function () { saveLook(key, this.checked ? LOOK_CHECKS[key][1] : null); });
+  });
+
   // ------------------------------------------------------------------ fonts
   // Three fonts this browser can change ("yue2.fonts"; the <head> script applies them before the first paint):
   // the text (--sans), the headings (--heading, the text font unless picked) and numbers and code (--mono).
@@ -9874,9 +9965,12 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   });
   $("fontsReset").addEventListener("click", function () {
     store("yue2.fonts", null);
+    store("yue2.look", null);
     applyFonts();
+    applyLook();
     paintFonts();
-    toast("Fonts are back to the app's own");
+    paintLook();
+    toast("The look options and fonts are back to the app's own (the theme stays)");
   });
   $("fontsAll").classList.toggle("is-hidden", typeof window.queryLocalFonts !== "function");
   $("fontsAll").addEventListener("click", function () {
@@ -9891,6 +9985,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     }).catch(function (error) { toast("The browser did not list the fonts: " + error.message, "bad"); });
   });
   paintFonts();
+  paintLook();
   (window.requestIdleCallback || function (fn) { return setTimeout(fn, 200); })(function () {
     systemFonts = COMMON_FONTS.filter(hasFont);
     paintFonts();

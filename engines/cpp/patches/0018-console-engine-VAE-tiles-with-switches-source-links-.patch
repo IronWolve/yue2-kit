@@ -1,7 +1,7 @@
 From a66e4be7fe74134f97785bdcced8cc362e99fa46 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 08:28:21 -0700
-Subject: [PATCH 18/53] console: engine VAE tiles with switches, source links
+Subject: [PATCH 18/54] console: engine VAE tiles with switches, source links
  and recaps on every tile
 
 The Engine tab's VAE list becomes tiles like the LoRAs: an On/Off switch

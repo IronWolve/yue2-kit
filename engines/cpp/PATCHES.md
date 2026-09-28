@@ -651,3 +651,13 @@ Files:
 - `tools/console/app.css` (+28 −20)
 - `tools/console/app.js` (+1 −4)
 - `tools/console/index.html` (+12 −9)
+
+## 0054 An Appearance card; the layout's inspiration gets its own About section
+
+2026-09-28. The Engine page's Fonts card becomes Appearance: the theme (a grouped menu, in step with the top bar's swatches), options that work with any theme (hover highlights in the theme's colour, a soft accent glow around cards, Rounded, Softer or Square corners, a calmer page without animations), then the three fonts. The options are kept per browser and applied before the first paint; Default look resets them and the fonts, not the theme. In About, the layout's inspiration moves from under the credit line to a section of its own after the engine's.
+
+Files:
+- `tools/console/app.css` (+22 −3)
+- `tools/console/app.js` (+53 −1)
+- `tools/console/help.js` (+5 −0)
+- `tools/console/index.html` (+32 −13)

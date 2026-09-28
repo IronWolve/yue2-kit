@@ -1,7 +1,7 @@
 From 077fee50da1d76db39d01aaac8f8da4205d68680 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 19:32:27 -0700
-Subject: [PATCH 47/53] Add a Fonts card to the Engine page
+Subject: [PATCH 47/54] Add a Fonts card to the Engine page
 
 Three menus change the text, heading and number fonts for this browser: the app's own fonts first with the default marked, a line, then the fonts this computer has (a common set found by measuring, or every installed family on request where the browser can list them). The choice is applied before the first paint; Default fonts forgets it. Headings get their own font setting, the text font unless picked.
 ---
