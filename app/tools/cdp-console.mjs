@@ -397,6 +397,15 @@ check("(i) beside Sliders says they are an add-on, not stock, and a cousin of a 
 t = await hoverOn('[data-tip-ref="tip-seeds"]');
 check("(i) beside the seeds explains music vs sound", t?.on && /Music/.test(t.text) && /Sound/.test(t.text), t?.text.split("\n")[0]);
 await ev(`document.getElementById("coverDrawer").open = true; document.getElementById("outDrawer").open = true; true`);
+const cover = await ev(`(() => { const body = document.querySelector("#coverDrawer .drawer-body"), parts = [...body.querySelectorAll(".cover-part")];
+  const w = (id) => Math.round(document.getElementById(id).getBoundingClientRect().width / parts[0].getBoundingClientRect().width * 100);
+  const b = ["coverFromAudio", "coverFromTake"].map(id => document.getElementById(id).getBoundingClientRect());
+  return { parts: parts.length, full: ["coverFile", "coverTask", "coverTake"].map(w), sizes: b.map(r => Math.round(r.width) + "x" + Math.round(r.height)),
+    left: b.map((r, i) => Math.round(r.left - parts[i].getBoundingClientRect().left)), hints: body.querySelectorAll(".hint").length,
+    infos: parts.map(p => !!p.querySelector(".mini .info")).join() }; })()`);
+check("Cover or remix: two parts of one shape, each control on its own full line, both buttons the same size on the left, no long paragraphs",
+  cover.parts === 2 && cover.full.every((x) => x >= 95) && cover.sizes[0] === "172x30" && cover.sizes[1] === "172x30" && cover.left.every((x) => x <= 1) &&
+  cover.hints === 0 && cover.infos === "true,true", JSON.stringify(cover));
 t = await hoverOn('[data-tip-ref="tip-transcribe"]');
 check("(i) beside From a recording names both models", t?.on && t.text.includes("m-a-p/SheetSage2") && t.text.includes("m-a-p/MERT-v2-FullSong"), t?.text.split("\n")[0]);
 check("  the tip sits inside the window", inView(t));
@@ -1062,7 +1071,8 @@ const ideaBox = await ev(`(() => { const box = document.getElementById("idea"), 
     stackedFill: Math.round(document.getElementById("structure").getBoundingClientRect().width / row.width * 100),
     modelUnder: document.getElementById("museModel").getBoundingClientRect().top >= document.getElementById("structure").getBoundingClientRect().bottom,
     modelFill: Math.round(document.getElementById("museModel").getBoundingClientRect().width / row.width * 100) }; })()`);
-check("the idea box is a full line across that grows with its text, like the style box", ideaBox.tag === "TEXTAREA" && ideaBox.fill >= 90 && ideaBox.grown > ideaBox.one * 2 &&
+check("the idea box is two lines across the drawer and grows with its text, like the style box", ideaBox.tag === "TEXTAREA" && ideaBox.fill >= 90 &&
+  ideaBox.one >= 60 && ideaBox.one <= 72 && ideaBox.grown > ideaBox.one * 1.5 &&
   ideaBox.back === ideaBox.one, JSON.stringify(ideaBox));
 check("  the Chat Server button and Write the brief sit together on the left, the same size", ideaBox.sameRow && ideaBox.gap >= 0 && ideaBox.gap <= 10 &&
   ideaBox.hW === ideaBox.hC && ideaBox.wW === ideaBox.wC && ideaBox.left <= 1, JSON.stringify(ideaBox));

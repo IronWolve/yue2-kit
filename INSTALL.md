@@ -18,7 +18,7 @@ Everything comes from public GitHub and Hugging Face sources, plus this kit:
 downloaded into one install folder and runs from there.
 
 **The app** is `yue2.cpp` (ServeurpersoCom/yue2.cpp), a fast C++/GGML engine for YuE2 that you
-compile. It gets 42 patches from my friend, which give it his web page and everything
+compile. It gets 43 patches from my friend, which give it his web page and everything
 below. They were made for upstream commit `f17d526` of 2026-09-24: upstream may be newer by now. It
 runs on port 41867.
 
@@ -61,9 +61,10 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - title, a music seed and a sound seed (the dice puts a seed in or clears it; blank = random);
   - a style prompt that grows with its text and counts tokens (about 11,400 for style and lyrics together);
   - lyrics, an official **Instrumental** switch, and three modes: Full plan, Melody only, Direct;
-  - a supplied or editable ABC score, covers from a recording or from a take;
+  - a supplied or editable ABC score; **Cover or remix** from a recording or from a take (two parts of the
+    same shape: each control on its own line, the button on the left);
   - sampling controls, versions per pass, and Plan score only;
-  - **Start from an idea**: a local chat model drafts title, style and lyrics. An Idea line that grows as you
+  - **Start from an idea**: a local chat model drafts title, style and lyrics. An Idea box (two lines) that grows as you
     type; Structure, and the writer model on its own line under it; then, under a thin line, a square **Chat Server
     Connected** (green) or **Chat Server Offline** (red) button and **Write the brief**, the same size on the
     left, and "Generate the song right after". The chat button's tip says what to do; a click checks again.
@@ -244,7 +245,7 @@ Then ask me, in one message:
 ROOT/
   yue2-install-2026-09-27-v10/     this kit (unzipped here, or the yue2-kit clone); call it KIT
   upstream/          github.com/ServeurpersoCom/yue2.cpp @ f17d526 (+ ggml submodule), never edited
-  build/             upstream + the 42 patches + the built page: compiled and run from here
+  build/             upstream + the 43 patches + the built page: compiled and run from here
   build/checkpoints -> ../checkpoints       build/models -> ../models
   checkpoints/       the Hugging Face checkpoints the converter reads
   models/            the GGUF files the app loads (made here, no download)
@@ -274,7 +275,7 @@ git -C build checkout -B master f17d526 && git -C build submodule update --init 
 (cd build && git -c user.name=install -c user.email=install@localhost am "$KIT"/engines/cpp/patches/*.patch)
 cp "$KIT"/engines/cpp/page/index.html.gz build/tools/public/index.html.gz   # the built page (not in the patches)
 git -C build -c user.name=install -c user.email=install@localhost commit -q -am "Add the built page"
-[ "$(git -C build rev-parse HEAD^{tree})" = e0817af6bf4f1d195e90665ab639d20906b216fe ] && echo "code OK: identical to the original"
+[ "$(git -C build rev-parse HEAD^{tree})" = cad2c4c43e15135eed6dc1f4760148ec17a23bc8 ] && echo "code OK: identical to the original"
 ln -s ../checkpoints build/checkpoints && ln -s ../models build/models
 printf 'checkpoints\nmodels\n' >> build/.git/info/exclude
 cp -r "$KIT"/app/. . && chmod +x *.sh tools/*.sh      # his root scripts and his whole tools/ folder
@@ -456,7 +457,7 @@ treat it as GPU VRAM from the table above. Start from these, and treat them as u
 |---|---|---|---|
 | `tools/verify-install.sh` | the whole install against his: the code tree, 22 GGUF files (6 models + 16 sliders), 11 LoRAs (pinned sizes, then the server's LoRA reader), `sources.json`, settings | nothing | ~10 s |
 | `tools/test_downloaders.sh` | the download scripts: the include patterns reach the downloader literally, and incomplete downloads are caught | nothing | seconds |
-| `node tools/cdp-console.mjs` | the whole page against a stand-in server: 293 checks | node, google-chrome, python3 | ~75 s |
+| `node tools/cdp-console.mjs` | the whole page against a stand-in server: 294 checks | node, google-chrome, python3 | ~75 s |
 | `tools/test-real.sh` | the real server and page, including a real 1-second song on the CPU: 6 checks + 13 page checks | node, google-chrome, the models | ~1–3 min |
 | `tmp/venv/bin/python tools/test_flac.py --no-song` | the built-in FLAC encoder, bit-exact against flac and ffmpeg | flac, ffmpeg | ~20 s |
 | `tools/test_downloaders.sh --online` | also the real pinned downloader on two include patterns (about 16 MB) | network | ~10 s |

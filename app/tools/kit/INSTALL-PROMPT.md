@@ -61,9 +61,10 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - title, a music seed and a sound seed (the dice puts a seed in or clears it; blank = random);
   - a style prompt that grows with its text and counts tokens (about 11,400 for style and lyrics together);
   - lyrics, an official **Instrumental** switch, and three modes: Full plan, Melody only, Direct;
-  - a supplied or editable ABC score, covers from a recording or from a take;
+  - a supplied or editable ABC score; **Cover or remix** from a recording or from a take (two parts of the
+    same shape: each control on its own line, the button on the left);
   - sampling controls, versions per pass, and Plan score only;
-  - **Start from an idea**: a local chat model drafts title, style and lyrics. An Idea line that grows as you
+  - **Start from an idea**: a local chat model drafts title, style and lyrics. An Idea box (two lines) that grows as you
     type; Structure, and the writer model on its own line under it; then, under a thin line, a square **Chat Server
     Connected** (green) or **Chat Server Offline** (red) button and **Write the brief**, the same size on the
     left, and "Generate the song right after". The chat button's tip says what to do; a click checks again.
