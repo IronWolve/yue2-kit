@@ -1,7 +1,7 @@
 From 9d69c01db946fc4fb36defaebe6a1292bc432d98 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 18:13:59 -0700
-Subject: [PATCH 37/50] Add resize grips between the page's columns
+Subject: [PATCH 37/51] Add resize grips between the page's columns
 
 Drag the line left or right of the middle column to size the compose column or the takes list; the middle keeps at least 420px. Double-click or Home resets a column, arrow keys move a focused grip, and the widths are kept per browser. Hidden when the columns stack on narrow windows.
 ---

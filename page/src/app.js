@@ -230,6 +230,7 @@
   });
 
   document.addEventListener("keydown", function (event) {
+    if (event.defaultPrevented) return;   // a list card already used the key
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)) return;
     if (event.key === "Escape") { $("view-engine").classList.add("is-hidden"); closeMenus(); }
     if (event.key === " " && (audio.getAttribute("src") || STATE.take) && !event.target.closest(".menu-pop")) { event.preventDefault(); togglePlay(); }
@@ -398,6 +399,7 @@
     if (radio) radio.checked = true;
     fillCfg();
     paintSliders();
+    YueLoras.repaint();
   }
   function fillCfg() {
     if ($("cfg").dataset.touched) return;
@@ -575,7 +577,6 @@
 
   function vaeInfo(name) { return STATE.vaes.filter(function (v) { return v.name === name; })[0] || null; }
   function vaeLabel(name) { var v = vaeInfo(name); return v ? (v.label || v.name) : (name || "default"); }
-  function vaeRepo(name) { var v = vaeInfo(name); return v && v.repo ? v.repo : (name || ""); }
 
   // One VAE per song, kept per browser. A take can gain another VAE version
   // later from its page.
@@ -686,6 +687,7 @@
     paintSliders();
   });
 
+  $("sliderActive").addEventListener("change", paintSliderCard);
   $("sliderActive").addEventListener("input", function (event) {
     var id = event.target.dataset.strength;
     if (!id) return;
@@ -838,6 +840,7 @@
     $("abc").value = ex.abc || "";
     $("lmSeed").value = ex.seed !== undefined && ex.seed !== null && /^\d+$/.test(String(ex.seed)) ? String(ex.seed) : "";
     $("soundSeed").value = "";
+    paintDice();
     setCodes(null);
     setCot(ex.cot || "full");
     if (ex.abc) $("scoreDrawer").open = true;
@@ -1079,6 +1082,7 @@
     if (req.abc) $("scoreDrawer").open = true;
     $("lmSeed").value = seedText(req.lm_seed);
     $("soundSeed").value = seedText(req.seed);
+    paintDice();
     var cot = MODES[req.cot] ? req.cot : "full";
     document.querySelector('input[name="cot"][value="' + cot + '"]').checked = true;
     if (typeof req.cfg_scale === "number" && req.cfg_scale >= 0 && round(req.cfg_scale, 4) !== defaultCfg(cot)) {
@@ -1531,7 +1535,7 @@
     land.then(function (takes) {
       job.takes = takes;
       settle(job, "done");
-      return refreshLibrary().then(function () { return nameVersions(job); });
+      return refreshLibrary().catch(function () {}).then(function () { return nameVersions(job); });
     }).then(function () {
       paintAllRuns();
       if (job.kind === "replay") return replayLanded(job);
@@ -1579,7 +1583,7 @@
         if (instrumentalAfterPlan(job, abc)) return;
         $("abc").value = abc;
         var seed = job.resolved.lm_seed || job.request.lm_seed;
-        if (seed && /^\d+$/.test(String(seed))) $("lmSeed").value = String(seed);
+        if (seed && /^\d+$/.test(String(seed))) { $("lmSeed").value = String(seed); paintDice(); }
         $("scoreDrawer").open = true;
         toast("Score planned. Check its sections under Supply your own score; Generate now renders exactly this score.", "good");
       }
@@ -2175,11 +2179,11 @@
       meter.classList.toggle("is-hidden", shown !== "running" && shown !== "completed");
       if (shown === "running") {
         meter.classList.toggle("indeterminate", pct < 0);
-        bar.style.width = pct < 0 ? "" : pct.toFixed(1) + "%";
+        bar.style.transform = pct < 0 ? "" : "scaleX(" + (pct / 100).toFixed(4) + ")";   // the indeterminate slide is CSS
         bar.style.background = "";
       } else if (shown === "completed") {
         meter.classList.remove("indeterminate");
-        bar.style.width = "100%";
+        bar.style.transform = "scaleX(1)";
         bar.style.background = "var(--patina-dim)";
       }
     });
@@ -2195,6 +2199,7 @@
   }
 
   setInterval(function () {
+    if (document.hidden) return;
     if (tipFor && !tipFor.isConnected) hideTip();
     paintClock();
     var job = STATE.job;
@@ -2421,13 +2426,11 @@
 
   function refreshSettings() {
     return api("/settings").then(function (settings) {
-      STATE.noSettings = false;
       $("computeCard").classList.remove("is-off");
       paintSettings(settings);
     }).catch(function (error) {
       if (error.status !== 404) return;
       // An older server without engine settings: the card says so and stays still.
-      STATE.noSettings = true;
       $("computeCard").classList.add("is-off");
       all("#computeCard select, #computeCard input, #computeCard button").forEach(function (el) { el.disabled = true; });
       $("computeHint").textContent = "This server has no engine settings; its start-up flags decide.";
@@ -2532,7 +2535,7 @@
     }).join("");
   }
 
-  function unloadModels(button) {
+  function unloadModels() {
     var gpu = gpuOf(), before = gpu ? gib(gpu.total_bytes - gpu.free_bytes) : null;
     $("unloadModel").disabled = true;
     $("unloadNow").disabled = true;
@@ -2549,8 +2552,8 @@
     }).catch(function (error) { toast(error.message, "bad"); refreshHardware(); });
   }
 
-  $("unloadModel").addEventListener("click", function () { unloadModels(this); });
-  $("unloadNow").addEventListener("click", function () { unloadModels(this); });
+  $("unloadModel").addEventListener("click", unloadModels);
+  $("unloadNow").addEventListener("click", unloadModels);
 
   /* ---------------------------------------------------------------- take */
 
@@ -2578,7 +2581,7 @@
   // MP3 copies for sharing: made on the server at the bitrate chosen on the song page
   function mp3Rate() {
     var saved = 320;
-    try { saved = parseInt(localStorage.getItem("yue2.mp3kbps") || "320", 10); } catch (error) { saved = 320; }
+    saved = parseInt(recall("yue2.mp3kbps") || "320", 10);
     return [128, 192, 256, 320].indexOf(saved) >= 0 ? saved : 320;
   }
 
@@ -2611,7 +2614,7 @@
   }
 
   $("mp3Rate").addEventListener("change", function () {
-    try { localStorage.setItem("yue2.mp3kbps", $("mp3Rate").value); } catch (error) { /* private mode */ }
+    store("yue2.mp3kbps", $("mp3Rate").value);
     paintMp3();
     paintLibrary();
     toast("MP3 downloads now at " + mp3Rate() + " kbps");
@@ -2620,17 +2623,23 @@
   // True while a song is audibly playing; finished runs must not replace it.
   function isPlaying() { return !!audio.getAttribute("src") && !audio.paused && !audio.ended; }
 
+  var requestsPending = {};
   function getRequest(take) {
     if (STATE.requests[take.name]) return Promise.resolve(STATE.requests[take.name]);
     if (take.session) return Promise.reject(new Error("This take's request is gone with the page reload"));
-    return fetch("/library/request?name=" + encodeURIComponent(take.name)).then(function (r) {
+    if (requestsPending[take.name]) return requestsPending[take.name];   // one fetch for overlapping asks
+    var name = take.name, pending = fetch("/library/request?name=" + encodeURIComponent(name)).then(function (r) {
       return r.text().then(function (text) {
         if (!r.ok) throw new Error("Could not read the take's request (" + r.status + ")");
         var req = parseJSON(text);
-        STATE.requests[take.name] = req;
+        STATE.requests[name] = req;
         return req;
       });
     });
+    var done = function () { delete requestsPending[name]; };
+    pending.then(done, done);
+    requestsPending[name] = pending;
+    return pending;
   }
 
   function openTake(name, opts) {
@@ -2688,7 +2697,7 @@
     paintDecodeSwitch();
     paintPlayHere();
     paintSoundSwitch();
-    paintLibrary();
+    markActive();
     paintRunReturn();
     show("take");
   }
@@ -3223,13 +3232,12 @@
     if (STATE.take && STATE.take.name === take.name) clearTakeView();
   }
 
-  function deleteTake(take, confirmed) {
+  function deleteTake(take, confirmed, quiet) {
     if (!confirmed && !window.confirm("Delete \u201c" + displayTitle(take) + "\u201d and its files?")) return Promise.resolve(false);
     var gone = take.session ? Promise.resolve() : post("/library/delete?name=" + encodeURIComponent(take.name));
     return gone.then(function () {
       removeTake(take);
-      paintLibrary();
-      paintCoverTakes();
+      if (!quiet) { paintLibrary(); paintCoverTakes(); }
       if (!confirmed) toast("Take deleted");
       return true;
     }).catch(function (error) { toast(error.message, "bad"); return false; });
@@ -3244,9 +3252,11 @@
                         " not a favourite, with their files? " + kept + (kept === 1 ? " favourite stays." : " favourites stay."))) return;
     var chain = Promise.resolve(), count = 0;
     doomed.forEach(function (take) {
-      chain = chain.then(function () { return deleteTake(take, true).then(function (ok) { if (ok) count++; }); });
+      chain = chain.then(function () { return deleteTake(take, true, true).then(function (ok) { if (ok) count++; }); });
     });
     chain.then(function () {
+      paintLibrary();
+      paintCoverTakes();
       toast("Deleted " + count + (count === 1 ? " take; " : " takes; ") + kept + (kept === 1 ? " favourite kept" : " favourites kept"), "good");
     });
   });
@@ -3266,6 +3276,7 @@
   /* -------------------------------------------------------------- player */
 
   var audio = $("audio");
+  var pendingSeek = null;   // the A/B switch's "same bar" handler, while its file loads
 
   // The player holds its own song, apart from the song page on screen.
   STATE.playerTake = null;
@@ -3276,13 +3287,16 @@
     STATE.playerTake = take;
     if (audio.getAttribute("src") !== url) {
       audio.src = url;
+      if (pendingSeek) { audio.removeEventListener("loadedmetadata", pendingSeek); pendingSeek = null; }
       if (keepTime) {
         // A/B between versions of the same music: same bar, same play state
-        audio.addEventListener("loadedmetadata", function again() {
-          audio.removeEventListener("loadedmetadata", again);
+        pendingSeek = function () {
+          audio.removeEventListener("loadedmetadata", pendingSeek);
+          pendingSeek = null;
           try { audio.currentTime = Math.min(at, audio.duration || at); } catch (error) { /* not seekable yet */ }
           if (wasPlaying) audio.play().catch(function () {});
-        });
+        };
+        audio.addEventListener("loadedmetadata", pendingSeek);
       } else {
         $("timeNow").textContent = "0:00";
         $("playGlyph").textContent = "▶";
@@ -3495,6 +3509,7 @@
 
   /* -------------------------------------------------------------- library */
 
+  var libraryAsk = 0;
   function refreshLibrary() {
     if (!STATE.library) {
       STATE.takes = STATE.session.slice();
@@ -3502,7 +3517,9 @@
       paintCoverTakes();
       return Promise.resolve();
     }
+    var ask = ++libraryAsk;
     return api("/library").then(function (data) {
+      if (ask !== libraryAsk) return;   // an older reply landing after a newer one
       STATE.takes = STATE.session.concat((data && data.takes) || []);
       if (STATE.take) {
         var fresh = findTake(STATE.take.name);
@@ -3512,6 +3529,11 @@
       paintCoverTakes();
       if (STATE.take) { paintDecodeSwitch(); paintSoundSwitch(); }
     });
+  }
+
+  function markActive() {
+    var name = STATE.take ? STATE.take.name : null;
+    all("#libList .take[data-name]").forEach(function (card) { card.classList.toggle("is-active", card.dataset.name === name); });
   }
 
   function paintLibrary() {
@@ -4018,7 +4040,6 @@
   }
 
   function paintChat(status) {
-    CHAT.status = status;
     var pill = $("chatState");
     pill.textContent = !status.configured ? "not set" : (!status.available ? "not answering" : (status.use ? "ready" : "no model loaded"));
     pill.dataset.s = status.use ? "ready" : (status.configured ? "bad" : "missing");
@@ -4196,7 +4217,7 @@
   /* ---------------------------------------------------------------- boot */
 
   function propsChanged(a, b) {
-    var pick = function (p) { return JSON.stringify([p.version, p.model, p.vaes, p.default_vae, p.sliders, p.max_batch, p.transcriber, p.outputs]); };
+    var pick = function (p) { return JSON.stringify([p.version, p.model, p.vaes, p.default_vae, p.sliders, p.loras, p.sources, p.max_batch, p.transcriber, p.outputs]); };
     return !a || pick(a) !== pick(b);
   }
 
@@ -4212,11 +4233,15 @@
   }
 
   window.addEventListener("error", function (event) {
-    toast("Page error: " + (event.message || "unknown") + " — reload if things stop responding", "bad");
+    toastOnce("page-error:" + (event.message || ""), "Page error: " + (event.message || "unknown") + " — reload if things stop responding", "bad");
   });
 
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible" && STATE.online) refreshLibrary().catch(function () {});
+    if (document.visibilityState !== "visible") return;
+    pollProps();
+    if (!STATE.online) return;
+    refreshHardware();
+    refreshLibrary().catch(function () {});
   });
 
   // ------------------------------------------------------------ column grips
@@ -4393,10 +4418,23 @@
       toast(systemFonts.length + " fonts listed");
     }).catch(function (error) { toast("The browser did not list the fonts: " + error.message, "bad"); });
   });
-  systemFonts = COMMON_FONTS.filter(hasFont);
   paintFonts();
+  (window.requestIdleCallback || function (fn) { return setTimeout(fn, 200); })(function () {
+    systemFonts = COMMON_FONTS.filter(hasFont);
+    paintFonts();
+  });
 
   STATE.favOnly = recall("yue2.favOnly") === "1";
+
+  // The polls start once, and wait while the tab is hidden (a visible tab catches up at once).
+  var pollsStarted = false;
+  function startPolls() {
+    if (pollsStarted) return;
+    pollsStarted = true;
+    setInterval(function () { if (!document.hidden) pollProps(); }, 10000);
+    // Keep the memory readout honest while runs come and go.
+    setInterval(function () { if (!document.hidden) refreshHardware(); }, 5000);
+  }
 
   function boot() {
     api("/props").then(function (props) {
@@ -4404,14 +4442,13 @@
       applyProps(props);
       restoreJobs();
       connectLogs();
-      setInterval(pollProps, 10000);
+      startPolls();
       refreshSettings();
       refreshHardware();
-      // Keep the memory readout honest while runs come and go.
-      setInterval(refreshHardware, 5000);
       if (chatBase()) refreshChat().catch(function () {});
       else paintChat({ configured: false, available: false, models: [], loaded: null, use: null });
-      return refreshLibrary();
+      // a library that cannot be read is its own problem, not a server that is down
+      refreshLibrary().catch(function (error) { toastOnce("library", "Could not read the song library: " + error.message, "bad"); });
     }).catch(function (error) {
       STATE.online = false;
       paintEngine();

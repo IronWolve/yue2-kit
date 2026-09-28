@@ -267,18 +267,21 @@
 
   var watching = false;
   function watchPrompt() {
-    var style = document.getElementById("style"), lyrics = document.getElementById("lyrics");
+    var style = document.getElementById("style"), lyrics = document.getElementById("lyrics"), idea = document.getElementById("idea");
     if (watching || !style) return;
     watching = true;
     var sized = window.CSS && CSS.supports && CSS.supports("field-sizing", "content");
     var last = null;
     function tick() {
-      var now = style.value.length + ":" + (lyrics ? lyrics.value.length : 0);
+      // the texts themselves: a new prompt of the same length set by the page must still repaint
+      var now = style.value + "\u0000" + (lyrics ? lyrics.value : "");
       if (now === last) return;
       last = now;
       if (!sized) growBox(style);
       paintMeter();
     }
+    // browsers without field-sizing: the idea box grows by hand too
+    if (!sized && idea) idea.addEventListener("input", function () { growBox(idea); });
     style.addEventListener("input", tick);
     if (lyrics) lyrics.addEventListener("input", tick);
     setInterval(tick, 700);     // values set by the page itself (examples, reuse, the writer) fire no input event

@@ -1,7 +1,7 @@
 From 142f15ecdf701ddd0154b24bc9b8951b5fa1fc1f Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Fri, 25 Sep 2026 19:00:09 -0700
-Subject: [PATCH 06/50] Add MP3 and FLAC downloads and a model picker in the
+Subject: [PATCH 06/51] Add MP3 and FLAC downloads and a model picker in the
  top bar
 
 The song page offers a WAV take as MP3 at a chosen bitrate (320/256/192/128,

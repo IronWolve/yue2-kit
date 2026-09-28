@@ -619,3 +619,15 @@ Files:
 
 Files:
 - `tools/console/app.js` (+7 −3)
+
+## 0051 Page fixes: a steadier start, lighter list updates, visible focus
+
+2026-09-27. A library that fails to load no longer restarts the whole start-up (which stacked its timers); a finished song stays finished when the refresh after it fails; Space on a focused card opens it without also toggling playback; a server back with other LoRAs or sources is picked up; overlapping library replies keep the newest; polls rest while the tab is hidden. Opening a song moves the list's highlight instead of rebuilding the list; one fetch per saved request; bulk deletes redraw once; A/B switches keep one pending seek. Keyboard focus shows on checkboxes, sliders and the (i) marks; selected text and hovered buttons stay readable in every theme; reduced motion stops the spinners; narrow windows keep the Engine band and the player in place; long titles clear the hover buttons; progress bars scale instead of resizing. Unused styles and theme variables are removed, and the score engraver is loaded with its published integrity hash.
+
+Files:
+- `tools/console/app.css` (+23 −68)
+- `tools/console/app.js` (+68 −31)
+- `tools/console/help.js` (+5 −2)
+- `tools/console/index.html` (+1 −0)
+- `tools/console/themes.css` (+2 −84)
+- `tools/console/themes.js` (+1 −1)

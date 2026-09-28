@@ -70,8 +70,6 @@
   --hover: #2c251e;
   --focus-bg: #16120f;
   --field: #100d0b;
-  --accent-rgb: 232 163 61;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -107,8 +105,6 @@
   --hover: #2a2f35;
   --focus-bg: #16191c;
   --field: #0f1114;
-  --accent-rgb: 240 180 76;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -143,8 +139,6 @@
   --hover: #48516a;
   --focus-bg: #353c4a;
   --field: #272c36;
-  --accent-rgb: 235 203 139;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -179,8 +173,6 @@
   --hover: #3a3d50;
   --focus-bg: #252632;
   --field: #1b1c24;
-  --accent-rgb: 189 147 249;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -215,8 +207,6 @@
   --hover: #3c3836;
   --focus-bg: #222526;
   --field: #171a1a;
-  --accent-rgb: 250 189 47;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -251,8 +241,6 @@
   --hover: #0f4554;
   --focus-bg: #04303b;
   --field: #00212b;
-  --accent-rgb: 224 176 32;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -287,8 +275,6 @@
   --hover: #e8e0c8;
   --focus-bg: #fffaec;
   --field: #fffaec;
-  --accent-rgb: 155 106 0;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -324,8 +310,6 @@
   --hover: #e9ecf0;
   --focus-bg: #ffffff;
   --field: #ffffff;
-  --accent-rgb: 180 83 9;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -361,8 +345,6 @@
   --hover: #262626;
   --focus-bg: #101010;
   --field: #000000;
-  --accent-rgb: 255 204 64;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -384,19 +366,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Faint horizontal grain, like the brushed face of a rack unit. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background: repeating-linear-gradient(180deg, var(--grain) 0 1px, transparent 1px 3px);
-}
-
 button, input, select, textarea { font: inherit; color: inherit; }
 
-::selection { background: var(--amber-dim); color: #fff; }
+::selection { background: var(--amber); color: var(--on-amber); }
 
 :focus-visible {
   outline: 2px solid var(--amber);
@@ -521,8 +493,7 @@ body:has(#view-engine:not(.is-hidden)) #engineToggle { background: var(--amber);
 .fonts-card select option { font-size: 14px; }
 .check-row { display: flex; align-items: center; gap: 2px; }
 .card.is-off .field, .card.is-off .check-row { opacity: .5; }
-.card-actions { margin-top: auto; }
-.card-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.card-actions { margin-top: auto; display: flex; gap: 8px; justify-content: flex-end; }
 
 /* the workspace: form, run, library, all live at once */
 .workspace {
@@ -555,7 +526,6 @@ body:has(#view-engine:not(.is-hidden)) #engineToggle { background: var(--amber);
 body.is-resizing, body.is-resizing * { cursor: col-resize !important; user-select: none !important; }
 
 .col { background: var(--ground); overflow-y: auto; padding: 18px 22px 60px; display: flex; flex-direction: column; gap: 16px; }
-.compose-col { background: var(--ground); }
 .take-col { background: var(--take-bg); }
 /* Absolutely positioned bits inside a column (the hidden mode radios) must be
    anchored to the column, or they stretch the page past the window and the
@@ -610,7 +580,7 @@ body.is-resizing, body.is-resizing * { cursor: col-resize !important; user-selec
   color: var(--on-amber);
   font-weight: 600;
 }
-.btn.primary:hover { background: linear-gradient(180deg, var(--amber-hi2), var(--amber-hi)); }
+.btn.primary:hover { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 32%, transparent); }
 .btn[disabled] { opacity: .45; pointer-events: none; }
 .btn-glyph { font-size: 11px; }
 
@@ -677,7 +647,8 @@ input[type="text"], input[type="number"], textarea, select {
 textarea { resize: vertical; line-height: 1.6; }
 textarea.mono { font-family: var(--mono); font-size: 12.5px; }
 input:hover, textarea:hover, select:hover { border-color: var(--line-strong); }
-input:focus, textarea:focus, select:focus { outline: 0; border-color: var(--amber); background: var(--focus-bg); }
+input[type="text"]:focus, input[type="number"]:focus, input[type="search"]:focus, textarea:focus, select:focus {
+  outline: 0; border-color: var(--amber); background: var(--focus-bg); }
 select:disabled { opacity: .7; }
 ::placeholder { color: var(--placeholder); }
 
@@ -775,7 +746,6 @@ select:disabled { opacity: .7; }
   cursor: pointer;
 }
 .chip:hover { color: var(--ink); border-color: var(--patina-dim); }
-.chip.danger:hover { color: var(--bad); border-color: var(--bad-line); }
 
 /* sampling knobs */
 
@@ -797,12 +767,12 @@ select:disabled { opacity: .7; }
 .cover-part .mini { margin: 0; }
 .mini em { font-style: normal; text-transform: none; letter-spacing: 0; font-size: 11.5px; color: var(--dim); margin-left: 8px; }
 .cover-act { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.cover-act .btn { flex: none; width: 172px; height: 30px; box-sizing: border-box; justify-content: center; padding: 0 12px; font-size: 12.5px; }
+.cover-act .btn, .drawer-act .btn { flex: none; width: 172px; height: 30px; justify-content: center; padding: 0 12px; font-size: 12.5px; }
 .cover-status { flex: 1 1 200px; margin: 0; font-size: 11.5px; color: var(--dim); }
 .cover-status:empty { display: none; }
 /* a drawer's action buttons: under a thin line, on the left, all one size */
 .drawer-act { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 13px; border-top: 1px solid var(--line-soft); }
-.drawer-act .btn { flex: none; width: 172px; height: 30px; box-sizing: border-box; justify-content: center; padding: 0 12px; font-size: 12.5px; }
+
 
 .check { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
 .check input { width: auto; accent-color: var(--amber); }
@@ -888,7 +858,7 @@ select:disabled { opacity: .7; }
 .chat-link[data-s="on"] .off, .chat-link[data-s="off"] .on { visibility: hidden; }
 .chat-link:hover { filter: brightness(1.15); }
 /* Write the brief beside it, the same size */
-.muse-foot .chat-link, .muse-foot .btn.writer { width: 172px; height: 30px; box-sizing: border-box; }
+.muse-foot .chat-link, .muse-foot .btn.writer { width: 172px; height: 30px; }
 .muse-foot .btn.writer { justify-content: center; padding: 0 12px; font-size: 12.5px; }
 .muse-foot .btn.writer:disabled { opacity: .45; cursor: default; }
 
@@ -960,9 +930,11 @@ select:disabled { opacity: .7; }
 .meter i {
   display: block;
   height: 100%;
-  width: 0;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left;
   background: var(--amber);
-  transition: width .25s ease;
+  transition: transform .25s ease;
 }
 .meter.indeterminate i {
   width: 34%;
@@ -1051,8 +1023,7 @@ select:disabled { opacity: .7; }
 pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
 
 .paper svg { max-width: 100%; }
-.paper .abcjs-note, .paper .abcjs-staff, .paper path, .paper text { fill: var(--paper-ink); }
-.paper .abcjs-lyric { fill: #4a3d28; }
+.paper path, .paper text { fill: var(--paper-ink); }
 
 /* --------------------------------------------------------------- metadata */
 
@@ -1078,7 +1049,6 @@ pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-br
 .kv dd.ok { color: var(--good); }
 .kv dd.no { color: var(--bad); }
 .kv dd.amber { color: var(--amber); }
-.kv.wrap dd { white-space: normal; overflow-wrap: anywhere; }
 
 .writer-pane {
   padding: 12px;
@@ -1105,8 +1075,6 @@ pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-br
   white-space: nowrap;
 }
 .pill[data-s="ready"]   { color: var(--good); border-color: var(--good-line); }
-.pill[data-s="missing"] { color: var(--dim); }
-.pill[data-s="busy"]    { color: var(--amber); border-color: var(--amber-dim); }
 .pill[data-s="bad"]     { color: var(--bad); border-color: var(--bad-line); }
 
 /* the server's own console, streamed */
@@ -1181,13 +1149,12 @@ pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-br
   letter-spacing: .08em;
   text-transform: uppercase;
 }
-.tag.full { color: var(--patina); border-color: var(--patina-dim); }
-.tag.melody { color: var(--patina); border-color: var(--patina-dim); }
+.tag.full, .tag.melody { color: var(--patina); border-color: var(--patina-dim); }
 .tag.off { color: var(--dim); }
 .tag.vae { color: var(--amber); border-color: var(--amber-dim); }
 .tag.re { color: var(--dim); border-style: dashed; }
 
-.take-del, .take-fav, .take-dl {
+.take-del, .take-fav, .take-dl, .take-mp3 {
   position: absolute;
   top: 8px;
   padding: 3px 6px;
@@ -1205,23 +1172,10 @@ pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-br
 .take-fav { right: 38px; }
 .take-dl { right: 68px; text-decoration: none; }
 .take:hover .take-del, .take:hover .take-fav, .take:focus-within .take-del, .take:focus-within .take-fav,
-.take:hover .take-dl, .take:focus-within .take-dl { opacity: 1; }
+.take:hover .take-dl, .take:focus-within .take-dl, .take:hover .take-mp3, .take:focus-within .take-mp3 { opacity: 1; }
+.take:hover .take-title, .take:focus-within .take-title { padding-right: 132px; }
 .take-dl:hover { color: var(--amber); border-color: var(--amber-dim); }
-.take-mp3 {
-  position: absolute;
-  top: 8px; right: 98px;
-  padding: 3px 6px;
-  background: var(--sunk);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  color: var(--dim);
-  font-size: 10.5px;
-  line-height: 1.2;
-  text-decoration: none;
-  opacity: 0;
-  transition: opacity .13s ease;
-}
-.take:hover .take-mp3, .take:focus-within .take-mp3 { opacity: 1; }
+.take-mp3 { right: 98px; font-size: 10.5px; text-decoration: none; }
 .take-mp3:hover { color: var(--amber); border-color: var(--amber-dim); }
 .mp3-rate {
   width: auto;
@@ -1446,7 +1400,7 @@ textarea:hover::-webkit-scrollbar-thumb,
   font-size: 13px;
   cursor: pointer;
 }
-.play:hover { filter: brightness(1.08); }
+.play:hover { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 32%, transparent); }
 
 .time { font-size: 12.5px; flex: none; }
 .time.dim { color: var(--dim); }
@@ -1591,7 +1545,7 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   color: var(--dim);
   cursor: help;
 }
-.info:hover, .info:focus-visible { color: var(--amber); border-color: var(--amber); outline: none; }
+.info:hover, .info:focus-visible { color: var(--amber); border-color: var(--amber); }
 .tip {
   position: fixed;
   z-index: 50;
@@ -1648,8 +1602,9 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
 @media (max-width: 1150px) {
   .workspace { grid-template-columns: 1fr; height: auto; }
   .col-grip { display: none; }
-  .col { max-height: none; }
   .library { max-height: 420px; }
+  .engine-head { position: static; }
+  body { padding-bottom: 0; }
   .modes, .sampler-grid { grid-template-columns: 1fr; }
   .topbar { flex-wrap: wrap; height: auto; padding: 10px 14px; gap: 12px; }
   .playbar { position: sticky; }
@@ -1658,7 +1613,7 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
 
 /* instrumental switch under the planning modes */
@@ -1757,8 +1712,8 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
 
 </style>
 <style>
-/* Extra themes, generated by tools/gen_themes.py from compact palettes; edit the palettes there,
-   not this file. Every text colour clears 4.5:1 on every surface of its theme. */
+/* Extra themes. The generator that first wrote these from compact palettes is gone, so edit them here,
+   keeping every text colour at 4.5:1 or better on every surface of its theme. */
 
 [data-theme="bold-crimson"] {
   --ground: #A03C3C;
@@ -1789,8 +1744,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f9d6cf;
   --bad-line: #c47a77;
   --bad-ink: #fbe0d9;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -1825,8 +1778,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #150606;
   --bad-line: #803b26;
   --bad-ink: #100708;
-  --accent-rgb: 7 10 11;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -1861,8 +1812,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #a62016;
   --bad-line: #db9226;
   --bad-ink: #791c16;
-  --accent-rgb: 16 20 22;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -1897,8 +1846,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #1d0606;
   --bad-line: #2d5846;
   --bad-ink: #17090a;
-  --accent-rgb: 11 14 15;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -1933,8 +1880,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #821911;
   --bad-line: #698376;
   --bad-ink: #601812;
-  --accent-rgb: 16 20 22;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -1969,8 +1914,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f3a89b;
   --bad-line: #73697b;
   --bad-ink: #f7c0b4;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2005,8 +1948,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f9f4f2;
   --bad-line: #b899b8;
   --bad-ink: #fbf5f1;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2041,8 +1982,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #490e0a;
   --bad-line: #a6494e;
   --bad-ink: #38100e;
-  --accent-rgb: 16 20 22;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2077,8 +2016,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #ef8574;
   --bad-line: #8c463f;
   --bad-ink: #f4a799;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2113,8 +2050,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f9d2cb;
   --bad-line: #b87c85;
   --bad-ink: #fbddd6;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2149,8 +2084,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f6bbb1;
   --bad-line: #997480;
   --bad-ink: #f9cdc4;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2185,8 +2118,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #ef8574;
   --bad-line: #6d5347;
   --bad-ink: #f4a799;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2221,8 +2152,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f6bbb1;
   --bad-line: #7c7c79;
   --bad-ink: #f9cdc4;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2257,8 +2186,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #ffffff;
   --bad-line: #c8a480;
   --bad-ink: #ffffff;
-  --accent-rgb: 255 255 255;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2293,8 +2220,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f5b5aa;
   --bad-line: #9a6f65;
   --bad-ink: #f8c9bf;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2329,8 +2254,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f9cec7;
   --bad-line: #af8074;
   --bad-ink: #fbdad3;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2365,8 +2288,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #ee7a68;
   --bad-line: #694655;
   --bad-ink: #f3a091;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2401,8 +2322,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #000000;
   --bad-line: #254a68;
   --bad-ink: #000000;
-  --accent-rgb: 0 0 0;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2437,8 +2356,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #490e0a;
   --bad-line: #5c626d;
   --bad-ink: #38100e;
-  --accent-rgb: 16 20 22;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2473,8 +2390,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f9e2dd;
   --bad-line: #9196a9;
   --bad-ink: #fbe8e3;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2509,8 +2424,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f8c5bd;
   --bad-line: #9d7f5f;
   --bad-ink: #fad4cc;
-  --accent-rgb: 255 247 240;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2545,8 +2458,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #6e150f;
   --bad-line: #a36d3d;
   --bad-ink: #521511;
-  --accent-rgb: 16 20 22;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2581,8 +2492,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #ee7a68;
   --bad-line: #5f312a;
   --bad-ink: #e9978b;
-  --accent-rgb: 220 220 220;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -2617,8 +2526,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #b42318;
   --bad-line: #e1a29e;
   --bad-ink: #942119;
-  --accent-rgb: 160 60 60;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2653,8 +2560,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #8d1b12;
   --bad-line: #cd937d;
   --bad-ink: #701a11;
-  --accent-rgb: 121 58 37;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2689,8 +2594,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #991d14;
   --bad-line: #cd9994;
   --bad-ink: #87281e;
-  --accent-rgb: 102 72 61;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2725,8 +2628,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #a62016;
   --bad-line: #d5967b;
   --bad-ink: #912d1e;
-  --accent-rgb: 117 75 31;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2761,8 +2662,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #b42318;
   --bad-line: #d3a098;
   --bad-ink: #872f23;
-  --accent-rgb: 40 102 80;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2797,8 +2696,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #b42318;
   --bad-line: #d2a09c;
   --bad-ink: #8b312a;
-  --accent-rgb: 55 103 112;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2833,8 +2730,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #a62016;
   --bad-line: #d4a1a2;
   --bad-ink: #792125;
-  --accent-rgb: 30 63 102;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2869,8 +2764,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #a62016;
   --bad-line: #d59c9c;
   --bad-ink: #892325;
-  --accent-rgb: 109 73 112;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2905,8 +2798,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #b42318;
   --bad-line: #e19d9b;
   --bad-ink: #a82d2b;
-  --accent-rgb: 151 74 82;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2941,8 +2832,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #b42318;
   --bad-line: #daa09d;
   --bad-ink: #872521;
-  --accent-rgb: 75 85 99;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -2977,8 +2866,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f9d2cb;
   --bad-line: #766d72;
   --bad-ink: #f3d8d5;
-  --accent-rgb: 218 221 224;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -3013,8 +2900,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #b42318;
   --bad-line: #dca29b;
   --bad-ink: #8b251c;
-  --accent-rgb: 102 98 94;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -3049,8 +2934,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #b42318;
   --bad-line: #e1a7a3;
   --bad-ink: #89251f;
-  --accent-rgb: 8 97 201;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -3085,8 +2968,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #8d1b12;
   --bad-line: #b08788;
   --bad-ink: #6f2320;
-  --accent-rgb: 28 73 106;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -3121,8 +3002,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #821911;
   --bad-line: #a6847c;
   --bad-ink: #67231b;
-  --accent-rgb: 29 71 53;
-  --grain: rgba(0, 0, 0, .018);
   --shadow-md: rgba(20, 30, 45, .16);
   --shadow-lg: rgba(20, 30, 45, .28);
   color-scheme: light;
@@ -3157,8 +3036,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f9d9d3;
   --bad-line: #959299;
   --bad-ink: #f7e1de;
-  --accent-rgb: 191 228 255;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -3193,8 +3070,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #ee7a68;
   --bad-line: #72433c;
   --bad-ink: #e79689;
-  --accent-rgb: 55 148 255;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -3229,8 +3104,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
   --bad: #f19889;
   --bad-line: #78554b;
   --bad-ink: #f3b5a8;
-  --accent-rgb: 166 226 46;
-  --grain: rgba(255, 255, 255, .014);
   --shadow-md: rgba(0, 0, 0, .5);
   --shadow-lg: rgba(0, 0, 0, .9);
   color-scheme: dark;
@@ -3870,6 +3743,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
 
 <!-- the score engraver loads beside the page instead of in front of it (app.js: renderScore) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.7.0/abcjs-basic-min.js" defer
+        integrity="sha512-1ICwARGYDp4yG4ejBe7nBYxPoLpMQPKtm/kVEbXv+EwI/Po5fGkblkSYjNBtZUG0AhRIONPXpymORZi1cM8L2w==" crossorigin="anonymous" referrerpolicy="no-referrer"
         onload="window.__abcjsLanded && window.__abcjsLanded()"
         onerror="window.__abcjsFailed = true; window.__abcjsLanded && window.__abcjsLanded()"></script>
 
@@ -4752,18 +4626,21 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
 
   var watching = false;
   function watchPrompt() {
-    var style = document.getElementById("style"), lyrics = document.getElementById("lyrics");
+    var style = document.getElementById("style"), lyrics = document.getElementById("lyrics"), idea = document.getElementById("idea");
     if (watching || !style) return;
     watching = true;
     var sized = window.CSS && CSS.supports && CSS.supports("field-sizing", "content");
     var last = null;
     function tick() {
-      var now = style.value.length + ":" + (lyrics ? lyrics.value.length : 0);
+      // the texts themselves: a new prompt of the same length set by the page must still repaint
+      var now = style.value + "\u0000" + (lyrics ? lyrics.value : "");
       if (now === last) return;
       last = now;
       if (!sized) growBox(style);
       paintMeter();
     }
+    // browsers without field-sizing: the idea box grows by hand too
+    if (!sized && idea) idea.addEventListener("input", function () { growBox(idea); });
     style.addEventListener("input", tick);
     if (lyrics) lyrics.addEventListener("input", tick);
     setInterval(tick, 700);     // values set by the page itself (examples, reuse, the writer) fire no input event
@@ -5198,7 +5075,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
 (function (root) {
   "use strict";
 
-  /* THEMES:BEGIN (generated by tools/gen_themes.py) */
+  /* THEMES:BEGIN (the theme list; its generator is gone, so edit it here, with themes.css) */
   var THEMES = [{"id": "studio", "name": "Studio (warm)", "family": "classic", "dark": true, "bg": "#14110e", "fg": "#f2eadc", "accent": "#e8a33d", "rule": "#3a3129"},
     {"id": "graphite", "name": "Graphite", "family": "classic", "dark": true, "bg": "#131518", "fg": "#eef1f5", "accent": "#f0b44c", "rule": "#373d45"},
     {"id": "nord", "name": "Nord", "family": "classic", "dark": true, "bg": "#2e3440", "fg": "#eceff4", "accent": "#ebcb8b", "rule": "#4c566a"},
@@ -5718,6 +5595,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   });
 
   document.addEventListener("keydown", function (event) {
+    if (event.defaultPrevented) return;   // a list card already used the key
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)) return;
     if (event.key === "Escape") { $("view-engine").classList.add("is-hidden"); closeMenus(); }
     if (event.key === " " && (audio.getAttribute("src") || STATE.take) && !event.target.closest(".menu-pop")) { event.preventDefault(); togglePlay(); }
@@ -5886,6 +5764,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     if (radio) radio.checked = true;
     fillCfg();
     paintSliders();
+    YueLoras.repaint();
   }
   function fillCfg() {
     if ($("cfg").dataset.touched) return;
@@ -6063,7 +5942,6 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
 
   function vaeInfo(name) { return STATE.vaes.filter(function (v) { return v.name === name; })[0] || null; }
   function vaeLabel(name) { var v = vaeInfo(name); return v ? (v.label || v.name) : (name || "default"); }
-  function vaeRepo(name) { var v = vaeInfo(name); return v && v.repo ? v.repo : (name || ""); }
 
   // One VAE per song, kept per browser. A take can gain another VAE version
   // later from its page.
@@ -6174,6 +6052,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     paintSliders();
   });
 
+  $("sliderActive").addEventListener("change", paintSliderCard);
   $("sliderActive").addEventListener("input", function (event) {
     var id = event.target.dataset.strength;
     if (!id) return;
@@ -6326,6 +6205,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     $("abc").value = ex.abc || "";
     $("lmSeed").value = ex.seed !== undefined && ex.seed !== null && /^\d+$/.test(String(ex.seed)) ? String(ex.seed) : "";
     $("soundSeed").value = "";
+    paintDice();
     setCodes(null);
     setCot(ex.cot || "full");
     if (ex.abc) $("scoreDrawer").open = true;
@@ -6567,6 +6447,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     if (req.abc) $("scoreDrawer").open = true;
     $("lmSeed").value = seedText(req.lm_seed);
     $("soundSeed").value = seedText(req.seed);
+    paintDice();
     var cot = MODES[req.cot] ? req.cot : "full";
     document.querySelector('input[name="cot"][value="' + cot + '"]').checked = true;
     if (typeof req.cfg_scale === "number" && req.cfg_scale >= 0 && round(req.cfg_scale, 4) !== defaultCfg(cot)) {
@@ -7019,7 +6900,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     land.then(function (takes) {
       job.takes = takes;
       settle(job, "done");
-      return refreshLibrary().then(function () { return nameVersions(job); });
+      return refreshLibrary().catch(function () {}).then(function () { return nameVersions(job); });
     }).then(function () {
       paintAllRuns();
       if (job.kind === "replay") return replayLanded(job);
@@ -7067,7 +6948,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         if (instrumentalAfterPlan(job, abc)) return;
         $("abc").value = abc;
         var seed = job.resolved.lm_seed || job.request.lm_seed;
-        if (seed && /^\d+$/.test(String(seed))) $("lmSeed").value = String(seed);
+        if (seed && /^\d+$/.test(String(seed))) { $("lmSeed").value = String(seed); paintDice(); }
         $("scoreDrawer").open = true;
         toast("Score planned. Check its sections under Supply your own score; Generate now renders exactly this score.", "good");
       }
@@ -7663,11 +7544,11 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       meter.classList.toggle("is-hidden", shown !== "running" && shown !== "completed");
       if (shown === "running") {
         meter.classList.toggle("indeterminate", pct < 0);
-        bar.style.width = pct < 0 ? "" : pct.toFixed(1) + "%";
+        bar.style.transform = pct < 0 ? "" : "scaleX(" + (pct / 100).toFixed(4) + ")";   // the indeterminate slide is CSS
         bar.style.background = "";
       } else if (shown === "completed") {
         meter.classList.remove("indeterminate");
-        bar.style.width = "100%";
+        bar.style.transform = "scaleX(1)";
         bar.style.background = "var(--patina-dim)";
       }
     });
@@ -7683,6 +7564,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   }
 
   setInterval(function () {
+    if (document.hidden) return;
     if (tipFor && !tipFor.isConnected) hideTip();
     paintClock();
     var job = STATE.job;
@@ -7909,13 +7791,11 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
 
   function refreshSettings() {
     return api("/settings").then(function (settings) {
-      STATE.noSettings = false;
       $("computeCard").classList.remove("is-off");
       paintSettings(settings);
     }).catch(function (error) {
       if (error.status !== 404) return;
       // An older server without engine settings: the card says so and stays still.
-      STATE.noSettings = true;
       $("computeCard").classList.add("is-off");
       all("#computeCard select, #computeCard input, #computeCard button").forEach(function (el) { el.disabled = true; });
       $("computeHint").textContent = "This server has no engine settings; its start-up flags decide.";
@@ -8020,7 +7900,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     }).join("");
   }
 
-  function unloadModels(button) {
+  function unloadModels() {
     var gpu = gpuOf(), before = gpu ? gib(gpu.total_bytes - gpu.free_bytes) : null;
     $("unloadModel").disabled = true;
     $("unloadNow").disabled = true;
@@ -8037,8 +7917,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     }).catch(function (error) { toast(error.message, "bad"); refreshHardware(); });
   }
 
-  $("unloadModel").addEventListener("click", function () { unloadModels(this); });
-  $("unloadNow").addEventListener("click", function () { unloadModels(this); });
+  $("unloadModel").addEventListener("click", unloadModels);
+  $("unloadNow").addEventListener("click", unloadModels);
 
   /* ---------------------------------------------------------------- take */
 
@@ -8066,7 +7946,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   // MP3 copies for sharing: made on the server at the bitrate chosen on the song page
   function mp3Rate() {
     var saved = 320;
-    try { saved = parseInt(localStorage.getItem("yue2.mp3kbps") || "320", 10); } catch (error) { saved = 320; }
+    saved = parseInt(recall("yue2.mp3kbps") || "320", 10);
     return [128, 192, 256, 320].indexOf(saved) >= 0 ? saved : 320;
   }
 
@@ -8099,7 +7979,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   }
 
   $("mp3Rate").addEventListener("change", function () {
-    try { localStorage.setItem("yue2.mp3kbps", $("mp3Rate").value); } catch (error) { /* private mode */ }
+    store("yue2.mp3kbps", $("mp3Rate").value);
     paintMp3();
     paintLibrary();
     toast("MP3 downloads now at " + mp3Rate() + " kbps");
@@ -8108,17 +7988,23 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   // True while a song is audibly playing; finished runs must not replace it.
   function isPlaying() { return !!audio.getAttribute("src") && !audio.paused && !audio.ended; }
 
+  var requestsPending = {};
   function getRequest(take) {
     if (STATE.requests[take.name]) return Promise.resolve(STATE.requests[take.name]);
     if (take.session) return Promise.reject(new Error("This take's request is gone with the page reload"));
-    return fetch("/library/request?name=" + encodeURIComponent(take.name)).then(function (r) {
+    if (requestsPending[take.name]) return requestsPending[take.name];   // one fetch for overlapping asks
+    var name = take.name, pending = fetch("/library/request?name=" + encodeURIComponent(name)).then(function (r) {
       return r.text().then(function (text) {
         if (!r.ok) throw new Error("Could not read the take's request (" + r.status + ")");
         var req = parseJSON(text);
-        STATE.requests[take.name] = req;
+        STATE.requests[name] = req;
         return req;
       });
     });
+    var done = function () { delete requestsPending[name]; };
+    pending.then(done, done);
+    requestsPending[name] = pending;
+    return pending;
   }
 
   function openTake(name, opts) {
@@ -8176,7 +8062,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     paintDecodeSwitch();
     paintPlayHere();
     paintSoundSwitch();
-    paintLibrary();
+    markActive();
     paintRunReturn();
     show("take");
   }
@@ -8711,13 +8597,12 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     if (STATE.take && STATE.take.name === take.name) clearTakeView();
   }
 
-  function deleteTake(take, confirmed) {
+  function deleteTake(take, confirmed, quiet) {
     if (!confirmed && !window.confirm("Delete \u201c" + displayTitle(take) + "\u201d and its files?")) return Promise.resolve(false);
     var gone = take.session ? Promise.resolve() : post("/library/delete?name=" + encodeURIComponent(take.name));
     return gone.then(function () {
       removeTake(take);
-      paintLibrary();
-      paintCoverTakes();
+      if (!quiet) { paintLibrary(); paintCoverTakes(); }
       if (!confirmed) toast("Take deleted");
       return true;
     }).catch(function (error) { toast(error.message, "bad"); return false; });
@@ -8732,9 +8617,11 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
                         " not a favourite, with their files? " + kept + (kept === 1 ? " favourite stays." : " favourites stay."))) return;
     var chain = Promise.resolve(), count = 0;
     doomed.forEach(function (take) {
-      chain = chain.then(function () { return deleteTake(take, true).then(function (ok) { if (ok) count++; }); });
+      chain = chain.then(function () { return deleteTake(take, true, true).then(function (ok) { if (ok) count++; }); });
     });
     chain.then(function () {
+      paintLibrary();
+      paintCoverTakes();
       toast("Deleted " + count + (count === 1 ? " take; " : " takes; ") + kept + (kept === 1 ? " favourite kept" : " favourites kept"), "good");
     });
   });
@@ -8754,6 +8641,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   /* -------------------------------------------------------------- player */
 
   var audio = $("audio");
+  var pendingSeek = null;   // the A/B switch's "same bar" handler, while its file loads
 
   // The player holds its own song, apart from the song page on screen.
   STATE.playerTake = null;
@@ -8764,13 +8652,16 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     STATE.playerTake = take;
     if (audio.getAttribute("src") !== url) {
       audio.src = url;
+      if (pendingSeek) { audio.removeEventListener("loadedmetadata", pendingSeek); pendingSeek = null; }
       if (keepTime) {
         // A/B between versions of the same music: same bar, same play state
-        audio.addEventListener("loadedmetadata", function again() {
-          audio.removeEventListener("loadedmetadata", again);
+        pendingSeek = function () {
+          audio.removeEventListener("loadedmetadata", pendingSeek);
+          pendingSeek = null;
           try { audio.currentTime = Math.min(at, audio.duration || at); } catch (error) { /* not seekable yet */ }
           if (wasPlaying) audio.play().catch(function () {});
-        });
+        };
+        audio.addEventListener("loadedmetadata", pendingSeek);
       } else {
         $("timeNow").textContent = "0:00";
         $("playGlyph").textContent = "▶";
@@ -8983,6 +8874,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
 
   /* -------------------------------------------------------------- library */
 
+  var libraryAsk = 0;
   function refreshLibrary() {
     if (!STATE.library) {
       STATE.takes = STATE.session.slice();
@@ -8990,7 +8882,9 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       paintCoverTakes();
       return Promise.resolve();
     }
+    var ask = ++libraryAsk;
     return api("/library").then(function (data) {
+      if (ask !== libraryAsk) return;   // an older reply landing after a newer one
       STATE.takes = STATE.session.concat((data && data.takes) || []);
       if (STATE.take) {
         var fresh = findTake(STATE.take.name);
@@ -9000,6 +8894,11 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       paintCoverTakes();
       if (STATE.take) { paintDecodeSwitch(); paintSoundSwitch(); }
     });
+  }
+
+  function markActive() {
+    var name = STATE.take ? STATE.take.name : null;
+    all("#libList .take[data-name]").forEach(function (card) { card.classList.toggle("is-active", card.dataset.name === name); });
   }
 
   function paintLibrary() {
@@ -9506,7 +9405,6 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   }
 
   function paintChat(status) {
-    CHAT.status = status;
     var pill = $("chatState");
     pill.textContent = !status.configured ? "not set" : (!status.available ? "not answering" : (status.use ? "ready" : "no model loaded"));
     pill.dataset.s = status.use ? "ready" : (status.configured ? "bad" : "missing");
@@ -9684,7 +9582,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   /* ---------------------------------------------------------------- boot */
 
   function propsChanged(a, b) {
-    var pick = function (p) { return JSON.stringify([p.version, p.model, p.vaes, p.default_vae, p.sliders, p.max_batch, p.transcriber, p.outputs]); };
+    var pick = function (p) { return JSON.stringify([p.version, p.model, p.vaes, p.default_vae, p.sliders, p.loras, p.sources, p.max_batch, p.transcriber, p.outputs]); };
     return !a || pick(a) !== pick(b);
   }
 
@@ -9700,11 +9598,15 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   }
 
   window.addEventListener("error", function (event) {
-    toast("Page error: " + (event.message || "unknown") + " — reload if things stop responding", "bad");
+    toastOnce("page-error:" + (event.message || ""), "Page error: " + (event.message || "unknown") + " — reload if things stop responding", "bad");
   });
 
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible" && STATE.online) refreshLibrary().catch(function () {});
+    if (document.visibilityState !== "visible") return;
+    pollProps();
+    if (!STATE.online) return;
+    refreshHardware();
+    refreshLibrary().catch(function () {});
   });
 
   // ------------------------------------------------------------ column grips
@@ -9881,10 +9783,23 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       toast(systemFonts.length + " fonts listed");
     }).catch(function (error) { toast("The browser did not list the fonts: " + error.message, "bad"); });
   });
-  systemFonts = COMMON_FONTS.filter(hasFont);
   paintFonts();
+  (window.requestIdleCallback || function (fn) { return setTimeout(fn, 200); })(function () {
+    systemFonts = COMMON_FONTS.filter(hasFont);
+    paintFonts();
+  });
 
   STATE.favOnly = recall("yue2.favOnly") === "1";
+
+  // The polls start once, and wait while the tab is hidden (a visible tab catches up at once).
+  var pollsStarted = false;
+  function startPolls() {
+    if (pollsStarted) return;
+    pollsStarted = true;
+    setInterval(function () { if (!document.hidden) pollProps(); }, 10000);
+    // Keep the memory readout honest while runs come and go.
+    setInterval(function () { if (!document.hidden) refreshHardware(); }, 5000);
+  }
 
   function boot() {
     api("/props").then(function (props) {
@@ -9892,14 +9807,13 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       applyProps(props);
       restoreJobs();
       connectLogs();
-      setInterval(pollProps, 10000);
+      startPolls();
       refreshSettings();
       refreshHardware();
-      // Keep the memory readout honest while runs come and go.
-      setInterval(refreshHardware, 5000);
       if (chatBase()) refreshChat().catch(function () {});
       else paintChat({ configured: false, available: false, models: [], loaded: null, use: null });
-      return refreshLibrary();
+      // a library that cannot be read is its own problem, not a server that is down
+      refreshLibrary().catch(function (error) { toastOnce("library", "Could not read the song library: " + error.message, "bad"); });
     }).catch(function (error) {
       STATE.online = false;
       paintEngine();
