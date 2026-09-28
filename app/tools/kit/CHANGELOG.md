@@ -3,6 +3,26 @@
 Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
 `d48e6e2e4a4e9bff24f8f60c943eddd976358df1`. v5 is the first kit that changes the app itself.
 
+## v10 (2026-09-27, not yet released as a zip)
+
+50 patches, tree `0c1ff5bd25a9e13a687290796cc841de56912ba7`. The kit repository is now on GitHub as **yue2-kit**.
+
+- **Workspace**: drag the lines between the three columns to size them (double-click resets). The Compose
+  heading stands alone; the empty song page has a friendlier welcome.
+- **Idea writer**: a two-line idea box that grows; Structure and the writer model each on their own line;
+  a square **Chat Server Connected / Offline** button (green or red, always the same size, what to do in
+  its tip) beside **Write the brief**.
+- **Cover or remix** and **Supply your own score** cleaned up the same way: labels with their (i), one
+  control per line, square buttons of one size on the left. **▶ Listen** plays a chosen recording first.
+- **Drawer headings**: the name, and one sentence under it.
+- **Fonts**: headings now use the text font (IBM Plex Sans, medium); a **Fonts** card on the Engine page
+  changes the text, heading and number fonts per browser (the app's fonts first, then this computer's).
+- **Fixes**: the page no longer waits on the web fonts or the score engraver to start; a tip stays open
+  while the server log scrolls. The About card credits the layout's inspiration.
+- **The repository**: a GitHub README with every download (link, pinned revision, size) and the project
+  links; clean screenshots from `tools/screenshots.mjs` (optional for a kit); published notes say `~` for
+  the owner's home folder; every sync checks the whole repository for names it must not carry.
+
 ## v9 (2026-09-27)
 
 The app is the same as in v6 to v8: 36 patches, tree `46618fde37a376e5c80eb46d5ce3fef9334e6456`.
