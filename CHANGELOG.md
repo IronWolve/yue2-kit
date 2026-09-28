@@ -3,6 +3,20 @@
 Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
 `d48e6e2e4a4e9bff24f8f60c943eddd976358df1`. v5 is the first kit that changes the app itself.
 
+## v12 (2026-09-28)
+
+52 patches, tree `1368479d4b54bf53cd21a63d435333d676f32b86`. From a friend's copy of the page, brought onto v11.
+
+- **Downloads named after the song**: `Last Train Home.wav` instead of `20260927-183418-last-train-home.wav`,
+  for WAV, MP3 and FLAC, named by the server and the page alike (the characters Windows refuses in a file
+  name are left out). A rename renames them. The Takes list's ⋯ menu has **Put the date in download
+  names** to go back to the library name.
+- **The DMM theme**: zinc and electric purple with cyan and neon green, Michroma headings and Space Grotesk
+  text, and a larger play button with drawn play and pause icons. It is one of the themes in the picker;
+  Studio stays the default. Its two fonts are also in the Engine page's Fonts card.
+- **The play button says Play or Pause** to screen readers as it changes.
+- The real-server test now checks the download names too; its screenshots are taken only on request.
+
 ## v11 (2026-09-27)
 
 51 patches, tree `10b2ed565bc7fe787eaf654989198819bc4c421d`. Mostly from a real upgrade of an RTX 2070 laptop from v3 to v10.

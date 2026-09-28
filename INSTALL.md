@@ -1,6 +1,6 @@
 # Install a complete local YuE2 music studio, exactly like the original (instructions for an AI coding agent)
 
-Kit v11, 2026-09-27.
+Kit v12, 2026-09-28.
 
 You are an AI coding agent running on my computer with a shell. A friend has given me his
 local setup for **YuE2** (m-a-p/YuE2-3B, an AI model that writes whole songs with vocals from a
@@ -18,7 +18,7 @@ Everything comes from public GitHub and Hugging Face sources, plus this kit:
 downloaded into one install folder and runs from there.
 
 **The app** is `yue2.cpp` (ServeurpersoCom/yue2.cpp), a fast C++/GGML engine for YuE2 that you
-compile. It gets 51 patches from my friend, which give it his web page and everything
+compile. It gets 52 patches from my friend, which give it his web page and everything
 below. They were made for upstream commit `f17d526` of 2026-09-24: upstream may be newer by now. It
 runs on port 41867.
 
@@ -90,11 +90,14 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - the logo: "YuE2" links to the model's GitHub, the CPP badge to the engine's;
   - status and hardware readout;
   - a Model menu (BF16, Q5_K_M);
-  - a theme picker with **50 themes** (the default is Studio, a dark warm palette);
+  - a theme picker with **51 themes** (the default is Studio, a dark warm palette; DMM is a zinc and
+    electric purple one with its own fonts and play button);
   - Open/Save, Load example (110 official demos), Clear, a **New song** button, Unload model;
   - **Engine**.
 - **Three columns** (song form, song page, library): drag the line on either side of the middle one to
   resize the song form or the library; a double-click puts one back, and the browser remembers.
+- **Downloads** are named after the song (`Last Train Home.wav`); the Takes list's ⋯ menu can put the
+  date back in the names.
 - **Library** (right): a tinted card with a ▶ PLAYING badge for the song that plays; favourites and
   versions; a double-click on a song plays it.
 - **Song page** (middle):
@@ -170,14 +173,14 @@ What it has (all of it comes with the patches; you do not build any of it by han
 
 ## 1. Check the machine first, then ask me
 
-The zip is in the folder you were started in. Unzip it (that only makes `yue2-install-2026-09-27-v11/`), then run the machine
+The zip is in the folder you were started in. Unzip it (that only makes `yue2-install-2026-09-28-v12/`), then run the machine
 check. (A clone of the kit's git repository, yue2-kit, works the same: that folder is the kit, so skip the
-unzip and use its name wherever these steps say `yue2-install-2026-09-27-v11`.) It changes nothing. It also finds tools that are installed but **not on PATH**: on WSL, `nvcc`
+unzip and use its name wherever these steps say `yue2-install-2026-09-28-v12`.) It changes nothing. It also finds tools that are installed but **not on PATH**: on WSL, `nvcc`
 is often in `/usr/local/cuda/bin` and `nvidia-smi` in `/usr/lib/wsl/lib`.
 
 ```bash
-unzip -q -n yue2-install-2026-09-27-v11.zip       # makes yue2-install-2026-09-27-v11/ (-n: never overwrites a file)
-mkdir -p install-record && bash yue2-install-2026-09-27-v11/app/tools/check-machine.sh . 2>&1 | tee install-record/check-machine.txt
+unzip -q -n yue2-install-2026-09-28-v12.zip       # makes yue2-install-2026-09-28-v12/ (-n: never overwrites a file)
+mkdir -p install-record && bash yue2-install-2026-09-28-v12/app/tools/check-machine.sh . 2>&1 | tee install-record/check-machine.txt
 ```
 
 Summarise its report. The rules that follow from it:
@@ -253,9 +256,9 @@ Then ask me, in one message:
 
 ```
 ROOT/
-  yue2-install-2026-09-27-v11/     this kit (unzipped here, or the yue2-kit clone); call it KIT
+  yue2-install-2026-09-28-v12/     this kit (unzipped here, or the yue2-kit clone); call it KIT
   upstream/          github.com/ServeurpersoCom/yue2.cpp @ f17d526 (+ ggml submodule), never edited
-  build/             upstream + the 51 patches + the built page: compiled and run from here
+  build/             upstream + the 52 patches + the built page: compiled and run from here
   build/checkpoints -> ../checkpoints       build/models -> ../models
   checkpoints/       the Hugging Face checkpoints the converter reads
   models/            the GGUF files the app loads (made here, no download)
@@ -269,8 +272,8 @@ ROOT/
 
 ```bash
 ROOT=~/yue2-studio            # the folder I chose (you are already in it)
-mkdir -p "$ROOT" && cd "$ROOT" && unzip -q yue2-install-2026-09-27-v11.zip    # makes yue2-install-2026-09-27-v11/ (skip if already unzipped)
-KIT=$ROOT/yue2-install-2026-09-27-v11
+mkdir -p "$ROOT" && cd "$ROOT" && unzip -q yue2-install-2026-09-28-v12.zip    # makes yue2-install-2026-09-28-v12/ (skip if already unzipped)
+KIT=$ROOT/yue2-install-2026-09-28-v12
 export TMPDIR=$ROOT/tmp && mkdir -p tmp outputs tools
 ```
 
@@ -289,7 +292,7 @@ git -C build submodule update --init --recursive --reference "$ROOT/upstream/ggm
 (cd build && git -c user.name=install -c user.email=install@localhost am "$KIT"/engines/cpp/patches/*.patch)
 cp "$KIT"/engines/cpp/page/index.html.gz build/tools/public/index.html.gz   # the built page (not in the patches)
 git -C build -c user.name=install -c user.email=install@localhost commit -q -am "Add the built page"
-[ "$(git -C build rev-parse HEAD^{tree})" = 10b2ed565bc7fe787eaf654989198819bc4c421d ] && echo "code OK: identical to the original"
+[ "$(git -C build rev-parse HEAD^{tree})" = 1368479d4b54bf53cd21a63d435333d676f32b86 ] && echo "code OK: identical to the original"
 ln -s ../checkpoints build/checkpoints && ln -s ../models build/models
 printf 'checkpoints\nmodels\n' >> build/.git/info/exclude
 cp -r "$KIT"/app/. . && chmod +x *.sh tools/*.sh      # his root scripts and his whole tools/ folder
@@ -479,7 +482,7 @@ treat it as GPU VRAM from the table above. Start from these, and treat them as u
 |---|---|---|---|
 | `tools/verify-install.sh` | the whole install against his: the code tree, 22 GGUF files (6 models + 16 sliders), 11 LoRAs (pinned sizes, then the server's LoRA reader), `sources.json`, settings | nothing | ~10 s |
 | `tools/test_downloaders.sh` | the download scripts: the include patterns reach the downloader literally, and incomplete downloads are caught | nothing | seconds |
-| `node tools/cdp-console.mjs` | the whole page against a stand-in server: 307 checks | node, google-chrome, python3 | ~75 s |
+| `node tools/cdp-console.mjs` | the whole page against a stand-in server: 311 checks | node, google-chrome, python3 | ~75 s |
 | `tools/test-real.sh` | the real server and page, including a real 1-second song on the CPU: 6 checks + 13 page checks | node, google-chrome, the models | ~1–3 min |
 | `tmp/venv/bin/python tools/test_flac.py --no-song` | the built-in FLAC encoder, bit-exact against flac and ffmpeg | flac, ffmpeg | ~20 s |
 | `tools/test_downloaders.sh --online` | also the real pinned downloader on two include patterns (about 16 MB) | network | ~10 s |
@@ -543,7 +546,7 @@ Compare with the kit's `docs/screenshots/`:
 - `engine-page.png`: the Engine page with its band and dotted backdrop;
 - `engine-tiles.png`: VAE, LoRA and Sliders tiles with links and (i);
 - `engine-about.png`: the end of the Engine page, with the About card;
-- `theme-picker.png`: the 50 themes.
+- `theme-picker.png`: the themes.
 
 The screenshots were taken against a stand-in server that had his real LoRAs, VAEs and sliders; the
 songs and the hardware readout are examples. The layout, text, colours and controls are what I should see.

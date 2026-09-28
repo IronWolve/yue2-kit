@@ -42,6 +42,7 @@ import shutil
 import struct
 import sys
 import threading
+import urllib.parse
 import time
 from collections import deque
 from datetime import datetime
@@ -103,6 +104,21 @@ def write_atomic(path, text):
         except OSError:
             pass
         raise
+
+
+def disposition(how, folder, name, ext, q):
+    """Content-Disposition as the real server writes it: named after the song (the title from meta.json, without
+    the characters Windows refuses), or the library name when the page asks with names=library."""
+    title = name
+    if q.get("names") != "library":
+        try:
+            title = json.loads((folder / "meta.json").read_text(encoding="utf-8")).get("title") or name
+        except (OSError, ValueError):
+            pass
+    safe = re.sub(r'[\x00-\x1f\x7f\\/:*?"<>|\s]+', " ", title).rstrip(" .").strip() or name
+    safe += ext
+    ascii_name = "".join(c if ord(c) < 128 else "_" for c in safe)
+    return '%s; filename="%s"; filename*=UTF-8\'\'%s' % (how, ascii_name, urllib.parse.quote(safe, safe="-._~"))
 
 
 def byte_range(header, size):
@@ -929,7 +945,7 @@ def make_handler(mock):
                 if (folder / "audio.mp3").is_file():
                     return self.error(400, "this take was made as MP3; a FLAC of it would not sound any better")
                 return self.send(200, b"fLaC" + bytes(64), "audio/flac",
-                                 {"Content-Disposition": 'attachment; filename="%s.flac"' % name})
+                                 {"Content-Disposition": disposition("attachment", folder, name, ".flac", q)})
             if path == "/library/mp3":
                 # The real server encodes and tags; the page only needs the request and the file name
                 kbps = q.get("kbps", "320")
@@ -937,7 +953,7 @@ def make_handler(mock):
                 if kbps not in ("128", "192", "256", "320"):
                     return self.error(400, "kbps must be 128, 192, 256 or 320")
                 return self.send(200, b"ID3\x04\x00\x00\x00\x00\x00\x00" + b"\xff\xfb" * 64, "audio/mpeg",
-                                 {"Content-Disposition": 'attachment; filename="%s.mp3"' % name})
+                                 {"Content-Disposition": disposition("attachment", folder, name, ".mp3", q)})
             if path == "/library/audio":
                 mock.requests.append({"path": "/library/audio", "name": name, "range": bool(self.headers.get("Range"))})
                 audio = folder / "audio.mp3"
@@ -945,8 +961,8 @@ def make_handler(mock):
                     audio = folder / "audio.wav"
                 data = audio.read_bytes()
                 mime = "audio/mpeg" if audio.suffix == ".mp3" else "audio/wav"
-                # saved copies are named after the take, and played in place (like the real server)
-                head = {"Accept-Ranges": "bytes", "Content-Disposition": 'inline; filename="%s%s"' % (name, audio.suffix)}
+                # saved copies are named after the song, and played in place (like the real server)
+                head = {"Accept-Ranges": "bytes", "Content-Disposition": disposition("inline", folder, name, audio.suffix, q)}
                 span = byte_range(self.headers.get("Range"), len(data))
                 if span == "unsatisfiable":
                     return self.send(416, b"", mime, dict(head, **{"Content-Range": "bytes */%d" % len(data)}))

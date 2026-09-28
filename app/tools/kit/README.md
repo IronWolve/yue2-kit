@@ -35,7 +35,7 @@ it builds in its own folder and never changes an existing yue2.cpp install.
     <td width="50%"><img src="docs/screenshots/engine-tiles.png" alt="Engine"><br><sub><b>Engine</b>: every VAE, LoRA and slider, with its source</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/theme-picker.png" alt="Themes"><br><sub><b>50 themes</b>, Studio by default</sub></td>
+    <td width="50%"><img src="docs/screenshots/theme-picker.png" alt="Themes"><br><sub><b>51 themes</b>, Studio by default</sub></td>
     <td width="50%"><img src="docs/screenshots/engine-about.png" alt="About"><br><sub><b>About</b>: every project and add-on, linked</sub></td>
   </tr>
 </table>
@@ -43,13 +43,14 @@ it builds in its own folder and never changes an existing yue2.cpp install.
 ## Features
 
 - **A studio page**: song form, song page and library side by side, with columns you can drag wider or
-  narrower, 50 colour themes, your own choice of fonts, and an (i) help on every setting.
+  narrower, 51 colour themes, your own choice of fonts, and an (i) help on every setting.
 - **Add-ons**: 3 VAEs (Standard, Legacy and a Blend of the two), {{NSLIDER}} stackable voice and genre sliders,
   and {{NLORA}} LoRAs, each with its own strength for the music and the sound, and its trigger word.
 - **Songs**: Full plan, Melody only and Direct modes, the official Instrumental mode, covers from a
   recording (listen to it first) or from a song, and an editable score. Retake, Reuse, or give a song
   another VAE in seconds.
-- **Library**: every song kept on disk, with favourites and versions; FLAC, WAV and MP3 downloads;
+- **Library**: every song kept on disk, with favourites and versions; FLAC, WAV and MP3 downloads named
+  after the song (or with the date, if you prefer);
   double-click a song to play it; a status light in the player.
 - **Idea writer**: a local chat model drafts the title, style and lyrics from one line; a Connected or
   Offline button shows the chat server's state at a glance.

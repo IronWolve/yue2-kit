@@ -262,8 +262,8 @@ const fontMenu = await ev(`(() => { const s = document.getElementById("fontSans"
   return { first: kids.slice(0, hr).map(k => k.textContent), hr, system: kids.slice(hr + 1).map(k => k.value), value: s.value,
     heading: document.getElementById("fontHeading").options[0].textContent, mono: document.getElementById("fontMono").value,
     card: cards.findIndex(c => c.id === "fontsCard"), about: cards.findIndex(c => c.id === "aboutCard"), n: cards.length }; })()`);
-check("Fonts: the app's fonts first (the default marked), a line, then the fonts this computer has", fontMenu.first.join() === "IBM Plex Sans (default),IBM Plex Mono,Bodoni Moda" &&
-  fontMenu.hr === 3 && fontMenu.system.length >= 1 && fontMenu.value === "IBM Plex Sans" && fontMenu.heading === "Same as the text (default)" &&
+check("Fonts: the app's fonts first (the default marked), a line, then the fonts this computer has", fontMenu.first.join() === "IBM Plex Sans (default),IBM Plex Mono,Bodoni Moda,Space Grotesk,Michroma" &&
+  fontMenu.hr === 5 && fontMenu.system.length >= 1 && fontMenu.value === "IBM Plex Sans" && fontMenu.heading === "Same as the text (default)" &&
   fontMenu.mono === "IBM Plex Mono" && fontMenu.card >= 0 && fontMenu.about === fontMenu.n - 1, JSON.stringify({ ...fontMenu, system: fontMenu.system.slice(0, 6) }));
 const pickFont = (id, value) => ev(`(() => { const s = document.getElementById("${id}"); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event("change")); return s.value; })()`);
 const fontsNow = `(() => ({ body: getComputedStyle(document.body).fontFamily, head: getComputedStyle(document.querySelector(".col-head h2")).fontFamily,
@@ -675,11 +675,13 @@ check("✕ deletes a take (after the confirm)", (await libCount()) === n0 - 1 &&
 
 // ======================================================= downloads + playback
 section("downloads and playback");
+const fileTitle = (t) => t.replace(/[\u0000-\u001f\u007f\\/:*?"<>|\s]+/g, " ").replace(/[\s.]+$/, "").trim();
 const dl = await ev(`[...document.querySelectorAll("#libList .take:not(.is-running-row)")].map(e => {
-  const a = e.querySelector(".take-dl"); return a ? { name: e.dataset.name, href: a.getAttribute("href"), file: a.getAttribute("download") } : { name: e.dataset.name }; })`);
+  const a = e.querySelector(".take-dl"); return a ? { name: e.dataset.name, title: e.querySelector(".take-title").textContent, href: a.getAttribute("href"),
+    file: a.getAttribute("download") } : { name: e.dataset.name }; })`);
 check("every library card has a download icon", dl.length > 0 && dl.every((d) => d.href), `${dl.filter((d) => d.href).length}/${dl.length}`);
-check("  named after the take (date-time-title.wav), from the library",
-  dl.every((d) => d.file === d.name + ".wav" && d.href === "/library/audio?name=" + encodeURIComponent(d.name)), dl[0] && dl[0].file);
+check("  named after the song (Title.wav), from the library",
+  dl.every((d) => d.file === fileTitle(d.title) + ".wav" && d.href === "/library/audio?name=" + encodeURIComponent(d.name)), dl[0] && dl[0].file);
 await click(`#libList .take[data-name="${cdpTake}"]`);
 await showsTake(cdpTake);
 const dlOther = dl.map((d) => d.name).find((n) => n !== cdpTake);
@@ -687,9 +689,10 @@ const stay = await ev(`(() => { const stop = (e) => e.preventDefault(); document
   document.querySelector('#libList .take[data-name="${dlOther}"] .take-dl').click();
   return document.querySelector("#libList .take.is-active")?.dataset.name; })()`);
 check("  clicking it downloads instead of opening that take", stay === cdpTake, stay);
+const cdpTitle = fileTitle(await ev(`document.querySelector('#libList .take[data-name="${cdpTake}"] .take-title').textContent`));
 const names = await ev(`({ page: document.getElementById("dlTakeAudio").getAttribute("download"), pageHref: document.getElementById("dlTakeAudio").getAttribute("href"),
   label: document.getElementById("dlTakeAudio").textContent })`);
-check("song page has an Audio download with the same name", names.page === cdpTake + ".wav" && names.label === "WAV" &&
+check("song page has an Audio download with the same name", names.page === cdpTitle + ".wav" && names.label === "WAV" &&
   /\/library\/audio\?name=/.test(names.pageHref), JSON.stringify(names));
 check("  the player bar has no download buttons of its own (the song page has them)", (await ev(`!document.getElementById("dlAudio") && !document.getElementById("dlMp3Bar") &&
   !document.querySelector("#playbar a[download]")`)) === true);
@@ -698,10 +701,11 @@ await ev(`localStorage.removeItem("yue2.mp3kbps"); document.getElementById("mp3R
 const mp3 = await ev(`({ page: document.getElementById("dlTakeMp3").getAttribute("href"), pageFile: document.getElementById("dlTakeMp3").getAttribute("download"),
   label: document.getElementById("dlTakeMp3").textContent, rate: document.getElementById("mp3Rate").value,
   cards: [...document.querySelectorAll("#libList .take:not(.is-running-row)")].map(e => { const a = e.querySelector(".take-mp3");
-    return a ? a.getAttribute("href") === "/library/mp3?name=" + encodeURIComponent(e.dataset.name) + "&kbps=320" && a.getAttribute("download") === e.dataset.name + ".mp3" : false; }) })`);
+    const t = e.querySelector(".take-title").textContent.replace(/[\\u0000-\\u001f\\u007f\\\\/:*?"<>|\\s]+/g, " ").replace(/[\\s.]+$/, "").trim();
+    return a ? a.getAttribute("href") === "/library/mp3?name=" + encodeURIComponent(e.dataset.name) + "&kbps=320" && a.getAttribute("download") === t + ".mp3" : false; }) })`);
 check("song page has an MP3 download at 320 kbps by default", mp3.page === "/library/mp3?name=" + encodeURIComponent(cdpTake) + "&kbps=320" &&
-  mp3.pageFile === cdpTake + ".mp3" && mp3.label === "MP3" && mp3.rate === "320", JSON.stringify(mp3).slice(0, 200));
-check("  every library card has an mp3 chip named after the take", mp3.cards.length > 0 && mp3.cards.every(Boolean), `${mp3.cards.filter(Boolean).length}/${mp3.cards.length}`);
+  mp3.pageFile === cdpTitle + ".mp3" && mp3.label === "MP3" && mp3.rate === "320", JSON.stringify(mp3).slice(0, 200));
+check("  every library card has an mp3 chip named after the song", mp3.cards.length > 0 && mp3.cards.every(Boolean), `${mp3.cards.filter(Boolean).length}/${mp3.cards.length}`);
 t = await hoverOn("#dlTakeMp3");
 check("  (i) tip explains the bitrates", t?.on && /320 kbps/.test(t.text) && /128/.test(t.text), t?.text.slice(0, 80));
 await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });
@@ -721,10 +725,26 @@ await ev(`(() => { const s = document.getElementById("mp3Rate"); s.value = "320"
 const flacLink = await ev(`(() => { const a = document.getElementById("dlTakeFlac"); return { href: a.getAttribute("href"), file: a.getAttribute("download"),
   hidden: a.classList.contains("is-hidden") }; })()`);
 check("song page has a FLAC download (lossless, from the WAV)", !flacLink.hidden && flacLink.href === "/library/flac?name=" + encodeURIComponent(cdpTake) &&
-  flacLink.file === cdpTake + ".flac", JSON.stringify(flacLink));
+  flacLink.file === cdpTitle + ".flac", JSON.stringify(flacLink));
 const flacGet = await fetch(BASE + flacLink.href.slice(1));
-check("  the server answers with a FLAC file named after the take", flacGet.status === 200 && flacGet.headers.get("content-type") === "audio/flac" &&
-  (flacGet.headers.get("content-disposition") || "").includes(cdpTake + ".flac"));
+check("  the server answers with a FLAC file named after the song", flacGet.status === 200 && flacGet.headers.get("content-type") === "audio/flac" &&
+  (flacGet.headers.get("content-disposition") || "").includes('filename="' + cdpTitle + '.flac"'), flacGet.headers.get("content-disposition"));
+// the Takes menu puts the date back in the names (the library name), and tells the server the same
+await click("#libMenuBtn");
+await click("#dlNamesDate");
+const dated = await ev(`({ on: document.getElementById("dlNamesDate").getAttribute("aria-checked"), page: document.getElementById("dlTakeAudio").getAttribute("download"),
+  pageHref: document.getElementById("dlTakeAudio").getAttribute("href"), mp3: document.getElementById("dlTakeMp3").getAttribute("href"),
+  mp3File: document.getElementById("dlTakeMp3").getAttribute("download"), flac: document.getElementById("dlTakeFlac").getAttribute("download"),
+  card: document.querySelector('#libList .take[data-name="${cdpTake}"] .take-dl').getAttribute("download"), saved: localStorage.getItem("yue2.dlNames") })`);
+const datedGet = await fetch(BASE + dated.pageHref.slice(1));
+check("the Takes menu can put the date back in download names; the server names them the same",
+  dated.on === "true" && dated.page === cdpTake + ".wav" && dated.card === cdpTake + ".wav" && dated.mp3File === cdpTake + ".mp3" &&
+  dated.flac === cdpTake + ".flac" && /&names=library/.test(dated.pageHref) && /&names=library/.test(dated.mp3) && dated.saved === "library" &&
+  (datedGet.headers.get("content-disposition") || "").includes('filename="' + cdpTake + '.wav"'), JSON.stringify(dated).slice(0, 220));
+await click("#libMenuBtn");
+await click("#dlNamesDate");
+check("  and back to the song's name", (await ev(`document.getElementById("dlTakeAudio").getAttribute("download") === ${JSON.stringify(cdpTitle + ".wav")} &&
+  !/names=/.test(document.getElementById("dlTakeAudio").getAttribute("href")) && localStorage.getItem("yue2.dlNames") === null`)) === true);
 t = await hoverOn("#dlTakeFlac");
 check("  (i) tip says it is lossless", t?.on && /lossless/.test(t.text), t?.text.slice(0, 60));
 await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });
@@ -832,6 +852,18 @@ for (const clickCount of [1, 2]) {
 }
 const dblPlays = await waitFor(`!document.getElementById("audio").paused && document.getElementById("audio").src.includes(${JSON.stringify(encodeURIComponent(songA))})`, 4000);
 check("double-clicking a song in the list plays it", !!dblPlays, await ev(`document.getElementById("audio").src.split("name=")[1]`));
+check("  the play button says Pause while a song plays (for screen readers too)", (await ev(`document.getElementById("playBtn").getAttribute("aria-label") === "Pause" &&
+  document.getElementById("playBtn").classList.contains("is-playing")`)) === true);
+const dmm = await ev(`(() => { const was = document.documentElement.dataset.theme; YueThemes.set("dmm");
+  const b = document.getElementById("playBtn"), r = b.getBoundingClientRect(), cs = (e) => getComputedStyle(e);
+  const out = { accent: cs(document.documentElement).getPropertyValue("--amber").trim(), ground: cs(document.body).backgroundColor,
+    heading: cs(document.querySelector(".col-head h2")).fontFamily.split(",")[0], text: cs(document.body).fontFamily.split(",")[0],
+    size: Math.round(r.width), glyph: cs(document.getElementById("playGlyph")).display,
+    pauseIcon: cs(b.querySelector(".play-icon-pause")).display, playIcon: cs(b.querySelector(".play-icon-play")).display };
+  YueThemes.set(was); out.back = cs(b.querySelector(".play-icon-pause")).display; return out; })()`);
+check("  the DMM theme: purple and zinc, its own fonts, and its play button with drawn icons (none in other themes)",
+  dmm.accent === "#c94bff" && dmm.ground === "rgb(9, 9, 11)" && /Michroma/.test(dmm.heading) && /Space Grotesk/.test(dmm.text) && dmm.size === 48 &&
+  dmm.glyph === "none" && dmm.pauseIcon === "block" && dmm.playIcon === "none" && dmm.back === "none", JSON.stringify(dmm));
 check("  its card says PLAYING, and the page shows it with no Play button", JSON.stringify(await playingCards()) === JSON.stringify([songA]) &&
   (await ev(`document.getElementById("playHere").classList.contains("is-hidden") && document.getElementById("renameInput") === null`)) === true,
   JSON.stringify(await playingCards()));
@@ -1227,18 +1259,18 @@ for (const th of themeIds) {
   grounds.push(await ev(`getComputedStyle(document.body).backgroundColor`));
   if (["daylight", "nord", "solarized-light", "bold-sunflower", "jade", "bold-midnight-blue"].includes(th)) await shot("theme-" + th);
 }
-check("50 themes (41 new + the 9 hand-tuned), each painting its own background", themeIds.length === 50 && new Set(grounds).size >= 49,
+check("51 themes (41 new, the 9 hand-tuned and DMM), each painting its own background", themeIds.length === 51 && new Set(grounds).size >= 50,
   `${themeIds.length} themes, ${new Set(grounds).size} distinct backgrounds`);
 check("the theme choice is remembered", (await ev(`localStorage.getItem("yue2.theme")`)) === themeIds[themeIds.length - 1]);
 await ev(`YueThemes.set("studio"); localStorage.removeItem("yue2.themeFavorites"); localStorage.setItem("yue2.themeFamily", "all"); true`);
 await click("#themeButton");
 const tiles = () => ev(`[...document.querySelectorAll(".theme-popup .theme-choice")].map(b => b.dataset.themeId)`);
-check("the theme button opens a swatch grid of every theme", (await ev(`YueThemes.isOpen()`)) === true && (await tiles()).length === 50);
+check("the theme button opens a swatch grid of every theme", (await ev(`YueThemes.isOpen()`)) === true && (await tiles()).length === 51);
 await click('.theme-popup [data-family="bold"]');
 const bold = await tiles();
 await click('.theme-popup [data-family="soft"]');
 const soft = await tiles();
-check("  Bold / Soft filters", bold.length === 23 && soft.length === 12, `bold ${bold.length}, soft ${soft.length}`);
+check("  Bold / Soft filters (DMM is a bold one)", bold.length === 24 && bold.includes("dmm") && soft.length === 12, `bold ${bold.length}, soft ${soft.length}`);
 await ev(`(() => { const q = document.querySelector(".theme-popup .theme-search"); q.value = "jad"; q.dispatchEvent(new Event("input")); return true; })()`);
 check("  search looks through every collection", JSON.stringify(await tiles()) === '["jade"]', JSON.stringify(await tiles()));
 await ev(`(() => { const q = document.querySelector(".theme-popup .theme-search"); q.value = ""; q.dispatchEvent(new Event("input")); return true; })()`);

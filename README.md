@@ -8,8 +8,8 @@
 </p>
 
 <p align="center">
-  <img alt="kit v11" src="https://img.shields.io/badge/kit-v11-c8963e?style=flat-square">
-  <img alt="yue2.cpp f17d526 + 51 patches" src="https://img.shields.io/badge/yue2.cpp-f17d526%20%2B%2051%20patches-4a6b8a?style=flat-square">
+  <img alt="kit v12" src="https://img.shields.io/badge/kit-v12-c8963e?style=flat-square">
+  <img alt="yue2.cpp f17d526 + 52 patches" src="https://img.shields.io/badge/yue2.cpp-f17d526%20%2B%2052%20patches-4a6b8a?style=flat-square">
   <img alt="11 LoRAs" src="https://img.shields.io/badge/LoRAs-11-7a5c9e?style=flat-square">
   <img alt="3 VAEs" src="https://img.shields.io/badge/VAEs-3-3f8f6b?style=flat-square">
   <img alt="16 sliders" src="https://img.shields.io/badge/sliders-16-b5653b?style=flat-square">
@@ -35,7 +35,7 @@ it builds in its own folder and never changes an existing yue2.cpp install.
     <td width="50%"><img src="docs/screenshots/engine-tiles.png" alt="Engine"><br><sub><b>Engine</b>: every VAE, LoRA and slider, with its source</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/theme-picker.png" alt="Themes"><br><sub><b>50 themes</b>, Studio by default</sub></td>
+    <td width="50%"><img src="docs/screenshots/theme-picker.png" alt="Themes"><br><sub><b>51 themes</b>, Studio by default</sub></td>
     <td width="50%"><img src="docs/screenshots/engine-about.png" alt="About"><br><sub><b>About</b>: every project and add-on, linked</sub></td>
   </tr>
 </table>
@@ -43,13 +43,14 @@ it builds in its own folder and never changes an existing yue2.cpp install.
 ## Features
 
 - **A studio page**: song form, song page and library side by side, with columns you can drag wider or
-  narrower, 50 colour themes, your own choice of fonts, and an (i) help on every setting.
+  narrower, 51 colour themes, your own choice of fonts, and an (i) help on every setting.
 - **Add-ons**: 3 VAEs (Standard, Legacy and a Blend of the two), 16 stackable voice and genre sliders,
   and 11 LoRAs, each with its own strength for the music and the sound, and its trigger word.
 - **Songs**: Full plan, Melody only and Direct modes, the official Instrumental mode, covers from a
   recording (listen to it first) or from a song, and an editable score. Retake, Reuse, or give a song
   another VAE in seconds.
-- **Library**: every song kept on disk, with favourites and versions; FLAC, WAV and MP3 downloads;
+- **Library**: every song kept on disk, with favourites and versions; FLAC, WAV and MP3 downloads named
+  after the song (or with the date, if you prefer);
   double-click a song to play it; a status light in the player.
 - **Idea writer**: a local chat model drafts the title, style and lyrics from one line; a Connected or
   Offline button shows the chat server's state at a glance.
@@ -76,7 +77,7 @@ one folder: models, caches and songs.
 
 ```
 INSTALL.md     the steps the agent follows (install or upgrade)
-engines/cpp/   51 patches for yue2.cpp f17d526 (2026-09-24), with a note for each
+engines/cpp/   52 patches for yue2.cpp f17d526 (2026-09-24), with a note for each
 page/          the web page as plain files
 app/           scripts: start, downloads, model conversion, tests
 loras/         the LoRA, VAE and slider names, descriptions and links
@@ -131,7 +132,7 @@ Everything comes at a pinned revision, the exact files this kit was made from, a
 
 | | What it is | From |
 |---|---|---|
-| **yue2.cpp** | The C++ engine; the kit's 51 patches go on top | [ServeurpersoCom/yue2.cpp](https://github.com/ServeurpersoCom/yue2.cpp) <sub>`f17d526`</sub> |
+| **yue2.cpp** | The C++ engine; the kit's 52 patches go on top | [ServeurpersoCom/yue2.cpp](https://github.com/ServeurpersoCom/yue2.cpp) <sub>`f17d526`</sub> |
 | **ggml** | Its tensor library (the engine's own fork) | [ServeurpersoCom/ggml](https://github.com/ServeurpersoCom/ggml) <sub>`765bc96`</sub> |
 | **Python packages** | For the model converter, at pinned versions | [app/tools/converter-requirements.txt](app/tools/converter-requirements.txt) |
 

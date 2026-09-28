@@ -90,11 +90,14 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - the logo: "YuE2" links to the model's GitHub, the CPP badge to the engine's;
   - status and hardware readout;
   - a Model menu (BF16, Q5_K_M);
-  - a theme picker with **50 themes** (the default is Studio, a dark warm palette);
+  - a theme picker with **51 themes** (the default is Studio, a dark warm palette; DMM is a zinc and
+    electric purple one with its own fonts and play button);
   - Open/Save, Load example (110 official demos), Clear, a **New song** button, Unload model;
   - **Engine**.
 - **Three columns** (song form, song page, library): drag the line on either side of the middle one to
   resize the song form or the library; a double-click puts one back, and the browser remembers.
+- **Downloads** are named after the song (`Last Train Home.wav`); the Takes list's ⋯ menu can put the
+  date back in the names.
 - **Library** (right): a tinted card with a ▶ PLAYING badge for the song that plays; favourites and
   versions; a double-click on a song plays it.
 - **Song page** (middle):
@@ -543,7 +546,7 @@ Compare with the kit's `docs/screenshots/`:
 - `engine-page.png`: the Engine page with its band and dotted backdrop;
 - `engine-tiles.png`: VAE, LoRA and Sliders tiles with links and (i);
 - `engine-about.png`: the end of the Engine page, with the About card;
-- `theme-picker.png`: the 50 themes.
+- `theme-picker.png`: the themes.
 
 The screenshots were taken against a stand-in server that had his real LoRAs, VAEs and sliders; the
 songs and the hardware readout are examples. The layout, text, colours and controls are what I should see.

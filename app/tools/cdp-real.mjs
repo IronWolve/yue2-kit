@@ -20,7 +20,9 @@ const requests = [];
 cdp.on((d) => {
   if (d.method === "Network.requestWillBeSent") requests.push(d.params.request.method + " " + d.params.request.url.replace(BASE, "/"));
 });
-const shot = async (n) => { const r = await send("Page.captureScreenshot", { format: "png" }); writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.result.data, "base64")); };
+// screenshots only on request (YUE2_SHOTS=1), as in the page suite
+const SHOTS_ON = process.env.YUE2_SHOTS === "1";
+const shot = async (n) => { if (!SHOTS_ON) return; const r = await send("Page.captureScreenshot", { format: "png" }); writeFileSync(`${OUT}/${n}.png`, Buffer.from(r.result.data, "base64")); };
 const setValue = (sel, value) => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return false; e.value = ${JSON.stringify(value)};
   e.dispatchEvent(new Event("input", { bubbles: true })); e.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
 const engineOpen = (open) => waitFor(`document.getElementById("view-engine").classList.contains("is-hidden") === ${!open}`, 5000, 50);
@@ -29,7 +31,7 @@ const check = (name, ok, detail) => { ok ? passed++ : failed++;
   console.log(`  ${ok ? G + "PASS" : R + "FAIL"}${X}  ${name}${detail !== undefined ? D + "  (" + String(detail).slice(0, 200) + ")" + X : ""}`); };
 // every ending prints the counts (tools/test-real.sh reads them); a run that stops early counts as a failed check
 onReport(() => console.log(`\n${failed ? R : G}${passed} passed, ${failed} failed${X}  ${D}${((Date.now() - t0) / 1000).toFixed(0)} s, ` +
-                           `${errors.length} page errors, screenshots in tmp/shots/real${X}`));
+                           `${errors.length} page errors${SHOTS_ON ? ", screenshots in tmp/shots/real" : ""}${X}`));
 onStop((message) => check("the run stopped early: " + message, false));
 
 await send("Page.enable"); await send("Runtime.enable"); await send("Network.enable");
@@ -69,6 +71,15 @@ await shot("2-running");
 // the server's own library is the truth: wait until it holds the finished take
 const saved = await until(async () => (await (await fetch(BASE + "library")).json()).takes.find((t) => t.title === TITLE), 300000, 3000);
 check("the song finished and was saved by the server", !!saved, saved ? `${saved.name}, ${((Date.now() - t0) / 1000).toFixed(0)} s` : "none");
+// downloads are named after the song by the server itself; names=library keeps the library name (one byte fetched each)
+if (saved) {
+  const byName = async (extra) => (await fetch(`${BASE}library/audio?name=${encodeURIComponent(saved.name)}${extra}`, { headers: { Range: "bytes=0-0" } }))
+    .headers.get("content-disposition") || "";
+  const songName = TITLE.replace(/[\u0000-\u001f\u007f\\/:*?"<>|\s]+/g, " ").replace(/[\s.]+$/, "").trim() + ".wav";
+  const [titled, dated] = [await byName(""), await byName("&names=library")];
+  check("the server names the download after the song, or by its library name when asked", titled.includes(`filename="${songName}"`) &&
+    dated.includes(`filename="${saved.name}.wav"`), `${titled} | ${dated}`);
+}
 const shown = await waitFor(`!!document.querySelector('#libList [data-name="${saved?.name}"], #libList [data-take="${saved?.name}"]') ||
   [...document.querySelectorAll("#libList .take")].some(e => e.textContent.includes(${JSON.stringify(TITLE)}) && !/running|queued/i.test(e.className))`, 20000);
 check("the page's library shows it", !!shown);
