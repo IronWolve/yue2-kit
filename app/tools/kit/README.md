@@ -99,6 +99,7 @@ What changed in each version: [CHANGELOG.md](CHANGELOG.md).
 ## Credits and licences
 
 Customized Collection by **SeattleSysop** ([github.com/IronWolve](https://github.com/IronWolve)).
+HTML layout inspired by [Ladypoly/YuE2_WebUI](https://github.com/Ladypoly/YuE2_WebUI).
 
 - **YuE2 weights**: CC BY-NC 4.0, with a creator permission for selling your own songs (the
   `MODEL_LICENSE` in [multimodal-art-projection/YuE](https://github.com/multimodal-art-projection/YuE)).

@@ -227,12 +227,15 @@ for (const [w, h] of [[1536, 730], [1920, 960]]) {
         gh: links.some(a => a.href === "https://github.com/IronWolve"), yue: links.some(a => a.href === "https://github.com/multimodal-art-projection/YuE"),
         cpp: links.some(a => a.href === "https://github.com/ServeurpersoCom/yue2.cpp"), weights: links.some(a => a.href === "https://huggingface.co/m-a-p/YuE2-3B"),
         page: links.some(a => a.href === "https://map-yue2.github.io/"), ggml: links.some(a => a.href === "https://github.com/ggml-org/ggml"),
+        inspired: c.querySelector(".about-inspired")?.textContent.replace(/\\s+/g, " ").trim(),
+        inspiredLink: links.some(a => a.href === "https://github.com/Ladypoly/YuE2_WebUI"),
         projects: [...c.querySelectorAll(".about-project h4")].map(e => e.textContent).join(),
         newTab: links.every(a => a.target === "_blank" && /noopener/.test(a.rel)), web: links.every(a => /^https?:/.test(a.getAttribute("href"))),
         addons: [...c.querySelectorAll("#aboutAddons a")].map(a => a.textContent).join(","),
         plain: [...c.querySelectorAll("#aboutAddons .about-name")].map(e => e.textContent).join(","), shown: onScreen.bottom <= innerHeight && onScreen.top < innerHeight }; })()`);
     check("About closes the Engine page: your credit and GitHub, the model's and the engine's pages, all in new tabs", !!about && about.last &&
-      about.credit === "Customized Collection by SeattleSysop github.com/IronWolve" && about.gh && about.yue && about.cpp && about.weights && about.page && about.ggml && about.projects === "YuE2,yue2.cpp,ggml" && about.newTab && about.web,
+      about.credit === "Customized Collection by SeattleSysop github.com/IronWolve" &&
+      about.inspired === "HTML layout inspired by Ladypoly/YuE2_WebUI" && about.inspiredLink && about.gh && about.yue && about.cpp && about.weights && about.page && about.ggml && about.projects === "YuE2,yue2.cpp,ggml" && about.newTab && about.web,
       JSON.stringify(about));
     check("  the add-ons come from sources.json; a non-web link stays plain text", about?.addons === "Standard VAE,Blend VAE,Voice and genre sliders,sv-billie,Industrial rock" &&
       about.plain === "Legacy VAE", JSON.stringify({ addons: about?.addons, plain: about?.plain }));
@@ -406,6 +409,24 @@ const cover = await ev(`(() => { const body = document.querySelector("#coverDraw
 check("Cover or remix: two parts of one shape, each control on its own full line, both buttons the same size on the left, no long paragraphs",
   cover.parts === 2 && cover.full.every((x) => x >= 95) && cover.sizes[0] === "172x30" && cover.sizes[1] === "172x30" && cover.left.every((x) => x <= 1) &&
   cover.hints === 0 && cover.infos === "true,true", JSON.stringify(cover));
+await ev(`document.getElementById("scoreDrawer").open = true; true`);
+const scoreBox = await ev(`(() => { const d = document.getElementById("scoreDrawer"), rm = document.getElementById("abcRemove"), mi = document.getElementById("abcInstrumental");
+  const body = d.querySelector(".drawer-body").getBoundingClientRect(), r = rm.getBoundingClientRect(), m = mi.getBoundingClientRect();
+  const abc = document.getElementById("abc"); abc.value = "X:1"; rm.click(); const cleared = abc.value === "";
+  return { box: rm.classList.contains("btn") && !rm.classList.contains("chip"), radius: parseFloat(getComputedStyle(rm).borderTopLeftRadius),
+    chipRadius: parseFloat(getComputedStyle(d.querySelector(".chip")).borderTopLeftRadius), sizes: [m, r].map(x => Math.round(x.width) + "x" + Math.round(x.height)).join(),
+    left: Math.round(m.left - body.left - parseFloat(getComputedStyle(d.querySelector(".drawer-body")).paddingLeft)), sameRow: Math.abs(m.top - r.top) < 1,
+    hints: d.querySelectorAll(".hint").length, info: !!abc.closest(".field").querySelector(".label .info"),
+    chips: [...d.querySelectorAll(".chip")].map(c => c.textContent).join(), cleared }; })()`);
+check("Supply your own score: Remove score is a square button beside Make instrumental, both one size on the left; the examples stay chips",
+  scoreBox.box && scoreBox.radius < 10 && scoreBox.chipRadius >= 10 && scoreBox.sizes === "172x30,172x30" && scoreBox.left <= 1 && scoreBox.sameRow &&
+  scoreBox.hints === 0 && scoreBox.info && scoreBox.chips === "Melody only,Melody and chords,Jazz chords" && scoreBox.cleared, JSON.stringify(scoreBox));
+await ev(`document.getElementById("scoreDrawer").open = false; true`);
+const empty = await ev(`(() => { const e = document.getElementById("takeEmpty"); return { shown: !e.classList.contains("is-hidden"),
+  title: e.querySelector(".take-empty-title")?.textContent, text: e.textContent.replace(/\\s+/g, " ").trim() }; })()`);
+check("the song page's empty state: a title and one friendly paragraph", empty.shown && empty.title === "Your next song starts here" &&
+  /press Generate song, then watch it take shape/.test(empty.text) && /opens here too\.$/.test(empty.text) && !/Start a song on the left/.test(empty.text),
+  empty.text.slice(0, 140));
 t = await hoverOn('[data-tip-ref="tip-transcribe"]');
 check("(i) beside From a recording names both models", t?.on && t.text.includes("m-a-p/SheetSage2") && t.text.includes("m-a-p/MERT-v2-FullSong"), t?.text.split("\n")[0]);
 check("  the tip sits inside the window", inView(t));
