@@ -264,8 +264,9 @@ for name in compose-page song-page song-page-narrow engine-page engine-tiles eng
   from="$SHOTS/$name.png"
   if [ -f "$from" ] && [ "$(stat -c %Y "$from")" -ge "$page_built" ]; then
     cp "$from" "$STAGE/docs/screenshots/$name.png"; shots_new=$((shots_new + 1))
-  elif [ -f "$DIST/docs/screenshots/$name.png" ]; then
-    cp "$DIST/docs/screenshots/$name.png" "$STAGE/docs/screenshots/$name.png"; shots_kept=$((shots_kept + 1))
+  elif command git -C "$DIST" cat-file -e "HEAD:docs/screenshots/$name.png" 2>/dev/null; then
+    # docs/ was emptied in step 2: keep the last committed copy
+    command git -C "$DIST" show "HEAD:docs/screenshots/$name.png" > "$STAGE/docs/screenshots/$name.png"; shots_kept=$((shots_kept + 1))
   fi
 done
 [ "$shots_kept" = 0 ] || note "screenshots: $shots_kept kept from repo/ (older than the page; fine unless this is for GitHub)"
