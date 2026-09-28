@@ -1,7 +1,7 @@
 From c06bc7b1dfbf48f72c175de07305e17bd84f9abe Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Fri, 25 Sep 2026 19:25:57 -0700
-Subject: [PATCH 08/57] Explain every setting with an (i) beside it
+Subject: [PATCH 08/58] Explain every setting with an (i) beside it
 
 tools/console/help.js is the same file the other console ships: the help
 for every form and engine control, what it does, its default, and when to

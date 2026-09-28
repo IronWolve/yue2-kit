@@ -1,7 +1,7 @@
 From 412fe52dfc096d4cec76f8a586244b04aef2479c Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 16:27:16 -0700
-Subject: [PATCH 35/57] Link the logo: YuE2 opens the model's repo, the CPP
+Subject: [PATCH 35/58] Link the logo: YuE2 opens the model's repo, the CPP
  badge the engine's
 
 Both open in a new tab and look as before until hovered.

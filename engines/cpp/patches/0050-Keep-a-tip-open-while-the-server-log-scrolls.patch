@@ -1,7 +1,7 @@
 From 616af6cc698017c7f3318938ee1900def1b9a687 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 20:17:54 -0700
-Subject: [PATCH 50/57] Keep a tip open while the server log scrolls
+Subject: [PATCH 50/58] Keep a tip open while the server log scrolls
 
 Every scroll anywhere on the page closed the open tip, so the server log following new lines closed a tip within a second or two. A scroll now closes it only when the box that scrolled holds the tip's target.
 ---

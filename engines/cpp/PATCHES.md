@@ -687,3 +687,11 @@ Files:
 Files:
 - `tools/console/app.css` (+4 −1)
 - `tools/console/index.html` (+5 −4)
+
+## 0058 The music note top left opens the collection's repository; About's projects in two columns
+
+2026-09-28. The music-note logo in the top-left corner links the collection's own repository, in a new tab, and lifts on hover. The status beside it (Ready, Generating...) is plain text again. In About, YuE2 stands in the left column and the engine, the layout and the tensor library are stacked in the right one.
+
+Files:
+- `tools/console/app.css` (+6 −5)
+- `tools/console/index.html` (+7 −7)

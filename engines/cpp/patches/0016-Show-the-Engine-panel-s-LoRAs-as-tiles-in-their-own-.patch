@@ -1,7 +1,7 @@
 From 72df1b13f384171c01f2369e491522032be3d968 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Fri, 25 Sep 2026 21:55:53 -0700
-Subject: [PATCH 16/57] Show the Engine panel's LoRAs as tiles in their own
+Subject: [PATCH 16/58] Show the Engine panel's LoRAs as tiles in their own
  card; keep the waveform
 
 The list squeezed long names and details into narrow key/value rows and

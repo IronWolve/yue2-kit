@@ -21,27 +21,27 @@
 <!-- ---------------------------------------------------------------- topbar -->
 <header class="topbar">
   <div class="brand">
-    <div class="brand-mark" aria-hidden="true">
-      <svg viewBox="0 0 40 40" width="26" height="26">
+    <!-- the music note, top left: it opens the collection's own repository -->
+    <a class="brand-mark" href="https://github.com/IronWolve/yue2-kit" target="_blank" rel="noopener noreferrer" aria-label="yue2-kit on GitHub"
+       data-tip="yue2-kit on GitHub: this collection's install kit, its patches and its releases">
+      <svg viewBox="0 0 40 40" width="26" height="26" aria-hidden="true">
         <path d="M6 30 L6 12 L20 8 L20 26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
         <circle cx="10.5" cy="30" r="4.4" fill="currentColor"/>
         <circle cx="24.5" cy="26" r="4.4" fill="currentColor"/>
         <path d="M28 13 L36 13 M28 18 L36 18 M28 23 L36 23" stroke="currentColor" stroke-width="1.1" opacity="0.55"/>
       </svg>
-    </div>
+    </a>
     <h1><a class="brand-link" href="https://github.com/multimodal-art-projection/YuE" target="_blank" rel="noopener noreferrer" data-tip="YuE, the music model this app runs: its repo on GitHub (opens in a new tab)">YuE<span class="two">2</span></a></h1>
     <a class="engine-tag" href="https://github.com/ServeurpersoCom/yue2.cpp" target="_blank" rel="noopener noreferrer" data-tip="The C++ engine this page runs on: its repo on GitHub (opens in a new tab)">cpp</a>
   </div>
 
-  <!-- the status note, top left: it opens the collection's own repository -->
-  <a class="engine-chip" href="https://github.com/IronWolve/yue2-kit" target="_blank" rel="noopener noreferrer"
-     data-tip="yue2-kit on GitHub: this collection's install kit, its patches and its releases">
+  <div class="engine-chip">
     <span class="lamp" id="engineLamp"></span>
     <div>
       <strong id="engineState">Checking</strong>
       <small id="engineDetail">asking the server</small>
     </div>
-  </a>
+  </div>
 
   <div class="spacer"></div>
 

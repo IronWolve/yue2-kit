@@ -1,7 +1,7 @@
 From 4e720f2d9178972449ac04805a1ff8bba2f59cd9 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Mon, 28 Sep 2026 01:33:57 -0700
-Subject: [PATCH 52/57] Name downloads after the song; add the DMM theme and a
+Subject: [PATCH 52/58] Name downloads after the song; add the DMM theme and a
  Play/Pause label
 
 Downloads (WAV, MP3, FLAC) are named after the song's title, without the characters Windows refuses in a file name, by the server and the page alike, with an ASCII fallback and the full name in UTF-8. The Takes menu can put the date back (the library name); the page asks the server for the same with names=library. A new DMM theme from a friend's copy of the page joins the picker: zinc and electric purple, its own heading and text fonts, and a larger play button with drawn icons. The play button tells screen readers Play or Pause.

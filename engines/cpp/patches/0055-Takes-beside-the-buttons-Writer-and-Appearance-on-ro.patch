@@ -1,7 +1,7 @@
 From 9956f5b455f4eadeaba40556fb346bfe2ce20a77 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Mon, 28 Sep 2026 11:32:57 -0700
-Subject: [PATCH 55/57] Takes beside the buttons; Writer and Appearance on rows
+Subject: [PATCH 55/58] Takes beside the buttons; Writer and Appearance on rows
  of their own
 
 The bottom bar's Takes box joins the two buttons as one group on the right (it wraps above them, still right-aligned, in a narrow column). On the Engine page the Writer card takes a row of its own, and so does Appearance, with its Theme and Fonts parts side by side (stacked when the card is narrow).
