@@ -46,12 +46,10 @@
   <div class="spacer"></div>
 
   <div class="head-actions">
-    <select id="modelPick" class="theme-pick" aria-label="Model" data-tip="Which copy of the YuE2 model the engine loads.
-BF16: the full release, 7.2 GB.
-Q8_0: near lossless (the C++ author), 3.8 GB.
-Q6_K 2.9 GB and Q5_K_M 2.6 GB: smaller still; the author advises nothing below Q5.
-Smaller copies need less VRAM and write music a little faster. A change loads with the next song.
-Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+    <select id="modelPick" class="theme-pick" aria-label="Model" data-tip="The copy of the model the engine loads (from the next song).
+BF16 · 7.2 GB · the full release
+Q8_0 · 3.8 GB · near lossless
+Q6_K · 2.9 GB, Q5_K_M · 2.6 GB · smaller, less VRAM"></select>
     <button type="button" class="btn ghost small theme-button" id="themeButton">Theme</button>
     <button class="btn ghost small" id="openPrompt" title="Open a prompt saved as JSON or YAML">Open</button>
     <input type="file" id="openFile" accept=".json,.yaml,.yml" hidden />
@@ -201,7 +199,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     <div class="card wide about-card" id="aboutCard">
       <div class="about-head">
         <h3>About</h3>
-        <p class="about-credit">Customized Collection by <strong>SeattleSysop</strong>
+        <p class="about-credit"><a class="about-kit" href="https://github.com/IronWolve/yue2-kit" target="_blank" rel="noopener noreferrer"
+          data-tip="This collection's own repository: the install kit, its patches and its releases">Customized Collection</a> by <strong>SeattleSysop</strong>
           <a class="about-gh" href="https://github.com/IronWolve" target="_blank" rel="noopener noreferrer">github.com/IronWolve</a></p>
       </div>
       <div class="about-grid">

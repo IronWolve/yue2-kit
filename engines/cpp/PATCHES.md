@@ -669,3 +669,13 @@ Files:
 Files:
 - `tools/console/app.css` (+10 −3)
 - `tools/console/index.html` (+7 −5)
+
+## 0056 A two-line GPU readout, GB, roomier tips and number boxes; the credit links the kit
+
+2026-09-28. The top bar's readout becomes two small lines (the GPU's short name, its memory in use) that stay on small screens; the full GPU name, backbone, context and batch move to its tip. Memory reads GB, not GiB. Tips are wider so their lines stay whole, and the model menu's tip is four short lines. Number boxes leave room before their up/down arrows (the compose knobs are a little wider). In About, Customized Collection links the collection's own repository.
+
+Files:
+- `tools/console/app.css` (+13 −8)
+- `tools/console/app.js` (+18 −13)
+- `tools/console/help.js` (+2 −2)
+- `tools/console/index.html` (+6 −7)

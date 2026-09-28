@@ -1,7 +1,7 @@
 From 7c1dc0e0f66105249121c31eebcd31471cd98d90 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Mon, 28 Sep 2026 11:13:03 -0700
-Subject: [PATCH 53/55] A cleaner bottom bar; room for tall heading fonts;
+Subject: [PATCH 53/56] A cleaner bottom bar; room for tall heading fonts;
  wrapped song names
 
 The compose column's bottom bar shows Takes (was Versions) and two slim buttons of one size on the right, with a note only when a run is queued, the server is away or codes are loaded (no more model-loading text). Headings get the line height a tall font needs (the DMM theme's were clipped). A theme can colour its hover highlights; DMM's are purple. A long song name in the player wraps to two lines in a slightly smaller size instead of being cut off.

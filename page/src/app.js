@@ -2498,8 +2498,8 @@
     var hw = STATE.hardware || {}, gpu = gpuOf(), loaded = hw.loaded_modules || 0;
     var rows = [
       ["GPU", gpu ? (gpu.description || gpu.name) : (STATE.noHardware ? "not reported" : "none: runs on the CPU"), gpu ? "ok" : "no"],
-      ["VRAM", gpu ? gib(gpu.total_bytes - gpu.free_bytes) + " / " + gib(gpu.total_bytes) + " GiB" : "—", ""],
-      ["Loaded", loaded ? gib(hw.loaded_bytes || 0) + " GiB · " + loaded + (loaded === 1 ? " module" : " modules") : "nothing", loaded ? "amber" : ""],
+      ["VRAM", gpu ? gib(gpu.total_bytes - gpu.free_bytes) + " / " + gib(gpu.total_bytes) + " GB" : "—", ""],
+      ["Loaded", loaded ? gib(hw.loaded_bytes || 0) + " GB · " + loaded + (loaded === 1 ? " module" : " modules") : "nothing", loaded ? "amber" : ""],
       ["Busy", hw.busy ? "running a job" : "idle", hw.busy ? "amber" : ""]
     ];
     $("hwCard").innerHTML = rows.map(function (row) {
@@ -2516,20 +2516,25 @@
     paintSubmitNote();
   }
 
+  // The top bar's readout: two small lines, the GPU and its memory, small enough to stay on a small screen.
+  // The rest (the full GPU name, backbone, context, batch) is in its tip and on the Engine page.
+  function shortGpu(name) {
+    return String(name || "").replace(/^nvidia\s+/i, "").replace(/^geforce\s+/i, "").replace(/\s*\([^)]*\)\s*$/, "") || String(name || "");
+  }
   function paintStrip() {
-    var p = STATE.props || {}, s = STATE.settings, gpu = gpuOf();
-    var strip = [];
+    var p = STATE.props || {}, s = STATE.settings, gpu = gpuOf(), rows = [];
     if (gpu) {
-      strip.push(["GPU", gpu.description || gpu.name]);
-      strip.push(["VRAM", gib(gpu.total_bytes - gpu.free_bytes) + " / " + gib(gpu.total_bytes) + " GiB"]);
+      rows.push(["GPU", shortGpu(gpu.description || gpu.name)]);
+      rows.push(["VRAM", gib(gpu.total_bytes - gpu.free_bytes) + " / " + gib(gpu.total_bytes) + " GB"]);
     } else if (STATE.hardware) {
-      strip.push(["GPU", "none"]);
+      rows.push(["GPU", "none (CPU)"]);
     }
-    strip.push(["Backbone", s && s.model ? s.model : (basename(p.model).replace(/\.gguf$/i, "") || "—")]);
-    strip.push(["Context", s ? (s.max_seq ? s.max_seq.toLocaleString() : "whole") : (p.context ? p.context.toLocaleString() : "—")]);
-    strip.push(["Batch", String(STATE.maxBatch)]);
-    $("hwStats").innerHTML = strip.map(function (row) {
-      return "<div><dt>" + row[0] + '</dt><dd title="' + escape(row[1]) + '">' + escape(row[1]) + "</dd></div>";
+    var backbone = s && s.model ? s.model : (basename(p.model).replace(/\.gguf$/i, "") || "—");
+    var context = s ? (s.max_seq ? s.max_seq.toLocaleString() : "whole") : (p.context ? p.context.toLocaleString() : "—");
+    $("hwStats").dataset.tip = (gpu ? (gpu.description || gpu.name) + " · " : "") + "backbone " + backbone + " · context " + context +
+      " · batch " + STATE.maxBatch;
+    $("hwStats").innerHTML = rows.map(function (row) {
+      return "<div><dt>" + row[0] + "</dt><dd>" + escape(row[1]) + "</dd></div>";
     }).join("");
   }
 
@@ -2545,7 +2550,7 @@
       return refreshHardware().then(function () {
         var now = gpuOf(), after = now ? gib(now.total_bytes - now.free_bytes) : null;
         toast("Model unloaded — " + Math.round(data.freed_mb || 0).toLocaleString() + " MB freed" +
-              (before !== null && after !== null ? " (VRAM " + before + " GiB -> " + after + " GiB)" : ""), "good");
+              (before !== null && after !== null ? " (VRAM " + before + " GB -> " + after + " GB)" : ""), "good");
       });
     }).catch(function (error) { toast(error.message, "bad"); refreshHardware(); });
   }

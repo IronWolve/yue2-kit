@@ -1,7 +1,7 @@
 From b99ae2e86c680bfb9a2b00466db6da331a02c80f Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Fri, 25 Sep 2026 18:34:56 -0700
-Subject: [PATCH 05/55] Let songs be browsed without stopping the one that
+Subject: [PATCH 05/56] Let songs be browsed without stopping the one that
  plays
 
 The player keeps its own song. Opening another song shows its page and

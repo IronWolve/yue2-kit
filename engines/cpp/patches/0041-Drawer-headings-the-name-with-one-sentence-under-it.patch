@@ -1,7 +1,7 @@
 From 5decf6b12c66e71840a54df7b62355dd48702e28 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 18:51:11 -0700
-Subject: [PATCH 41/55] Drawer headings: the name, with one sentence under it
+Subject: [PATCH 41/56] Drawer headings: the name, with one sentence under it
 
 Each drawer's heading is its name on one line and a proper sentence under it (Sound and output keeps its live summary there), instead of a lower-case fragment pushed to the right that wrapped beside the name in a narrow column.
 ---

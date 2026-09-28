@@ -1,7 +1,7 @@
 From acb8af6a9b619e701c54d2abe3ea1ed2c165ce7f Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Mon, 28 Sep 2026 11:17:40 -0700
-Subject: [PATCH 54/55] An Appearance card; the layout's inspiration gets its
+Subject: [PATCH 54/56] An Appearance card; the layout's inspiration gets its
  own About section
 
 The Engine page's Fonts card becomes Appearance: the theme (a grouped menu, in step with the top bar's swatches), options that work with any theme (hover highlights in the theme's colour, a soft accent glow around cards, Rounded, Softer or Square corners, a calmer page without animations), then the three fonts. The options are kept per browser and applied before the first paint; Default look resets them and the fonts, not the theme. In About, the layout's inspiration moves from under the credit line to a section of its own after the engine's.

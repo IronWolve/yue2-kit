@@ -110,9 +110,9 @@
       "and turns off CUDA graphs, so music writing is much slower (about 6.5× in one user's measurement). Not allowed with FP32.",
     memPreset: "Fills VRAM budget and offload for a card of that size; press Save to apply. Auto reads this GPU's memory. " +
       "Whole card: no cap.",
-    setBudget: "A hard cap on the GPU memory this app may use, in GiB, with 2 GiB of it kept in reserve. Blank or 0: the whole card.\n" +
+    setBudget: "A hard cap on the GPU memory this app may use, in GB, with 2 GB of it kept in reserve. Blank or 0: the whole card.\n" +
       "At 12 or less the VAE also decodes in smaller tiles (512 frames instead of 1024: less memory, the same sound). " +
-      "The model card measured an 11.2 GiB peak on a 3.6-minute song and 14.1 GiB at the longest context.",
+      "The model card measured an 11.2 GB peak on a 3.6-minute song and 14.1 GB at the longest context.",
     setOde: ODE,
     setOffload: "Moves the language model's layers to system RAM while the sound stage runs, and back afterwards: " +
       "a lower GPU memory peak for a few seconds more per song. Useful on 12–16 GB cards.",
