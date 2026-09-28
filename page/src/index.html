@@ -481,15 +481,18 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         </div>
       </details>
 
+      <!-- how many takes, then the two actions, one size, on the right; a note under them only when it matters -->
       <div class="submit-bar">
-        <div class="submit-note" id="submitNote">Models load stage by stage on the first run.</div>
         <label class="versions">
-          <span>Versions <span class="info" tabindex="0" role="img" aria-label="About versions" data-tip-ref="tip-versions">i</span></span><input type="number" id="versions" min="1" max="10" step="1" value="1" /></label>
-        <button type="button" class="btn ghost" id="planBtn"
-          title="Write only the score (seconds, no audio). Check its sections, then Generate renders exactly that score.">Plan score only</button>
-        <button type="submit" class="btn primary" id="generateBtn">
-          <span class="btn-glyph" aria-hidden="true">▸</span> Generate song
-        </button>
+          <span>Takes <span class="info" tabindex="0" role="img" aria-label="About takes" data-tip-ref="tip-versions">i</span></span><input type="number" id="versions" min="1" max="10" step="1" value="1" /></label>
+        <div class="submit-actions">
+          <button type="button" class="btn ghost" id="planBtn"
+            title="Write only the score (seconds, no audio). Check its sections, then Generate renders exactly that score.">Plan score only</button>
+          <button type="submit" class="btn primary" id="generateBtn">
+            <span class="btn-glyph" aria-hidden="true">▸</span> Generate song
+          </button>
+        </div>
+        <p class="submit-note" id="submitNote"></p>
       </div>
     </form>
   </section>
@@ -758,8 +761,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   <p>Sound variations render the same music with seeds sound&nbsp;+&nbsp;1, +&nbsp;2&hellip; side by side.</p>
 </template>
 <template id="tip-versions">
-  <span class="tip-kind">Versions</span>
-  <p>Separate songs from the same prompt, each with its own music seed (seed, seed&nbsp;+&nbsp;1&hellip;).
+  <span class="tip-kind">Takes</span>
+  <p>How many songs to make from this prompt: separate songs, each with its own music seed (seed, seed&nbsp;+&nbsp;1&hellip;).
     The server writes up to <strong data-fill="max-batch">1</strong> side by side in one pass; more are
     queued as further passes.</p>
 </template>

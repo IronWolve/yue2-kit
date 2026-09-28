@@ -925,10 +925,7 @@
     if (!STATE.online) note = "The server is not answering; runs cannot start.";
     else if (live.length) note = "A run is in progress; the next song is queued behind it.";
     else if (STATE.codes) note = "Codes loaded: Generate renders that music again, in seconds.";
-    else if (STATE.hardware && STATE.hardware.loaded_modules > 0) note = "Model is resident — generation starts immediately.";
-    else if (STATE.settings && STATE.settings.keep_loaded) note = "Model loads on the first run and stays resident.";
-    else note = "Models load stage by stage and leave GPU memory after each run. Up to " + STATE.maxBatch +
-      (STATE.maxBatch === 1 ? " song" : " songs") + " per pass.";
+    else note = "";   // nothing to say: the bar stays clean
     $("submitNote").textContent = note;
   }
 

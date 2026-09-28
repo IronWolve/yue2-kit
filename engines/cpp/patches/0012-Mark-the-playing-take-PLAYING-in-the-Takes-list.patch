@@ -1,7 +1,7 @@
 From 70517bb8b6a87a9a47296c6720bcdc1e130f0e21 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Fri, 25 Sep 2026 20:56:40 -0700
-Subject: [PATCH 12/52] Mark the playing take PLAYING in the Takes list
+Subject: [PATCH 12/53] Mark the playing take PLAYING in the Takes list
 
 The card of the song the player is playing shows a PLAYING tag beside its
 mode; it follows the player (play, pause, end, switching songs) and survives

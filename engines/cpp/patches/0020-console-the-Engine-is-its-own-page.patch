@@ -1,7 +1,7 @@
 From 3b6ba362b4f339a15339383707454a42187060f1 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 09:01:45 -0700
-Subject: [PATCH 20/52] console: the Engine is its own page
+Subject: [PATCH 20/53] console: the Engine is its own page
 
 Opening the Engine now sets the song workspace aside instead of dropping the
 panel above it, so it is never mistaken for Compose: a band names it (a gear,

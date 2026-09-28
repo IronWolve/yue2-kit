@@ -642,3 +642,12 @@ Files:
 - `tools/console/index.html` (+6 −2)
 - `tools/console/themes.js` (+2 −1)
 - `tools/yue-server.cpp` (+54 −8)
+
+## 0053 A cleaner bottom bar; room for tall heading fonts; wrapped song names
+
+2026-09-28. The compose column's bottom bar shows Takes (was Versions) and two slim buttons of one size on the right, with a note only when a run is queued, the server is away or codes are loaded (no more model-loading text). Headings get the line height a tall font needs (the DMM theme's were clipped). A theme can colour its hover highlights; DMM's are purple. A long song name in the player wraps to two lines in a slightly smaller size instead of being cut off.
+
+Files:
+- `tools/console/app.css` (+28 −20)
+- `tools/console/app.js` (+1 −4)
+- `tools/console/index.html` (+12 −9)
