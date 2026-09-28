@@ -3,6 +3,14 @@
 Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
 `d48e6e2e4a4e9bff24f8f60c943eddd976358df1`. v5 is the first kit that changes the app itself.
 
+## v8 (2026-09-27)
+
+The app is the same as in v6 and v7: 36 patches, tree `46618fde37a376e5c80eb46d5ce3fef9334e6456`.
+
+- **The web page as plain files**: `page/src/` has the page's HTML, CSS and JS sources as they are
+  edited, and `page/index.html` the whole built page in one file. Before, they were only inside the
+  patches and a compressed copy.
+
 ## v7 (2026-09-27)
 
 The app is the same as in v6: 36 patches, tree `46618fde37a376e5c80eb46d5ce3fef9334e6456`.

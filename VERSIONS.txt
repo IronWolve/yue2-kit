@@ -1,4 +1,4 @@
-YuE2 studio install reference kit v7, 2026-09-27
+YuE2 studio install reference kit v8, 2026-09-27
 
 Code:   https://github.com/ServeurpersoCom/yue2.cpp.git  @ f17d526 of 2026-09-24 (branch master; ggml submodule at 765bc96)
         + 36 patches (engines/cpp/patches, git am) + the built page (engines/cpp/page)

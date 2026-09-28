@@ -5,6 +5,8 @@
 #   repo/engines/cpp/page/index.html.gz     the built page, once (./build-page.sh makes it from the sources)
 #   repo/engines/cpp/BASE.txt               the upstream commit they were made on, its date, the ggml pin, the tree
 #   repo/engines/cpp/PATCHES.md             a note per patch (what, why, which files) and how to use them safely
+#   repo/page/src/                          the web page's sources as plain files (his HTML, CSS and JS)
+#   repo/page/index.html                    the whole built page as one plain HTML file
 #
 # Then prove it: a scratch checkout of upstream/ at the base, the patches applied, the page added, must give
 # exactly build/'s tree. Commits the change in repo/ when there is one.
@@ -109,14 +111,18 @@ got=$(git -C "$V" rev-parse 'HEAD^{tree}')
 mkdir -p "$ENG"
 for part in patches page; do rm -rf "${ENG:?}/$part"; cp -r "$NEW/$part" "$ENG/$part"; done
 cp "$NEW/PATCHES.md" "$ENG/PATCHES.md"
+# the page as readable files too: the sources as he edits them, and the built page unpacked
+rm -rf "$DIST/page"; mkdir -p "$DIST/page"
+cp -r "$BUILD/tools/console" "$DIST/page/src"
+gzip -dc "$BUILD/$PAGE" > "$DIST/page/index.html"
 # BASE.txt's "made" line changes every run: keep the old file when nothing else in it changed
 if [ -f "$ENG/BASE.txt" ] && diff -q <(command grep -v '^made=' "$ENG/BASE.txt") <(command grep -v '^made=' "$NEW/BASE.txt") >/dev/null; then :; else cp "$NEW/BASE.txt" "$ENG/BASE.txt"; fi
 rm -rf "$NEW"
-git -C "$DIST" add -A engines/cpp
+git -C "$DIST" add -A engines/cpp page
 if git -C "$DIST" diff --cached --quiet; then
   state="no change in repo/"
 else
-  git -C "$DIST" commit --quiet -m "Sync the engine patches ($NP) and the built page" -m "From build/ at tree ${TREE:0:12}, on upstream ${BASE:0:7} of $BASEDATE."
+  git -C "$DIST" commit --quiet -m "Sync the engine patches ($NP), the built page and its sources" -m "From build/ at tree ${TREE:0:12}, on upstream ${BASE:0:7} of $BASEDATE."
   state="committed in repo/ as $(git -C "$DIST" rev-parse --short HEAD)"
 fi
 size=$(du -sh "$ENG" | cut -f1 | tr -d ' ')

@@ -69,6 +69,8 @@ MANIFEST.txt        every file in the kit with its SHA-256
 engines/cpp/        the C++ engine's changes: patches/ ({{NPATCH}}, git am on a fresh clone of upstream),
                     PATCHES.md (a note per patch, and how to use them safely), BASE.txt (the upstream
                     commit and date they were made for), page/ (the built web page)
+page/               his web page as plain files: src/ (the HTML, CSS and JS he edits) and index.html (the
+                    whole built page in one file). The install does not need them: the patches carry them.
 app/                his root scripts and his whole tools/ folder: start, downloads pinned to his revisions,
                     model conversion with his package versions, page build, tests, the kit builder
 loras/sources.json  the LoRA, VAE and slider names, blurbs, links and descriptions the page shows
