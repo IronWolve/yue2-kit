@@ -1,7 +1,7 @@
 From 851235c94542369f5878be32a442c0452f0a1a64 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 18:19:25 -0700
-Subject: [PATCH 38/42] Show the chat server's state as a fixed-size button
+Subject: [PATCH 38/43] Show the chat server's state as a fixed-size button
 
 The idea writer's line of status text becomes a square button: Chat Server Connected in green when the server answers, Chat Server Offline in red when not. Both labels share one cell, so the button never changes size; the old text is its tip, and a click checks again.
 ---

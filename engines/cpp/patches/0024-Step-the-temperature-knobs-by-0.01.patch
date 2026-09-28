@@ -1,7 +1,7 @@
 From a1730ada83bcd76363628d4e2be662179ce52802 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 12:31:45 -0700
-Subject: [PATCH 24/42] Step the temperature knobs by 0.01
+Subject: [PATCH 24/43] Step the temperature knobs by 0.01
 
 The presets and the useful range sit on hundredths (0.55, 0.85, 0.9-0.95); the arrows moved by 0.1.
 ---

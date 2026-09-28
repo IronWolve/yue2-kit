@@ -553,3 +553,11 @@ Files:
 
 Files:
 - `tools/console/index.html` (+5 −7)
+
+## 0043 Two-line idea box; clean up Cover or remix
+
+2026-09-27. The idea box starts two lines tall. Cover or remix becomes two parts of the same shape under a thin line: a heading with a short note and its (i) (the long paragraphs move into the tips), each control on its own full line, the button on the left at the idea drawer's button size, its status beside it.
+
+Files:
+- `tools/console/app.css` (+11 −1)
+- `tools/console/index.html` (+23 −27)

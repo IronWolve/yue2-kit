@@ -211,7 +211,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     <section class="muse" id="muse">
       <label class="field">
         <span class="label">Idea <em>a line about the song; the box grows as you type</em></span>
-        <textarea id="idea" rows="1" autocomplete="off"
+        <textarea id="idea" rows="2" autocomplete="off"
                   placeholder="a slow song about missing the last train home"></textarea>
       </label>
       <label class="field">
@@ -335,12 +335,12 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
 
       <details class="drawer" id="coverDrawer">
         <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Cover or remix</span><span class="sum-say">Reuse a melody and change the style.</span></span></summary>
-        <div class="drawer-body">
-          <h4 class="mini">From a recording <span class="info" tabindex="0" role="img" aria-label="About transcription" data-tip-ref="tip-transcribe">i</span></h4>
-          <p class="hint">Transcribe the melody of any song you have as a file, then render it with your own
-            style and lyrics. The words are not transcribed, and the singer is not copied.</p>
-          <div class="field-row" id="coverAudioRow">
-            <label class="field grow"><span class="label">Recording</span>
+        <div class="drawer-body cover-body">
+          <!-- two ways in, the same shape: a heading with its short note, one control per line, the button on the left -->
+          <section class="cover-part" id="coverAudioRow">
+            <h4 class="mini">From a recording <span class="info" tabindex="0" role="img" aria-label="About transcription" data-tip-ref="tip-transcribe">i</span>
+              <em>its tune only, not the words or the singer</em></h4>
+            <label class="field"><span class="label">Recording</span>
               <input type="file" id="coverFile" accept=".wav,.mp3,.flac,.m4a,.ogg,.opus,.aac" /></label>
             <label class="field"><span class="label">Transcribe</span>
               <select id="coverTask">
@@ -348,28 +348,24 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
                 <option value="melody-vocal">Vocal melody only</option>
                 <option value="full">Melody and chords</option>
               </select></label>
-            <div class="field reset-cell"><button type="button" class="btn ghost" id="coverFromAudio">Transcribe</button></div>
-          </div>
-          <p class="row-hint" id="coverAudioStatus"></p>
-          <h4 class="mini">From one of your takes</h4>
-          <p class="hint">Take the melody from a song you already made and render it somewhere else
-            entirely — a ballad as a techno track, a German song in English. The chord symbols are
-            dropped so the new style can rebuild the harmony, and the run switches to
-            <strong>Melody only</strong>.</p>
-
-          <div class="field-row">
-            <label class="field grow">
-              <span class="label">Melody from</span>
-              <select id="coverTake"></select>
-            </label>
-            <div class="field reset-cell">
-              <button type="button" class="btn ghost" id="coverFromTake">Use this melody</button>
+            <div class="cover-act">
+              <button type="button" class="btn ghost" id="coverFromAudio">Transcribe</button>
+              <p class="cover-status" id="coverAudioStatus"></p>
             </div>
-          </div>
-
-          <label class="check"><input type="checkbox" id="coverMelodyOnly" checked />
-            <span>Drop chord symbols so the new style can rebuild the harmony</span></label>
-          <p class="row-hint" id="coverStatus"></p>
+          </section>
+          <section class="cover-part">
+            <h4 class="mini">From one of your takes <span class="info" tabindex="0" role="img" aria-label="About covers from a take"
+                data-tip="Take the melody from a song you already made and render it somewhere else entirely: a ballad as a techno track, a German song in English. The run switches to Melody only.">i</span>
+              <em>its melody, in a new style</em></h4>
+            <label class="field"><span class="label">Melody from</span>
+              <select id="coverTake"></select></label>
+            <label class="check"><input type="checkbox" id="coverMelodyOnly" checked />
+              <span>Drop the chord symbols, so the new style can rebuild the harmony</span></label>
+            <div class="cover-act">
+              <button type="button" class="btn ghost" id="coverFromTake">Use this melody</button>
+              <p class="cover-status" id="coverStatus"></p>
+            </div>
+          </section>
         </div>
       </details>
 

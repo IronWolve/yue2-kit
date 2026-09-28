@@ -773,6 +773,16 @@ select:disabled { opacity: .7; }
 .knob span { font-size: 12px; color: var(--dim); }
 .knob input { padding: 5px 8px; font-family: var(--mono); font-size: 12px; text-align: right; }
 .reset-cell { justify-content: flex-end; align-items: flex-start; padding-top: 22px; }
+/* Cover or remix: two parts of the same shape, a thin line between them */
+.cover-body { gap: 16px; }
+.cover-part { display: flex; flex-direction: column; gap: 11px; }
+.cover-part + .cover-part { padding-top: 16px; border-top: 1px solid var(--line-soft); }
+.cover-part .mini { margin: 0; }
+.mini em { font-style: normal; text-transform: none; letter-spacing: 0; font-size: 11.5px; color: var(--dim); margin-left: 8px; }
+.cover-act { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cover-act .btn { flex: none; width: 172px; height: 30px; box-sizing: border-box; justify-content: center; padding: 0 12px; font-size: 12.5px; }
+.cover-status { flex: 1 1 200px; margin: 0; font-size: 11.5px; color: var(--dim); }
+.cover-status:empty { display: none; }
 
 .check { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
 .check input { width: auto; accent-color: var(--amber); }
@@ -825,7 +835,7 @@ select:disabled { opacity: .7; }
 }
 
 /* the idea: a full line that grows with its text, like the style box */
-#idea { field-sizing: content; min-height: 0; max-height: 40vh; resize: vertical; }
+#idea { field-sizing: content; min-height: calc(2lh + 20px); max-height: 40vh; resize: vertical; }   /* two lines to start */
 /* the writer model is shown, not picked: the page never switches the chat server's model */
 .static-field { display: flex; align-items: baseline; gap: 8px; min-height: 42px; box-sizing: border-box; padding: 11px 13px;
   border: 1px dashed var(--line); border-radius: var(--r-md); font-size: 13px; color: var(--ink); min-width: 0; }

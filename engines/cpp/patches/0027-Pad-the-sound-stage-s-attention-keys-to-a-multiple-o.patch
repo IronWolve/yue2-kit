@@ -1,7 +1,7 @@
 From 6e8c47f5aafc408d78794db33e11f370a587b94a Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 14:24:05 -0700
-Subject: [PATCH 27/42] Pad the sound stage's attention keys to a multiple of
+Subject: [PATCH 27/43] Pad the sound stage's attention keys to a multiple of
  256 on the GPU backend that needs it
 
 That backend's flash attention takes its grouped-query path only when the key count is a multiple of 256; otherwise every query head reads K and V again. Masked zero rows after the latent block make the count fit, with the same bytes out (measured on his laptop's 8 GB GPU: attention per layer 55 -> 29 ms). Other backends are unchanged: a CPU render is byte-identical to before.
