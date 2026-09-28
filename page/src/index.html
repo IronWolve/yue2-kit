@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en" data-theme="studio">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>YuE2 Console · cpp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+<script>try { var t = localStorage.getItem("yue2.theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<link rel="stylesheet" href="app.css" />
+<link rel="stylesheet" href="themes.css" />
+</head>
+<body>
+
+<!-- ---------------------------------------------------------------- topbar -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 40 40" width="26" height="26">
+        <path d="M6 30 L6 12 L20 8 L20 26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="10.5" cy="30" r="4.4" fill="currentColor"/>
+        <circle cx="24.5" cy="26" r="4.4" fill="currentColor"/>
+        <path d="M28 13 L36 13 M28 18 L36 18 M28 23 L36 23" stroke="currentColor" stroke-width="1.1" opacity="0.55"/>
+      </svg>
+    </div>
+    <h1><a class="brand-link" href="https://github.com/multimodal-art-projection/YuE" target="_blank" rel="noopener noreferrer" data-tip="YuE, the music model this app runs: its repo on GitHub (opens in a new tab)">YuE<span class="two">2</span></a></h1>
+    <a class="engine-tag" href="https://github.com/ServeurpersoCom/yue2.cpp" target="_blank" rel="noopener noreferrer" data-tip="The C++ engine this page runs on: its repo on GitHub (opens in a new tab)">cpp</a>
+  </div>
+
+  <div class="engine-chip" id="engineChip">
+    <span class="lamp" id="engineLamp"></span>
+    <div>
+      <strong id="engineState">Checking</strong>
+      <small id="engineDetail">asking the server</small>
+    </div>
+  </div>
+
+  <dl class="hw-strip" id="hwStats"></dl>
+
+  <div class="spacer"></div>
+
+  <div class="head-actions">
+    <select id="modelPick" class="theme-pick" aria-label="Model" data-tip="Which copy of the YuE2 model the engine loads.
+BF16: the full release, 7.2 GB.
+Q8_0: near lossless (the C++ author), 3.8 GB.
+Q6_K 2.9 GB and Q5_K_M 2.6 GB: smaller still; the author advises nothing below Q5.
+Smaller copies need less VRAM and write music a little faster. A change loads with the next song.
+Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+    <button type="button" class="btn ghost small theme-button" id="themeButton">Theme</button>
+    <button class="btn ghost small" id="openPrompt" title="Open a prompt saved as JSON or YAML">Open</button>
+    <input type="file" id="openFile" accept=".json,.yaml,.yml" hidden />
+    <div class="menu-wrap">
+      <button class="btn ghost small" id="savePrompt" title="Save the form as a prompt file" aria-haspopup="true" aria-expanded="false">Save</button>
+      <div class="menu-pop is-hidden" id="saveMenu" role="menu">
+        <button type="button" role="menuitem" data-save="json">Prompt as JSON</button>
+        <button type="button" role="menuitem" data-save="yaml">Prompt as YAML</button>
+      </div>
+    </div>
+    <button class="btn ghost small" id="loadExample" title="A random official demo prompt">Load example</button>
+    <button class="btn ghost small" id="clearForm">Clear</button>
+    <button class="btn ghost small" id="unloadModel" title="Drop every idle model from GPU memory now" disabled>Unload model</button>
+    <button class="btn ghost small" id="engineToggle">Engine</button>
+  </div>
+</header>
+
+<!-- ---------------------------------------------------------------- engine -->
+<section class="engine-panel is-hidden" id="view-engine">
+  <div class="engine-head">
+    <h2 class="engine-title"><span class="engine-gear" aria-hidden="true">&#9881;</span> Engine</h2>
+    <p class="engine-sub">models, decoders, add-ons and this machine &middot; settings here apply to every song until you change them</p>
+    <button type="button" class="btn ghost small" id="engineBack" data-tip="Back to the song form (Esc)">&larr; Back to compose</button>
+  </div>
+  <div class="engine-grid">
+    <div class="card">
+      <h3>Server</h3>
+      <dl class="kv" id="serverCard"></dl>
+    </div>
+
+    <div class="card compute-card" id="computeCard">
+      <h3>Compute</h3>
+      <label class="field"><span class="label">Model <span class="info" tabindex="0" role="img" aria-label="About the model files" data-tip-ref="tip-model">i</span><em>the backbone file</em></span>
+        <select id="setModel"></select></label>
+      <label class="field"><span class="label">GPU memory preset <em>sets the knobs below; then Save</em></span>
+        <select id="memPreset"><option value="">Custom</option><option value="auto">Auto (detect)</option>
+          <option value="8">8 GB</option><option value="12">12 GB</option><option value="16">16 GB</option>
+          <option value="24">24 GB</option><option value="32">32 GB</option></select></label>
+      <div class="field-row bottom">
+        <label class="field grow"><span class="label">Context rows <span class="info" tabindex="0" role="img" aria-label="About the context size" data-tip-ref="tip-context">i</span></span>
+          <input type="number" id="setMaxSeq" step="1024" placeholder="0 = whole" /></label>
+        <label class="field grow"><span class="label">VAE tile frames</span>
+          <input type="number" id="setVaeCore" step="64" /></label>
+      </div>
+      <div class="check-row">
+        <label class="check"><input type="checkbox" id="setKeepLoaded" /> <span>Keep models loaded between songs</span></label>
+        <span class="info" tabindex="0" role="img" aria-label="About keeping models loaded" data-tip-ref="tip-keep">i</span>
+      </div>
+      <p class="row-hint" id="computeHint"></p>
+      <div class="card-actions">
+        <button class="btn primary small" id="saveSettings">Save</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Hardware</h3>
+      <dl class="kv" id="hwCard"></dl>
+      <p class="hint" id="hwNote"></p>
+      <div class="card-actions">
+        <button class="btn ghost small" id="unloadNow" disabled>Unload model</button>
+      </div>
+    </div>
+
+    <div class="card wide lora-card">
+      <div class="lora-card-head"><h3>VAEs</h3>
+        <span class="lora-card-note" id="vaeCardNote"></span></div>
+      <ul class="lora-list vae-list" id="vaeCard"></ul>
+    </div>
+
+    <div class="card wide lora-card">
+      <div class="lora-card-head"><h3>LoRAs <span class="kind-badge is-addon" data-tip="Add-on: made by a third party, not the model&#39;s publisher">add-on</span> <span class="info" tabindex="0" role="img" aria-label="About LoRAs" data-tip-ref="tip-loras">i</span></h3>
+        <span class="lora-card-note" id="loraCardNote"></span></div>
+      <ul class="lora-list" id="loraCard"></ul>
+    </div>
+
+    <div class="card wide lora-card">
+      <div class="lora-card-head"><h3>Sliders <span class="kind-badge is-addon" data-tip="Add-on: made by a third party, not the model&#39;s publisher">add-on</span></h3>
+        <span class="lora-card-note" id="sliderCardNote"></span></div>
+      <div class="tile-src card-src" id="sliderSource"></div>
+      <ul class="lora-list slider-list" id="sliderCard"></ul>
+    </div>
+
+    <div class="card writer-card">
+      <h3>Writer</h3>
+      <p class="hint">A local language model turns a one-line idea into a title, style prompt and
+        lyrics. The browser talks to the chat server directly.</p>
+      <div class="writer-pane" id="paneServer">
+        <div class="pane-head">
+          <h4 class="mini">Local chat server</h4>
+          <span class="pill" id="chatState">not set</span>
+          <div class="spacer"></div>
+          <button type="button" class="btn ghost small" id="chatTest">Test connection</button>
+        </div>
+        <label class="field"><span class="label">Address <em>any server with a /v1 chat endpoint</em></span>
+          <input type="text" id="chatUrl" placeholder="http://127.0.0.1:18000/v1" autocomplete="off" spellcheck="false" /></label>
+        <p class="row-hint" id="chatHint">Uses whatever model the server has loaded. This page never loads,
+          switches or unloads a model on it.</p>
+      </div>
+    </div>
+
+    <div class="card wide">
+      <div class="pane-head">
+        <h3>Server log</h3>
+        <span class="pill" id="logState">connecting</span>
+        <div class="spacer"></div>
+        <label class="check small-check"><input type="checkbox" id="logFollow" checked /> <span>Follow</span></label>
+        <button type="button" class="btn ghost small" id="logCopy">Copy</button>
+        <button type="button" class="btn ghost small" id="logClear">Clear view</button>
+      </div>
+      <div class="log-body mono" id="logBody" role="log" aria-live="off"></div>
+    </div>
+
+    <!-- credits: upstream project names, not paths (build-page.sh's folder-name guard skips this block) -->
+    <div class="card wide about-card" id="aboutCard">
+      <div class="about-head">
+        <h3>About</h3>
+        <p class="about-credit">Customized Collection by <strong>SeattleSysop</strong>
+          <a class="about-gh" href="https://github.com/IronWolve" target="_blank" rel="noopener noreferrer">github.com/IronWolve</a></p>
+      </div>
+      <div class="about-grid">
+        <div class="about-projects">
+          <section class="about-project"><h4>YuE2</h4><p class="about-what">the music model, by the Multimodal Art Projection team</p><ul class="about-links">
+            <li><a href="https://map-yue2.github.io/" target="_blank" rel="noopener noreferrer">Project page</a><span class="about-where">map-yue2.github.io</span></li>
+            <li><a href="https://github.com/multimodal-art-projection/YuE" target="_blank" rel="noopener noreferrer">Code and guides</a><span class="about-where">github · multimodal-art-projection/YuE</span></li>
+            <li><a href="https://huggingface.co/m-a-p/YuE2-3B" target="_blank" rel="noopener noreferrer">Model weights</a><span class="about-where">hugging face · m-a-p/YuE2-3B</span></li>
+            <li><a href="https://huggingface.co/m-a-p/YuE2-Vae" target="_blank" rel="noopener noreferrer">Sound decoder</a><span class="about-where">hugging face · m-a-p/YuE2-Vae</span></li>
+            <li><a href="https://huggingface.co/m-a-p/SheetSage2" target="_blank" rel="noopener noreferrer">Covers: transcriber</a><span class="about-where">hugging face · m-a-p/SheetSage2</span></li>
+            <li><a href="https://huggingface.co/m-a-p/MERT-v2-FullSong" target="_blank" rel="noopener noreferrer">Covers: audio encoder</a><span class="about-where">hugging face · m-a-p/MERT-v2-FullSong</span></li>
+            <li><a href="https://github.com/multimodal-art-projection/YuE/blob/main/docs/technical_report.pdf" target="_blank" rel="noopener noreferrer">Technical report</a><span class="about-where">pdf</span></li>
+            <li><a href="https://arxiv.org/abs/2503.08638" target="_blank" rel="noopener noreferrer">Paper</a><span class="about-where">arxiv · 2503.08638</span></li>
+          </ul></section>
+          <section class="about-project"><h4>yue2.cpp</h4><p class="about-what">the C++ engine and server this app runs on</p><ul class="about-links">
+            <li><a href="https://github.com/ServeurpersoCom/yue2.cpp" target="_blank" rel="noopener noreferrer">Code</a><span class="about-where">github · ServeurpersoCom/yue2.cpp</span></li>
+            <li><a href="https://huggingface.co/Serveurperso/YuE2-GGUF" target="_blank" rel="noopener noreferrer">Ready-made model files</a><span class="about-where">hugging face · Serveurperso/YuE2-GGUF</span></li>
+          </ul></section>
+          <section class="about-project"><h4>ggml</h4><p class="about-what">the tensor library underneath</p><ul class="about-links">
+            <li><a href="https://github.com/ggml-org/ggml" target="_blank" rel="noopener noreferrer">Code</a><span class="about-where">github · ggml-org/ggml</span></li>
+            <li><a href="https://github.com/ServeurpersoCom/ggml" target="_blank" rel="noopener noreferrer">The fork yue2.cpp uses</a><span class="about-where">github · ServeurpersoCom/ggml</span></li>
+          </ul></section>
+        </div>
+        <div class="about-addons" id="aboutAddons"></div>
+      </div>
+    </div>
+    <!-- /credits -->
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------- workspace -->
+<div class="workspace">
+
+  <!-- compose ------------------------------------------------------------ -->
+  <section class="col compose-col" id="view-compose">
+    <div class="col-head">
+      <h2>Compose</h2>
+      <span class="col-note">symbols in, sound out</span>
+      <div class="spacer"></div>
+      <button type="button" class="btn ghost small" id="newSong" data-tip="Start a new song: every field, both seeds, the score, loaded music codes, the mode, sampling, sliders, LoRAs and Instrumental back to their defaults. Your VAE, output and theme choices stay.">＋ New song</button>
+    </div>
+
+    <details class="drawer" id="museDrawer">
+      <summary><span class="chev" aria-hidden="true"></span> Start from an idea <em class="summary-note">a local model drafts title, style and lyrics</em></summary>
+      <div class="drawer-body">
+    <section class="muse" id="muse">
+      <div class="muse-head">
+        <span class="muse-tag" id="museTag">chat server</span>
+        <div class="spacer"></div>
+        <select id="museModel" title="The model loaded on the chat server; this page never picks another" disabled></select>
+      </div>
+      <div class="muse-row">
+        <input type="text" id="idea" autocomplete="off"
+               placeholder="a slow song about missing the last train home" />
+        <button type="button" class="btn writer" id="museBtn">
+          <span id="museGlyph" aria-hidden="true">✎</span> <span id="museLabel">Write the brief</span>
+        </button>
+      </div>
+      <div class="muse-row secondary">
+        <label class="field grow">
+          <span class="label">Structure</span>
+          <select id="structure">
+            <option value="simple">Verse · Chorus</option>
+            <option value="bridge" selected>Verse · Chorus · Bridge</option>
+            <option value="prechorus">With a pre-chorus</option>
+            <option value="full">Full arc — intro, pre-chorus, bridge, outro</option>
+          </select>
+        </label>
+      </div>
+      <p class="row-hint" id="structureHint"></p>
+      <div class="muse-foot">
+        <label class="check"><input type="checkbox" id="autoRun" />
+          <span><strong>Write and generate</strong> — go straight on to the song</span></label>
+        <span class="muse-status mono" id="museStatus"></span>
+      </div>
+    </section>
+      </div>
+    </details>
+
+    <form id="composeForm" class="compose" novalidate>
+      <div class="field-row wrap">
+        <label class="field grow titlefield">
+          <span class="label">Title</span>
+          <input type="text" id="title" placeholder="Song title" autocomplete="off" />
+        </label>
+        <label class="field seedfield">
+          <span class="label">Music seed <span class="info" tabindex="0" role="img" aria-label="About the two seeds" data-tip-ref="tip-seeds">i</span></span>
+          <div class="seed-wrap">
+            <input type="text" id="lmSeed" placeholder="random" inputmode="numeric" autocomplete="off" spellcheck="false" />
+            <button type="button" class="dice" id="rollLmSeed" aria-label="Put in a random music seed">
+              <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><rect x="2.5" y="2.5" width="15" height="15" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/><circle cx="13" cy="13" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </label>
+        <label class="field seedfield">
+          <span class="label">Sound seed</span>
+          <div class="seed-wrap">
+            <input type="text" id="soundSeed" placeholder="random" inputmode="numeric" autocomplete="off" spellcheck="false" />
+            <button type="button" class="dice" id="rollSoundSeed" aria-label="Put in a random sound seed">
+              <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><rect x="2.5" y="2.5" width="15" height="15" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/><circle cx="13" cy="13" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </label>
+      </div>
+
+      <label class="field">
+        <span class="label">Style prompt <em>language, genre, voice, instruments, tempo</em></span>
+        <textarea id="style" rows="3" placeholder="Language, genre, voice, instruments, tempo"></textarea>
+        <span class="row-hint size-meter" id="styleMeter"></span>
+      </label>
+
+      <fieldset class="field sound">
+        <span class="label">VAE <span class="info" tabindex="0" role="img" aria-label="About the VAE" data-tip-ref="tip-vae">i</span><em>turns the written song into sound</em></span>
+        <div class="toggles" id="decoders"></div>
+      </fieldset>
+
+      <fieldset class="field sound">
+        <span class="label">Sliders <span class="kind-badge is-addon" data-tip="Add-on: made by a third party, not the model&#39;s publisher">add-on</span> <span class="info" tabindex="0" role="img" aria-label="About the sliders" data-tip-ref="tip-sliders">i</span><em>voice and genre while the music is written; 0 is off, 1 is full</em></span>
+        <div class="slider-active" id="sliderActive"></div>
+        <div class="slider-chips" id="sliderChips"></div>
+        <p class="row-hint" id="sliderHint"></p>
+      </fieldset>
+
+      <fieldset class="field sound">
+        <span class="label">LoRAs <span class="kind-badge is-addon" data-tip="Add-on: made by a third party, not the model&#39;s publisher">add-on</span> <span class="info" tabindex="0" role="img" aria-label="About LoRAs" data-tip-ref="tip-loras">i</span><em>a strength for the music half and for the sound half</em></span>
+        <div id="loraPicker"></div>
+      </fieldset>
+
+      <label class="field">
+        <span class="label">Lyrics <em>section tags on their own line</em></span>
+        <textarea id="lyrics" rows="14" spellcheck="false" placeholder="[Verse]&#10;&#10;[Chorus]"></textarea>
+      </label>
+
+      <fieldset class="field">
+        <span class="label">Planning mode</span>
+        <div class="modes" id="modes">
+          <label class="mode">
+            <input type="radio" name="cot" value="full" checked />
+            <span class="mode-body">
+              <strong>Full plan</strong>
+              <small>Melody and chords written first, then rendered. Best for new songs.</small>
+            </span>
+          </label>
+          <label class="mode">
+            <input type="radio" name="cot" value="melody" />
+            <span class="mode-body">
+              <strong>Melody only</strong>
+              <small>Melody plan, free accompaniment. Recommended for covers.</small>
+            </span>
+          </label>
+          <label class="mode">
+            <input type="radio" name="cot" value="off" />
+            <span class="mode-body">
+              <strong>Direct</strong>
+              <small>Straight from lyrics and style, no editable score.</small>
+            </span>
+          </label>
+        </div>
+        <label class="check instrumental-check"><input type="checkbox" id="instrumental" />
+          <span><strong>Instrumental</strong> · no vocals, the official YuE2 recipe</span>
+          <span class="info" tabindex="0" role="img" aria-label="About instrumental songs" data-tip-ref="tip-instrumental">i</span></label>
+      </fieldset>
+
+      <div class="codes-note is-hidden" id="codesNote">
+        <div>
+          <strong>Music codes loaded</strong>
+          <span id="codesNoteText"></span>
+        </div>
+        <button type="button" class="btn ghost small" id="dropCodes" title="Forget the codes: Generate writes new music from the prompt">Drop codes</button>
+      </div>
+
+      <details class="drawer" id="coverDrawer">
+        <summary><span class="chev" aria-hidden="true"></span> Cover or remix <em class="summary-note">reuse a melody, change the style</em></summary>
+        <div class="drawer-body">
+          <h4 class="mini">From a recording <span class="info" tabindex="0" role="img" aria-label="About transcription" data-tip-ref="tip-transcribe">i</span></h4>
+          <p class="hint">Transcribe the melody of any song you have as a file, then render it with your own
+            style and lyrics. The words are not transcribed, and the singer is not copied.</p>
+          <div class="field-row" id="coverAudioRow">
+            <label class="field grow"><span class="label">Recording</span>
+              <input type="file" id="coverFile" accept=".wav,.mp3,.flac,.m4a,.ogg,.opus,.aac" /></label>
+            <label class="field"><span class="label">Transcribe</span>
+              <select id="coverTask">
+                <option value="melody-full">Lead melody (voice + instruments)</option>
+                <option value="melody-vocal">Vocal melody only</option>
+                <option value="full">Melody and chords</option>
+              </select></label>
+            <div class="field reset-cell"><button type="button" class="btn ghost" id="coverFromAudio">Transcribe</button></div>
+          </div>
+          <p class="row-hint" id="coverAudioStatus"></p>
+          <h4 class="mini">From one of your takes</h4>
+          <p class="hint">Take the melody from a song you already made and render it somewhere else
+            entirely — a ballad as a techno track, a German song in English. The chord symbols are
+            dropped so the new style can rebuild the harmony, and the run switches to
+            <strong>Melody only</strong>.</p>
+
+          <div class="field-row">
+            <label class="field grow">
+              <span class="label">Melody from</span>
+              <select id="coverTake"></select>
+            </label>
+            <div class="field reset-cell">
+              <button type="button" class="btn ghost" id="coverFromTake">Use this melody</button>
+            </div>
+          </div>
+
+          <label class="check"><input type="checkbox" id="coverMelodyOnly" checked />
+            <span>Drop chord symbols so the new style can rebuild the harmony</span></label>
+          <p class="row-hint" id="coverStatus"></p>
+        </div>
+      </details>
+
+      <details class="drawer" id="scoreDrawer">
+        <summary><span class="chev" aria-hidden="true"></span> Supply your own score <em class="summary-note">ABC, for covers and edits</em></summary>
+        <div class="drawer-body">
+          <p class="hint">Paste an ABC score to condition the song on a melody you already have. Available in full and melody modes; for covers, use melody mode with a score that carries no chord symbols.</p>
+          <div class="chiprow">
+            <button type="button" class="chip" data-abc="melody">Example melody</button>
+            <button type="button" class="chip" data-abc="score">Example score</button>
+            <button type="button" class="chip" data-abc="jazz">Jazz reharmonization</button>
+            <button type="button" class="chip" id="abcInstrumental" data-tip="Move the vocal melody of this score to the instrument (the official instrumental recipe) and tick Instrumental">Make instrumental</button>
+            <button type="button" class="chip danger" data-abc="">Remove score</button>
+          </div>
+          <textarea id="abc" rows="8" spellcheck="false" class="mono" placeholder="X:1&#10;L:1/8&#10;M:4/4&#10;K:C"></textarea>
+        </div>
+      </details>
+
+      <details class="drawer" id="advDrawer">
+        <summary><span class="chev" aria-hidden="true"></span> Sampling <em class="summary-note">defaults are tuned</em></summary>
+        <div class="drawer-body">
+          <div class="shape" id="shape">
+            <label class="shape-row"><span class="shape-name">Composition<em>familiar ↔ unexpected melody and chords</em></span>
+              <input type="range" id="shapeComposition" min="0" max="4" step="1" value="2" /><output id="shapeCompositionOut">default</output></label>
+            <label class="shape-row"><span class="shape-name">Performance<em>controlled ↔ adventurous delivery</em></span>
+              <input type="range" id="shapePerformance" min="0" max="4" step="1" value="2" /><output id="shapePerformanceOut">default</output></label>
+            <label class="shape-row"><span class="shape-name">Style influence<em>loose ↔ focused on your style and lyrics</em></span>
+              <input type="range" id="shapeStyle" min="0" max="4" step="1" value="2" /><output id="shapeStyleOut">default</output></label>
+            <div class="shape-foot"><span class="row-hint">Shortcuts that set the knobs below; the middle is the tuned default.
+              Composition does nothing in Direct mode or with a supplied score.</span>
+              <button type="button" class="btn ghost small" id="shapeReset">Reset sliders</button></div>
+          </div>
+          <div class="sampler-grid">
+            <div class="sampler">
+              <h4><span class="dot patina"></span> Score planner</h4>
+              <div class="knobs" data-group="abc"></div>
+            </div>
+            <div class="sampler">
+              <h4><span class="dot amber"></span> Music tokens</h4>
+              <div class="knobs" data-group="semantic"></div>
+            </div>
+          </div>
+          <div class="field-row">
+            <label class="field">
+              <span class="label">Guidance (CFG)<em>1.0 for full and melody, 1.01 for direct</em></span>
+              <input type="number" id="cfg" step="0.01" placeholder="default" />
+            </label>
+            <div class="field grow reset-cell">
+              <button type="button" class="btn ghost" id="resetSampling">Reset sampling</button>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="drawer" id="outDrawer">
+        <summary><span class="chev" aria-hidden="true"></span> Sound and output <em class="summary-note" id="outSummary">WAV 24-bit</em></summary>
+        <div class="drawer-body">
+          <div class="out-grid">
+            <label class="field"><span class="label">ODE steps <em>sound solver</em></span>
+              <input type="number" id="odeSteps" step="1" /></label>
+            <label class="field"><span class="label">Max length <em>seconds</em></span>
+              <input type="number" id="maxLength" step="10" /></label>
+            <label class="field"><span class="label">Sound variations <em>1–9</em></span>
+              <input type="number" id="variations" step="1" max="9" value="1" /></label>
+            <label class="field"><span class="label">Format <span class="info" tabindex="0" role="img" aria-label="About the output format" data-tip-ref="tip-output">i</span></span>
+              <select id="outFormat">
+                <option value="wav24">WAV 24-bit</option>
+                <option value="wav16">WAV 16-bit</option>
+                <option value="wav32">WAV 32-bit float</option>
+                <option value="mp3">MP3</option>
+              </select></label>
+            <label class="field" id="bitrateField"><span class="label">MP3 bitrate <em>kbps</em></span>
+              <select id="mp3Bitrate">
+                <option value="96">96</option><option value="128">128</option><option value="160">160</option>
+                <option value="192">192</option><option value="256">256</option><option value="320">320</option>
+              </select></label>
+            <label class="field"><span class="label">Peak clip <em>per million</em></span>
+              <input type="number" id="peakClip" step="1" /></label>
+          </div>
+          <div class="field-row">
+            <p class="row-hint grow" id="outHint"></p>
+            <button type="button" class="btn ghost small" id="resetOutput">Reset output</button>
+          </div>
+        </div>
+      </details>
+
+      <div class="submit-bar">
+        <div class="submit-note" id="submitNote">Models load stage by stage on the first run.</div>
+        <label class="versions">
+          <span>Versions <span class="info" tabindex="0" role="img" aria-label="About versions" data-tip-ref="tip-versions">i</span></span><input type="number" id="versions" min="1" max="10" step="1" value="1" /></label>
+        <button type="button" class="btn ghost" id="planBtn"
+          title="Write only the score (seconds, no audio). Check its sections, then Generate renders exactly that score.">Plan score only</button>
+        <button type="submit" class="btn primary" id="generateBtn">
+          <span class="btn-glyph" aria-hidden="true">▸</span> Generate song
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <!-- take / run --------------------------------------------------------- -->
+  <section class="col take-col" id="view-take">
+    <div class="col-head">
+      <h2 id="takeTitle">Nothing playing</h2>
+      <button type="button" class="btn primary small is-hidden" id="playHere" data-tip="Play this song now (the player keeps what it was playing until you do). Double-clicking a song in the list plays it too.">▶ Play this song</button>
+      <span class="col-note" id="takeEyebrow">no run yet</span>
+      <div class="spacer"></div>
+      <button class="btn ghost small run-return is-hidden" id="backToRun">
+        <span class="run-dot" aria-hidden="true"></span> <span id="backToRunLabel">Back to the run</span>
+      </button>
+      <div class="head-actions" id="takeActions"></div>
+    </div>
+
+    <div class="chain" id="chain" hidden>
+      <div class="chain-head">
+        <span class="run-state" id="runState">Queued</span>
+        <span class="run-clock mono" id="runClock">0:00</span>
+        <span class="run-what" id="runWhat"></span>
+        <div class="spacer"></div>
+        <button class="btn ghost small" id="cancelRun">Cancel run</button>
+      </div>
+      <p class="run-seeds mono" id="runSeeds"></p>
+      <ol class="stages" id="stages"></ol>
+      <p class="run-error is-hidden" id="runError"></p>
+    </div>
+
+    <div class="take-empty" id="takeEmpty">
+      <p>Start a song on the left. The run appears here as it happens: the score is written
+        first, then the music tokens, then the sound, then the decode.</p>
+    </div>
+
+    <div class="take-body is-hidden" id="takeBody">
+      <div class="take-tools" id="takeTools">
+        <div class="tool-group"><span class="tool-cap">Download</span><div class="tool-row">
+          <a class="btn ghost small" id="dlTakeAudio" download title="Download this song">WAV</a>
+          <a class="btn ghost small" id="dlTakeFlac" download data-tip="FLAC: the same song, lossless (every sample identical to the WAV) at about three quarters of the size. Made on the spot in about a second; the title and lyrics are written into the file.">FLAC</a>
+          <span class="split-btn"><a class="btn ghost small" id="dlTakeMp3" download data-tip="MP3 converter: makes a shareable MP3 from the lossless song on the server (a few seconds the first time, then kept). 320 kbps is near transparent (about 7 MB for 3 minutes); 256 is very good; 192 is good and smaller (about 4 MB); 128 is small, with audible loss on cymbals and reverb. The song title and lyrics are written into the file.">MP3</a>
+            <select class="mp3-rate" id="mp3Rate" aria-label="MP3 bitrate" data-tip="MP3 converter: makes a shareable MP3 from the lossless song on the server (a few seconds the first time, then kept). 320 kbps is near transparent (about 7 MB for 3 minutes); 256 is very good; 192 is good and smaller (about 4 MB); 128 is small, with audible loss on cymbals and reverb. The song title and lyrics are written into the file.">
+          <option value="320">320k</option><option value="256">256k</option>
+          <option value="192">192k</option><option value="128">128k</option>
+        </select></span>
+        </div></div>
+        <div class="tool-group"><span class="tool-cap">Make again</span><div class="tool-row">
+          <button type="button" class="btn ghost small" id="retakeTake" data-tip="Retake: this exact take into the form, with its score, both seeds and its music codes. Generate renders the same music again: try another VAE, sound seed or sound variations">Retake</button>
+          <button type="button" class="btn ghost small" id="reuseTake" data-tip="Reuse: the prompt, lyrics and every setting (mode, sampling, guidance, VAE, sliders, LoRAs, output) for a new song: no score, no seeds, no music codes, so Generate writes new music">Reuse</button>
+          <button type="button" class="btn ghost small" id="rerenderSound" title="Same music, a new sound seed (seconds)">Re-render sound</button>
+        </div></div>
+        <div class="tool-group"><span class="tool-cap">Files</span><div class="tool-row">
+          <button type="button" class="btn ghost small" id="dlRequest" title="The replay request (.json): prompt, score, codes and both seeds">Request</button>
+          <button type="button" class="btn ghost small" id="dlScore" title="The score as ABC notation (.abc)">Score</button>
+        </div></div>
+      </div>
+
+      <div class="meta-card" id="metaGrid"></div>
+      <div class="decode-switch" id="decodeSwitch"></div>
+      <div class="decode-switch" id="soundSwitch"></div>
+
+      <!-- what the song actually is: prompt first, words under it -->
+      <div class="word-row">
+        <section class="panel">
+          <div class="panel-head"><h3>Prompt</h3><div class="spacer"></div>
+            <button type="button" class="icon-btn copy-icon" id="copyPrompt" aria-label="Copy the prompt" data-tip="Copy the prompt">
+              <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 4.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v7.5A1.5 1.5 0 0 0 4 13h.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button></div>
+          <p class="prompt-text" id="metaStyle"></p>
+          <p class="prompt-text dim" id="metaCover"></p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Lyrics</h3>
+            <div class="spacer"></div>
+            <button class="btn ghost small" id="copyLyrics">Copy</button>
+            <button class="btn ghost small" id="lyricsTxt" title="Download the lyrics as a text file">TXT</button>
+            <button class="btn ghost small" id="lyricsJson" title="Title, style, lyrics and ordered sections for video tools">JSON</button>
+          </div>
+          <pre class="lyric-text" id="metaLyrics"></pre>
+        </section>
+      </div>
+
+      <details class="drawer" id="scorePanel">
+        <summary><span class="chev" aria-hidden="true"></span> Score <em class="summary-note">the editable plan</em></summary>
+        <div class="drawer-body">
+          <div class="score-head">
+            <div class="score-tabs">
+              <button class="stab is-active" data-score="staff">Staff</button>
+              <button class="stab" data-score="abc">ABC</button>
+            </div>
+            <div class="spacer"></div>
+            <button class="btn ghost small" id="reuseScore">Edit and re-render</button>
+          </div>
+          <div class="paper" id="scoreStaff"></div>
+          <pre class="paper mono is-hidden" id="scoreAbc"></pre>
+        </div>
+      </details>
+
+    </div>
+  </section>
+
+  <!-- takes -------------------------------------------------------------- -->
+  <aside class="library">
+    <header class="lib-head">
+      <h3>Takes</h3>
+      <span class="count mono" id="libCount">0</span>
+      <div class="spacer"></div>
+      <button type="button" class="lib-toggle" id="favFilter" aria-pressed="false" title="Show favourites only">★ Favourites</button>
+      <div class="menu-wrap">
+        <button type="button" class="icon-btn" id="libMenuBtn" aria-haspopup="true" aria-expanded="false" aria-label="Library actions" title="Library actions">⋯</button>
+        <div class="menu-pop right is-hidden" id="libMenu" role="menu">
+          <button type="button" role="menuitem" id="refreshLib">Refresh the list</button>
+          <button type="button" role="menuitem" class="danger" id="deleteNonFav">Delete non-favourites…</button>
+        </div>
+      </div>
+    </header>
+    <div class="lib-list" id="libList"></div>
+  </aside>
+</div>
+
+
+<!-- ---------------------------------------------------------------- playbar -->
+<footer class="playbar is-empty" id="playbar">
+  <div class="playbar-id">
+    <strong id="playbarTitle" data-tip="Pick a take on the right">Nothing loaded</strong>
+  </div>
+
+  <button class="play" id="playBtn" aria-label="Play"><span id="playGlyph">▶</span></button>
+
+  <span class="mono time" id="timeNow">0:00</span>
+  <canvas id="wave" height="40"></canvas>
+  <span class="mono time dim" id="timeTotal">0:00</span>
+
+  <div class="volume">
+    <button class="icon-btn" id="muteBtn" aria-label="Mute"><span id="muteGlyph">🔊</span></button>
+    <input type="range" id="volume" min="0" max="1" step="0.01" value="1" aria-label="Volume" />
+  </div>
+
+  <button type="button" class="status-pill" id="statusPill" data-s="idle" data-tip="Nothing is being made or played"><span class="status-dot" aria-hidden="true"></span><span id="statusText" aria-live="polite">Idle</span></button>
+
+  <audio id="audio" preload="auto"></audio>
+</footer>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.7.0/abcjs-basic-min.js"
+        onerror="window.__abcjsFailed=true"></script>
+
+<!-- ---------------------------------------------------------- info tips -->
+<!-- Shown by hovering the (i) icons; one floating tip, so no column clips it. -->
+<template id="tip-instrumental">
+  <b>Instrumental</b> is the official YuE2 recipe for a song with no singing.
+  <ul>
+    <li>A score is planned as usual: your lyrics shape the melody and sections (with no lyrics, a plain Intro, Verse, Chorus, Outro).</li>
+    <li>Every vocal note then moves to the instrument voice, keeping its pitch and timing; instrument notes under it give way.</li>
+    <li>The song renders from that score with only the section tags as lyrics, and <i>Instrumental, … no vocals, no singing, no choir, no spoken words</i> added to your style.</li>
+    <li>Full mode when the score has chords, Melody mode when it has none (a melody transcription).</li>
+  </ul>
+  With a score already under <i>Supply your own score</i> (planned, pasted or transcribed from a recording), that score is converted instead.
+  Your style and lyrics fields stay as you wrote them.
+</template>
+<template id="tip-loras">
+  <span class="tip-kind">LoRA &middot; add-on, not stock</span>
+  <p>A LoRA is a small file of weight changes someone trained on a style, a genre or an artist.
+    It is added into the model for this song, then taken out again.</p>
+  <dl>
+    <dt>Music</dt><dd>the half that writes the score and the music tokens: melody, words, arrangement</dd>
+    <dt>Sound</dt><dd>the half that turns them into audio: timbre, mix, production</dd>
+  </dl>
+  <p>1 is the strength it was trained at, 0 turns that half off. Above 1 on the music half the vocal
+    often falls apart; if a style comes out too strong, try 0.5 there first. Several can be stacked.</p>
+  <p>Many LoRAs need their trigger word in the style prompt, and were trained in one planning mode;
+    the hints below say so when the file does. Files live in the app's <code>loras/</code> folder
+    (files, folders or links); community ones are mostly CC BY-NC.</p>
+</template>
+<template id="tip-vae">
+  <span class="tip-kind">VAE &middot; sound decoder</span>
+  <p>The last step of every song. The model writes the song as a compact description, and the VAE
+    turns it into audio. It changes the tone and clarity, not the notes. One per song.</p>
+  <dl data-fill="vaes">
+    <dt>Standard</dt><dd><code>m-a-p/YuE2-Vae</code><br />current official, best sound</dd>
+    <dt>Legacy</dt><dd><code>m-a-p/YuE2-Vae-legacy</code><br />older official, used for the published scores</dd>
+    <dt>Blend</dt><dd><code>Mothersuperior/YuE2-Vae-merge-0.666</code><br />community mix, &#8532; Standard + &#8531; Legacy</dd>
+  </dl>
+  <p>A finished song can get another VAE version from its page, in seconds.</p>
+</template>
+<template id="tip-sliders">
+  <span class="tip-kind">Sliders &middot; add-on, not stock</span>
+  <p>None of these ship with the model: all of them are one outside maker's add-on (its link and
+    details are in Engine &rsaquo; Sliders). Each nudges the song model toward a voice or a genre while
+    it writes the music, so they change what is played, not just how it sounds.</p>
+  <p>A cousin of a LoRA, not a LoRA: a small trained network that adapts its push to the music as it
+    goes, so it runs live beside the model instead of being merged in. Each one active slows the
+    music stage a little.</p>
+  <p>Tap to add; 0 is off, 1 is full; stack as many as you like. Trained in Direct mode; applied only
+    while the music tokens are written, never to the score or the sound. Experimental.</p>
+</template>
+<template id="tip-model">
+  <span class="tip-kind">Backbone file</span>
+  <dl>
+    <dt>BF16</dt><dd>the release weights, as published (about 7.2 GB)</dd>
+    <dt>Q8_0 &hellip;</dt><dd>smaller quantized copies: less memory, slightly different numbers</dd>
+  </dl>
+  <p>Switching drops the old file from memory; the next song loads the new one.</p>
+</template>
+<template id="tip-context">
+  <span class="tip-kind">Context size &middot; key/value cache</span>
+  <p>0 keeps the whole 24,576 rows. Smaller saves GPU memory, but it must hold the prompt, the
+    score and the song: roughly 2,500 rows plus 25 for every second of music.</p>
+  <p>VAE tile frames: the decoder works on tiles of this size. Smaller tiles need less memory at the
+    same speed; 512 is the reference setting.</p>
+</template>
+<template id="tip-keep">
+  <span class="tip-kind">Keep models loaded</span>
+  <dl>
+    <dt>Off</dt><dd>each stage loads, runs and leaves GPU memory; the card is free again after every song</dd>
+    <dt>On</dt><dd>everything stays resident, so the next song starts at once</dd>
+  </dl>
+  <p>The C++ counterpart of the other console's "offload" choice.</p>
+</template>
+<template id="tip-transcribe">
+  <span class="tip-kind">Transcription models</span>
+  <dl>
+    <dt>MERT</dt><dd><code>m-a-p/MERT-v2-FullSong</code><br />listens to the recording</dd>
+    <dt>SheetSage</dt><dd><code>m-a-p/SheetSage2</code><br />writes what it hears as a score</dd>
+  </dl>
+  <p>Both run inside the server from one converted file, in its queue like a song. The score loads
+    into "Supply your own score" and the song model follows it. WAV and MP3 go up as they are;
+    other formats are converted in the browser first.</p>
+</template>
+<template id="tip-seeds">
+  <span class="tip-kind">Two seeds</span>
+  <dl>
+    <dt>Music</dt><dd>the token draw: the score, the melody and the length come from this one</dd>
+    <dt>Sound</dt><dd>the acoustic noise: the same music played through a different grain</dd>
+  </dl>
+  <p>Blank rolls a random one. Every take keeps both, so it can be replayed exactly, or given a
+    new sound in seconds without writing the music again.</p>
+</template>
+<template id="tip-output">
+  <span class="tip-kind">Output</span>
+  <dl>
+    <dt>WAV 24</dt><dd>the fair comparison with the other console's 24-bit files</dd>
+    <dt>WAV 32</dt><dd>raw float, no normalisation</dd>
+    <dt>MP3</dt><dd>small files; the server's own default</dd>
+    <dt>Peak clip</dt><dd>normalises to the peak left after ignoring this many samples per million;
+      0 is the true peak</dd>
+  </dl>
+  <p>Sound variations render the same music with seeds sound&nbsp;+&nbsp;1, +&nbsp;2&hellip; side by side.</p>
+</template>
+<template id="tip-versions">
+  <span class="tip-kind">Versions</span>
+  <p>Separate songs from the same prompt, each with its own music seed (seed, seed&nbsp;+&nbsp;1&hellip;).
+    The server writes up to <strong data-fill="max-batch">1</strong> side by side in one pass; more are
+    queued as further passes.</p>
+</template>
+<script src="examples.js"></script>
+<script src="instrumental.js"></script>
+<script src="help.js"></script>
+<script src="loras.js"></script>
+<script src="vaes.js"></script>
+<script src="themes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
