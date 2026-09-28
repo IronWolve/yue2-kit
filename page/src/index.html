@@ -571,7 +571,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   </section>
 
   <!-- takes -------------------------------------------------------------- -->
-  <aside class="library">
+  <aside class="library" id="library">
     <header class="lib-head">
       <h3>Takes</h3>
       <span class="count mono" id="libCount">0</span>
@@ -587,6 +587,12 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     </header>
     <div class="lib-list" id="libList"></div>
   </aside>
+
+  <!-- the grips between the columns (app.js: column grips) -->
+  <div class="col-grip left" id="gripLeft" role="separator" aria-orientation="vertical" aria-controls="view-compose" tabindex="0"
+       aria-label="Compose column width" title="Drag to resize · double-click for the default width"></div>
+  <div class="col-grip right" id="gripRight" role="separator" aria-orientation="vertical" aria-controls="library" tabindex="0"
+       aria-label="Takes list width" title="Drag to resize · double-click for the default width"></div>
 </div>
 
 

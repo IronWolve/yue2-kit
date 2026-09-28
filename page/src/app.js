@@ -4168,6 +4168,88 @@
     if (document.visibilityState === "visible" && STATE.online) refreshLibrary().catch(function () {});
   });
 
+  // ------------------------------------------------------------ column grips
+  // Drag the line between two columns to resize the compose column (left) or the takes list (right); the
+  // middle column takes what is left and never goes under its minimum. Double-click or Home gives the
+  // default width back; arrow keys move a focused grip. The widths are this browser's own ("yue2.cols"),
+  // kept as dragged: a smaller window squeezes them for now, a bigger one gives them back.
+  var GRIPS = {
+    left: { grip: "gripLeft", col: "view-compose", prop: "--col-left", min: 380, sign: 1 },
+    right: { grip: "gripRight", col: "library", prop: "--col-right", min: 240, sign: -1 }
+  };
+  var MIDDLE_MIN = 420;
+  var workspace = document.querySelector(".workspace");
+  var stacked = window.matchMedia("(max-width: 1150px)");
+
+  function savedCols() {
+    var cols;
+    try { cols = JSON.parse(recall("yue2.cols") || "{}") || {}; } catch (error) { cols = {}; }
+    return cols;
+  }
+  function colWidth(side) { return Math.round($(GRIPS[side].col).getBoundingClientRect().width); }
+  // the widest this side may be: the window less the other column, the middle's minimum and the two gaps
+  function colMax(side) {
+    var other = side === "left" ? "right" : "left";
+    return Math.floor(workspace.getBoundingClientRect().width - colWidth(other) - MIDDLE_MIN - 2);
+  }
+  function setCol(side, px) {
+    var g = GRIPS[side];
+    if (px === null) workspace.style.removeProperty(g.prop);
+    else workspace.style.setProperty(g.prop, Math.round(Math.max(g.min, Math.min(px, colMax(side)))) + "px");
+    var grip = $(g.grip);
+    grip.setAttribute("aria-valuenow", String(colWidth(side)));
+    grip.setAttribute("aria-valuemin", String(g.min));
+  }
+  function applyCols() {
+    if (stacked.matches || !workspace.offsetParent) return;
+    var cols = savedCols();
+    // left first against the default right, then right against the left it got, then left again
+    ["left", "right", "left"].forEach(function (side) { setCol(side, typeof cols[side] === "number" ? cols[side] : null); });
+  }
+  function saveCol(side, px) {
+    var cols = savedCols();
+    if (px === null) delete cols[side]; else cols[side] = px;
+    store("yue2.cols", Object.keys(cols).length ? JSON.stringify(cols) : null);
+  }
+
+  Object.keys(GRIPS).forEach(function (side) {
+    var g = GRIPS[side], grip = $(g.grip);
+    grip.addEventListener("pointerdown", function (event) {
+      if (event.button !== 0) return;
+      var startX = event.clientX, from = colWidth(side);
+      grip.setPointerCapture(event.pointerId);
+      grip.classList.add("is-dragging");
+      document.body.classList.add("is-resizing");
+      function move(e) { setCol(side, from + g.sign * (e.clientX - startX)); }
+      function done(e) {
+        grip.removeEventListener("pointermove", move);
+        grip.removeEventListener("pointerup", done);
+        grip.removeEventListener("pointercancel", done);
+        grip.classList.remove("is-dragging");
+        document.body.classList.remove("is-resizing");
+        if (e.clientX !== startX) saveCol(side, colWidth(side));
+      }
+      grip.addEventListener("pointermove", move);
+      grip.addEventListener("pointerup", done);
+      grip.addEventListener("pointercancel", done);
+    });
+    grip.addEventListener("dblclick", function () { saveCol(side, null); applyCols(); });
+    grip.addEventListener("keydown", function (event) {
+      var step = event.shiftKey ? 64 : 16, px;
+      if (event.key === "ArrowLeft") px = colWidth(side) - g.sign * step;
+      else if (event.key === "ArrowRight") px = colWidth(side) + g.sign * step;
+      else if (event.key === "Home") { event.preventDefault(); saveCol(side, null); applyCols(); return; }
+      else return;
+      event.preventDefault();
+      setCol(side, px);
+      saveCol(side, colWidth(side));
+    });
+  });
+  // re-fit on window resizes, and when the workspace comes back from the Engine page
+  if (window.ResizeObserver) new ResizeObserver(applyCols).observe(workspace);
+  else window.addEventListener("resize", applyCols);
+  applyCols();
+
   STATE.favOnly = recall("yue2.favOnly") === "1";
 
   function boot() {

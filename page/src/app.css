@@ -510,15 +510,31 @@ body:has(#view-engine:not(.is-hidden)) #engineToggle { background: var(--amber);
 .workspace {
   display: grid;
   /* compose | run | takes -- the takes column widens with the screen instead of
-     staying pinned at a fixed width. */
+     staying pinned at a fixed width. Dragging a grip sets --col-left / --col-right. */
   grid-template-columns:
-    minmax(500px, 760px)
+    var(--col-left, minmax(500px, 760px))
     minmax(420px, 1fr)
-    clamp(280px, 20vw, 560px);
+    var(--col-right, clamp(280px, 20vw, 560px));
   gap: 1px;
   background: var(--line);
   height: calc(100vh - 52px - var(--playbar-h));
+  position: relative;
 }
+
+/* the grips on the lines between the columns: drag to resize, double-click for the default width.
+   Each is placed on its column's start line and straddles the 1px gap. */
+.col-grip {
+  position: absolute; grid-row: 1; top: 0; bottom: 0; left: -6px; width: 11px;
+  z-index: 7; cursor: col-resize; touch-action: none; outline: none;
+}
+.col-grip.left { grid-column: 2; }
+.col-grip.right { grid-column: 3; }
+.col-grip::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 3px; border-radius: 2px;
+  background: transparent; transition: background .15s;
+}
+.col-grip:hover::after, .col-grip:focus-visible::after, .col-grip.is-dragging::after { background: var(--amber); }
+body.is-resizing, body.is-resizing * { cursor: col-resize !important; user-select: none !important; }
 
 .col { background: var(--ground); overflow-y: auto; padding: 18px 22px 60px; display: flex; flex-direction: column; gap: 16px; }
 .compose-col { background: var(--ground); }
@@ -1583,7 +1599,7 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
 /* ---------------------------------------------------------------- responsive */
 
 @media (max-width: 1500px) {
-  .workspace { grid-template-columns: minmax(380px, 1fr) minmax(380px, 1fr) 270px; }
+  .workspace { grid-template-columns: var(--col-left, minmax(380px, 1fr)) minmax(380px, 1fr) var(--col-right, 270px); }
   .col { padding: 16px 16px 50px; }
   .col-head { margin: -16px -16px 0; padding: 16px 16px 12px; }
   .hw-strip { display: none; }
@@ -1594,6 +1610,7 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
 
 @media (max-width: 1150px) {
   .workspace { grid-template-columns: 1fr; height: auto; }
+  .col-grip { display: none; }
   .col { max-height: none; }
   .library { max-height: 420px; }
   .modes, .sampler-grid { grid-template-columns: 1fr; }

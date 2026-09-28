@@ -501,3 +501,12 @@ Files:
 - `tools/console/app.css` (+39 −2)
 - `tools/console/app.js` (+66 −10)
 - `tools/console/index.html` (+36 −4)
+
+## 0037 Add resize grips between the page's columns
+
+2026-09-27. Drag the line left or right of the middle column to size the compose column or the takes list; the middle keeps at least 420px. Double-click or Home resets a column, arrow keys move a focused grip, and the widths are kept per browser. Hidden when the columns stack on narrow windows.
+
+Files:
+- `tools/console/app.css` (+21 −4)
+- `tools/console/app.js` (+82 −0)
+- `tools/console/index.html` (+7 −1)

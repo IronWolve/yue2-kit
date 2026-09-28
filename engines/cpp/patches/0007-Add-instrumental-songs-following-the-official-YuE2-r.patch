@@ -1,7 +1,7 @@
 From 116e2c9200513b04f696cd447a41a0dfaa93c574 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Fri, 25 Sep 2026 19:13:34 -0700
-Subject: [PATCH 07/36] Add instrumental songs, following the official YuE2
+Subject: [PATCH 07/37] Add instrumental songs, following the official YuE2
  recipe
 
 An Instrumental switch under the planning modes renders a song with no
