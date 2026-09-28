@@ -510,3 +510,12 @@ Files:
 - `tools/console/app.css` (+21 −4)
 - `tools/console/app.js` (+82 −0)
 - `tools/console/index.html` (+7 −1)
+
+## 0038 Show the chat server's state as a fixed-size button
+
+2026-09-27. The idea writer's line of status text becomes a square button: Chat Server Connected in green when the server answers, Chat Server Offline in red when not. Both labels share one cell, so the button never changes size; the old text is its tip, and a click checks again.
+
+Files:
+- `tools/console/app.css` (+9 −0)
+- `tools/console/app.js` (+10 −5)
+- `tools/console/index.html` (+3 −0)

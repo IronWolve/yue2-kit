@@ -3986,11 +3986,14 @@
       ? '<option value="' + escape(status.use) + '">' + escape(status.use) + " (loaded on the server)</option>"
       : '<option value="">no writer model yet — see Engine</option>';
     $("museBtn").disabled = !status.use;
-    if (!status.use) {
-      $("museStatus").textContent = !status.configured ? "Set the chat server address under Engine"
-        : (status.available ? "Load a model in your chat server first" : "The chat server is not answering — check its address under Engine");
-      $("museStatus").classList.add("bad");
-    } else if (!$("museBtn").dataset.busy || $("museBtn").dataset.busy === "0") {
+    // the state is the Chat Server button; what to do about it is its tip
+    var link = $("chatLink");
+    link.dataset.s = status.available ? "on" : "off";
+    link.dataset.tip = !status.configured ? "Set the chat server address under Engine"
+      : (!status.available ? "The chat server is not answering — check its address under Engine"
+        : (status.use ? "Loaded now: " + status.use : "The server answers but has no model loaded: load one there first")) + ". Click to check again.";
+    if (tipFor === link) showTip(link);
+    if (!$("museBtn").dataset.busy || $("museBtn").dataset.busy === "0") {
       $("museStatus").textContent = "";
       $("museStatus").classList.remove("bad");
     }
@@ -4049,6 +4052,8 @@
     }).catch(function (error) { toast(error.message, "bad"); })
       .then(function () { button.disabled = false; });
   });
+
+  $("chatLink").addEventListener("click", function () { refreshChat().catch(function () {}); });
 
   $("museDrawer").addEventListener("toggle", function () {
     if (this.open) refreshChat().catch(function () {});

@@ -1,7 +1,7 @@
 From b6b2b23117fc86cb1084882a370ddc4a4a9df129 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 16:11:02 -0700
-Subject: [PATCH 34/37] Make the song details compact: Song, Sound and Shape
+Subject: [PATCH 34/38] Make the song details compact: Song, Sound and Shape
  side by side
 
 One card of three rows: Song | Sound | Shape, then Sliders | LoRAs with each strength beside its name, then the two seeds stacked with copy buttons. Length and render time stay on the line under the title only, and Style influence shows its position without the guidance text (a hover gives it). In a narrow window Shape drops under Song and Sound.

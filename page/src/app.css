@@ -855,6 +855,15 @@ select:disabled { opacity: .7; }
 .muse .row-hint { margin: 0; }
 .muse-status { font-size: 11px; color: var(--patina); margin-left: auto; }
 .muse-status.bad { color: var(--bad); }
+/* the chat server's state: a square button, green when it answers, red when not. Both labels share one
+   grid cell, so it is always as wide as the longer one and never changes size; the details are its tip. */
+.chat-link { display: inline-grid; flex: none; align-items: center; justify-items: center; height: 28px; padding: 0 12px;
+  border: 1px solid var(--bad-line); border-radius: 2px; background: color-mix(in srgb, var(--bad) 12%, transparent);
+  color: var(--bad); font: 600 12px/1 var(--sans); white-space: nowrap; cursor: pointer; }
+.chat-link > span { grid-area: 1 / 1; }
+.chat-link[data-s="on"] { border-color: var(--good-line); background: color-mix(in srgb, var(--good) 12%, transparent); color: var(--good); }
+.chat-link[data-s="on"] .off, .chat-link[data-s="off"] .on { visibility: hidden; }
+.chat-link:hover { filter: brightness(1.15); }
 
 /* The writer lives in a closed drawer; inside it the muse panel drops its own frame. */
 #museDrawer .muse { margin: 0; padding: 0; background: none; border: 0; border-radius: 0; }

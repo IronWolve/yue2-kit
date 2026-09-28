@@ -1,0 +1,79 @@
+From 851235c94542369f5878be32a442c0452f0a1a64 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sun, 27 Sep 2026 18:19:25 -0700
+Subject: [PATCH 38/38] Show the chat server's state as a fixed-size button
+
+The idea writer's line of status text becomes a square button: Chat Server Connected in green when the server answers, Chat Server Offline in red when not. Both labels share one cell, so the button never changes size; the old text is its tip, and a click checks again.
+---
+ tools/console/app.css    |  9 +++++++++
+ tools/console/app.js     | 15 ++++++++++-----
+ tools/console/index.html |  3 +++
+ 3 files changed, 22 insertions(+), 5 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index a6b21d8..33523c2 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -855,6 +855,15 @@ select:disabled { opacity: .7; }
+ .muse .row-hint { margin: 0; }
+ .muse-status { font-size: 11px; color: var(--patina); margin-left: auto; }
+ .muse-status.bad { color: var(--bad); }
++/* the chat server's state: a square button, green when it answers, red when not. Both labels share one
++   grid cell, so it is always as wide as the longer one and never changes size; the details are its tip. */
++.chat-link { display: inline-grid; flex: none; align-items: center; justify-items: center; height: 28px; padding: 0 12px;
++  border: 1px solid var(--bad-line); border-radius: 2px; background: color-mix(in srgb, var(--bad) 12%, transparent);
++  color: var(--bad); font: 600 12px/1 var(--sans); white-space: nowrap; cursor: pointer; }
++.chat-link > span { grid-area: 1 / 1; }
++.chat-link[data-s="on"] { border-color: var(--good-line); background: color-mix(in srgb, var(--good) 12%, transparent); color: var(--good); }
++.chat-link[data-s="on"] .off, .chat-link[data-s="off"] .on { visibility: hidden; }
++.chat-link:hover { filter: brightness(1.15); }
+ 
+ /* The writer lives in a closed drawer; inside it the muse panel drops its own frame. */
+ #museDrawer .muse { margin: 0; padding: 0; background: none; border: 0; border-radius: 0; }
+diff --git a/tools/console/app.js b/tools/console/app.js
+index ab7acf9..3e133a6 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -3986,11 +3986,14 @@
+       ? '<option value="' + escape(status.use) + '">' + escape(status.use) + " (loaded on the server)</option>"
+       : '<option value="">no writer model yet — see Engine</option>';
+     $("museBtn").disabled = !status.use;
+-    if (!status.use) {
+-      $("museStatus").textContent = !status.configured ? "Set the chat server address under Engine"
+-        : (status.available ? "Load a model in your chat server first" : "The chat server is not answering — check its address under Engine");
+-      $("museStatus").classList.add("bad");
+-    } else if (!$("museBtn").dataset.busy || $("museBtn").dataset.busy === "0") {
++    // the state is the Chat Server button; what to do about it is its tip
++    var link = $("chatLink");
++    link.dataset.s = status.available ? "on" : "off";
++    link.dataset.tip = !status.configured ? "Set the chat server address under Engine"
++      : (!status.available ? "The chat server is not answering — check its address under Engine"
++        : (status.use ? "Loaded now: " + status.use : "The server answers but has no model loaded: load one there first")) + ". Click to check again.";
++    if (tipFor === link) showTip(link);
++    if (!$("museBtn").dataset.busy || $("museBtn").dataset.busy === "0") {
+       $("museStatus").textContent = "";
+       $("museStatus").classList.remove("bad");
+     }
+@@ -4050,6 +4053,8 @@
+       .then(function () { button.disabled = false; });
+   });
+ 
++  $("chatLink").addEventListener("click", function () { refreshChat().catch(function () {}); });
++
+   $("museDrawer").addEventListener("toggle", function () {
+     if (this.open) refreshChat().catch(function () {});
+   });
+diff --git a/tools/console/index.html b/tools/console/index.html
+index 61a293c..4d66a4e 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -238,6 +238,9 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+         <label class="check"><input type="checkbox" id="autoRun" />
+           <span><strong>Write and generate</strong> — go straight on to the song</span></label>
+         <span class="muse-status mono" id="museStatus"></span>
++        <button type="button" class="chat-link" id="chatLink" data-s="off" data-tip="Set the chat server address under Engine">
++          <span class="on">Chat Server Connected</span><span class="off">Chat Server Offline</span>
++        </button>
+       </div>
+     </section>
+       </div>
