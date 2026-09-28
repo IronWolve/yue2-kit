@@ -62,7 +62,8 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - a style prompt that grows with its text and counts tokens (about 11,400 for style and lyrics together);
   - lyrics, an official **Instrumental** switch, and three modes: Full plan, Melody only, Direct;
   - a supplied or editable ABC score; **Cover or remix** from a recording or from a take (two parts of the
-    same shape: each control on its own line, the button on the left);
+    same shape: each control on its own line, the buttons on the left; a chosen recording can be played with
+    **▶ Listen** first);
   - sampling controls, versions per pass, and Plan score only;
   - **Start from an idea**: a local chat model drafts title, style and lyrics. An Idea box (two lines) that grows as you
     type; Structure, and the writer model on its own line under it; then, under a thin line, a square **Chat Server

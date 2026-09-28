@@ -431,7 +431,7 @@ check("(i) beside the seeds explains music vs sound", t?.on && /Music/.test(t.te
 await ev(`document.getElementById("coverDrawer").open = true; document.getElementById("outDrawer").open = true; true`);
 const cover = await ev(`(() => { const body = document.querySelector("#coverDrawer .drawer-body"), parts = [...body.querySelectorAll(".cover-part")];
   const w = (id) => Math.round(document.getElementById(id).getBoundingClientRect().width / parts[0].getBoundingClientRect().width * 100);
-  const b = ["coverFromAudio", "coverFromTake"].map(id => document.getElementById(id).getBoundingClientRect());
+  const b = parts.map(p => p.querySelector(".cover-act .btn").getBoundingClientRect());   // each part's first button
   return { parts: parts.length, full: ["coverFile", "coverTask", "coverTake"].map(w), sizes: b.map(r => Math.round(r.width) + "x" + Math.round(r.height)),
     left: b.map((r, i) => Math.round(r.left - parts[i].getBoundingClientRect().left)), hints: body.querySelectorAll(".hint").length,
     infos: parts.map(p => !!p.querySelector(".mini .info")).join() }; })()`);
@@ -928,10 +928,22 @@ const setFile = (name, kind) => ev(`(() => {
   for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.round(Math.sin(i / 8) * 8000), true);
   const bytes = ${JSON.stringify(kind)} === "junk" ? new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]) : new Uint8Array(buf);
   const dt = new DataTransfer(); dt.items.add(new File([bytes], ${JSON.stringify(name)}, { type: "audio/wav" }));
-  const input = document.getElementById("coverFile"); input.files = dt.files; return input.files.length; })()`);
+  const input = document.getElementById("coverFile"); input.files = dt.files; input.dispatchEvent(new Event("change")); return input.files.length; })()`);
 await ev(`document.getElementById("coverDrawer").open = true; document.getElementById("abc").value = ""; true`);
 await mockClear();
+const listenOff = await ev(`document.getElementById("coverListen").disabled`);
 await setFile("tune.wav", "wav");
+const listen = await ev(`(async () => { const b = document.getElementById("coverListen"), t = document.getElementById("coverFromAudio"), main = document.getElementById("audio");
+  const size = [b, t].map(x => Math.round(x.offsetWidth) + "x" + Math.round(x.offsetHeight)).join();
+  const before = { off: b.disabled, label: b.textContent };
+  b.click(); await new Promise(r => setTimeout(r, 700));
+  const playing = { pressed: b.getAttribute("aria-pressed"), label: b.textContent, mainPaused: main.paused };
+  b.click(); await new Promise(r => setTimeout(r, 150));
+  return { size, before, playing, after: b.textContent }; })()`);
+check("a chosen recording can be listened to: ▶ Listen beside Transcribe, the same size", listenOff === true && !listen.before.off && listen.before.label === "▶ Listen" &&
+  listen.size === "172x30,172x30", JSON.stringify(listen));
+check("  playing shows ❚❚ and the time, pauses the player at the bottom; a second click stops it", listen.playing.pressed === "true" &&
+  /^❚❚ 0:0\d \/ 0:02$/.test(listen.playing.label) && listen.playing.mainPaused && listen.after === "▶ Listen", JSON.stringify(listen.playing) + " then " + listen.after);
 await ev(`(() => { const s = document.getElementById("coverTask"); s.value = "melody-vocal"; return true; })()`);
 await click("#coverFromAudio");
 const vocal = await waitFor(`document.getElementById("abc").value.startsWith("X:1") ? document.getElementById("abc").value : null`, 10000);
