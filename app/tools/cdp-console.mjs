@@ -347,6 +347,22 @@ const f4 = await ev(fontsNow);
 check("  Default fonts puts the app's own back and forgets the choice", f4.body.startsWith('"IBM Plex Sans"') && f4.head.startsWith('"IBM Plex Sans"') && f4.saved === null,
   JSON.stringify(f4));
 
+// ============================================================ tips vs the log
+section("tips stay while the server log scrolls");
+await click("#engineToggle");
+await sleep(300);
+const logTip = await hoverOn('#computeCard .field:has(#setVaeCore) .info');
+await ev(`(() => { const b = document.getElementById("logBody"); for (let i = 0; i < 300; i++) { const d = document.createElement("div"); d.className = "probe-line"; d.textContent = "line " + i; b.appendChild(d); }
+  b.scrollTop = b.scrollHeight; window.__feed = setInterval(() => { const d = document.createElement("div"); d.className = "probe-line"; d.textContent = "[AR] Semantic"; b.appendChild(d); b.scrollTop = b.scrollHeight; }, 200); return true; })()`);
+await sleep(1200);
+const stillOn = await ev(`document.querySelector(".tip").classList.contains("is-on")`);
+await ev(`clearInterval(window.__feed); document.querySelectorAll("#logBody .probe-line").forEach(d => d.remove()); true`);
+check("a tip stays open while the server log follows new lines (it closed within ~2 s before)", logTip?.on && stillOn === true && /tiles/.test(logTip.text), logTip?.text.slice(0, 60));
+await wheel(lastHover.x, lastHover.y, 400);
+check("  scrolling the page itself still closes it", (await ev(`document.querySelector(".tip").classList.contains("is-on")`)) === false);
+await click("#engineBack");
+await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });
+
 // ============================================================ engine panel
 section("engine panel");
 await click("#engineToggle");

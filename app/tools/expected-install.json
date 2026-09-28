@@ -1,6 +1,6 @@
 {
  "kit": "v10",
- "tree": "e0faf55a5199423659261a013b7bc733c4d7da10",
+ "tree": "0c1ff5bd25a9e13a687290796cc841de56912ba7",
  "models": [
   "SheetSage2-F32.gguf",
   "YuE2-3B-BF16.gguf",
