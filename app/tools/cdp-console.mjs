@@ -1035,13 +1035,40 @@ await ev(`document.getElementById("museDrawer").open = true; true`);
 const chatOn = await ev(chatBtn);
 check("chat server answering: a green square Chat Server Connected button, the model in its tip", chatOn.s === "on" && chatOn.label === "Chat Server Connected" && chatOn.green &&
   chatOn.radius <= 3 && /model-b/.test(chatOn.tip), JSON.stringify(chatOn));
+const buttonPair = `(() => { const w = document.getElementById("museBtn").getBoundingClientRect(), c = document.getElementById("chatLink").getBoundingClientRect(),
+  st = document.getElementById("museStatus"), sr = st.getBoundingClientRect();
+  return { gap: Math.round(w.left - c.right), sameRow: Math.abs((w.top + w.bottom) / 2 - (c.top + c.bottom) / 2) < 2, status: st.textContent, statusBelow: !st.textContent || sr.top >= w.bottom }; })()`;
+const ideaBox = await ev(`(() => { const box = document.getElementById("idea"), row = box.closest(".muse").getBoundingClientRect(), r0 = box.getBoundingClientRect();
+  box.value = "a long idea ".repeat(40); box.dispatchEvent(new Event("input")); const r1 = box.getBoundingClientRect();
+  box.value = ""; box.dispatchEvent(new Event("input")); const r2 = box.getBoundingClientRect();
+  const w = document.getElementById("museBtn").getBoundingClientRect(), c = document.getElementById("chatLink").getBoundingClientRect();
+  return { tag: box.tagName, fill: Math.round(r0.width / row.width * 100), one: Math.round(r0.height), grown: Math.round(r1.height), back: Math.round(r2.height),
+    gap: Math.round(w.left - c.right), sameRow: Math.abs((w.top + w.bottom) / 2 - (c.top + c.bottom) / 2) < 2, hW: Math.round(w.height), hC: Math.round(c.height),
+    wW: Math.round(w.width), wC: Math.round(c.width), left: Math.round(c.left - row.left),
+    oldTag: !!document.getElementById("museTag"), oldHint: !!document.getElementById("structureHint"),
+    ideaInfo: !!box.closest(".field").querySelector(".label .info"), modelInfo: !!document.getElementById("museModel").closest(".field").querySelector(".label .info"),
+    structureTip: document.getElementById("structure").closest(".field").querySelector(".info")?.dataset.tip || "" }; })()`);
+check("the idea box is a full line across that grows with its text, like the style box", ideaBox.tag === "TEXTAREA" && ideaBox.fill >= 90 && ideaBox.grown > ideaBox.one * 2 &&
+  ideaBox.back === ideaBox.one, JSON.stringify(ideaBox));
+check("  the Chat Server button and Write the brief sit together on the left, the same size", ideaBox.sameRow && ideaBox.gap >= 0 && ideaBox.gap <= 10 &&
+  ideaBox.hW === ideaBox.hC && ideaBox.wW === ideaBox.wC && ideaBox.left <= 1, JSON.stringify(ideaBox));
+check("  one chat server marker (no small tag); the (i)s sit on the labels; the structure's note is in its (i)", !ideaBox.oldTag && !ideaBox.oldHint &&
+  ideaBox.ideaInfo && ideaBox.modelInfo && /Now: Verse, Chorus and Bridge/.test(ideaBox.structureTip), JSON.stringify({ tag: ideaBox.oldTag, hint: ideaBox.oldHint, tip: ideaBox.structureTip.slice(-80) }));
+await ev(`document.getElementById("idea").focus(); true`);
+await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, modifiers: 8, text: "\r" });
+await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, modifiers: 8 });
+check("  Shift+Enter makes a new line in it (Enter still writes the brief)", (await ev(`document.getElementById("idea").value`)) === "\n", JSON.stringify(await ev(`document.getElementById("idea").value`)));
+await ev(`document.getElementById("idea").value = ""; document.getElementById("idea").blur(); true`);
 check("status names the loaded model only", /model-b/.test(await ev(`document.getElementById("chatHint").textContent`)) &&
-  (await ev(`[...document.getElementById("museModel").options].map(o => o.value).join()`)) === "model-b");
+  (await ev(`document.getElementById("museModel").textContent`)) === "model-b loaded on the chat server");
 await ev(`document.getElementById("museDrawer").open = true; document.getElementById("idea").value = "a truck that will not start"; true`);
 await click("#museBtn");
 const brief = await waitFor(`document.getElementById("title").value === "Ridge Road" && /Truck/.test(document.getElementById("lyrics").value)`, 8000);
 const chatReqs = (await mockGet("mock/requests")).filter((r) => /fakechat/.test(r.path));
 check("Write the brief fills title, style and lyrics", !!brief);
+const afterWrite = await ev(buttonPair);
+check("  with the result line showing, the two buttons still sit together and the line goes under them", afterWrite.sameRow && afterWrite.gap >= 0 && afterWrite.gap <= 10 &&
+  !!afterWrite.status && afterWrite.statusBelow, JSON.stringify(afterWrite));
 check("  only the loaded model is ever asked (structured first, then plain)", chatReqs.length >= 2 && chatReqs.every((r) => r.model === "model-b") && chatReqs[0].json_schema && !chatReqs[1].json_schema,
   chatReqs.map((r) => r.model + (r.json_schema ? "+schema" : "")).join(", "));
 await shot("writer");
@@ -1050,7 +1077,8 @@ await ev(`(() => { const u = document.getElementById("chatUrl"); u.value = locat
 await waitFor(`document.getElementById("chatState").textContent === "no model loaded"`, 5000);
 const chatNone = await ev(chatBtn);
 check("nothing loaded: writer refuses; the button's tip asks you to load one", (await ev(`document.getElementById("museBtn").disabled`)) === true &&
-  chatNone.s === "on" && /no model loaded: load one there first/.test(chatNone.tip), JSON.stringify(chatNone));
+  chatNone.s === "on" && /no model loaded: load one there first/.test(chatNone.tip) &&
+  /none yet · load a model/.test(await ev(`document.getElementById("museModel").textContent`)), JSON.stringify(chatNone));
 await ev(`document.getElementById("museBtn").disabled = false; document.getElementById("museBtn").click(); true`);
 await sleep(600);
 check("  and sends no completion request", (await mockGet("mock/requests")).filter((r) => /fakechat/.test(r.path)).length === 0);

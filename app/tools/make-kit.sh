@@ -252,25 +252,24 @@ fi
 
 cp "$ROOT/tools/kit/CHANGELOG.md" "$STAGE/CHANGELOG.md"
 
-# --- 5. his notes, marked as his, and screenshots from the last page-test run
+# --- 5. his notes, marked as his, and the clean screenshots (tools/screenshots.mjs)
 header() { printf '> The original owner'"'"'s %s, copied as they were on %s. His paths (%s/..., ~/work/...),\n> his shared model folder under %s/models and his personal rules do not apply to this\n> install; the technical facts do. The install itself is ../INSTALL.md.\n\n' "$1" "$DATE" "$HOME" "$HOME"; }
 { header "working notes"; cat "$ROOT/AGENTS.md"; } > "$STAGE/docs/notes.md"
 { header "list of how his install differs from a stock one"; cat "$ROOT/LOCAL-CHANGES.md"; } > "$STAGE/docs/local-changes.md"
-SHOTS="$ROOT/tmp/shots/console"
+SHOTS="$ROOT/tmp/shots/showcase"
 page_built=$(stat -c %Y "$BUILD/tools/public/index.html.gz")
-for pair in "1920x960-1-page:compose-page" "take-open:song-page" "take-open-1280:song-page-narrow" "1920x960-2-engine-open:engine-page" \
-            "engine-loras:engine-tiles" "1920x960-3-engine-scrolled:engine-about" "theme-picker:theme-picker"; do
-  from="$SHOTS/${pair%%:*}.png"
+for name in compose-page song-page song-page-narrow engine-page engine-tiles engine-about theme-picker; do
+  from="$SHOTS/$name.png"
   if [ ! -f "$from" ]; then
-    [ "$RELEASE" = 1 ] && fail "no ${pair%%:*}.png: run node tools/cdp-console.mjs first for the screenshots"
-    note "no ${pair%%:*}.png: run node tools/cdp-console.mjs first for the screenshots"; continue
+    [ "$RELEASE" = 1 ] && fail "no $name.png: run node tools/screenshots.mjs first"
+    note "no $name.png: run node tools/screenshots.mjs first"; continue
   fi
   # a screenshot older than the built page shows an older page: a release refuses it
   if [ "$(stat -c %Y "$from")" -lt "$page_built" ]; then
-    [ "$RELEASE" = 1 ] && fail "${pair%%:*}.png is older than the built page: run node tools/cdp-console.mjs for fresh screenshots"
-    note "${pair%%:*}.png is older than the built page"
+    [ "$RELEASE" = 1 ] && fail "$name.png is older than the built page: run node tools/screenshots.mjs for fresh ones"
+    note "$name.png is older than the built page"
   fi
-  cp "$from" "$STAGE/docs/screenshots/${pair#*:}.png"
+  cp "$from" "$STAGE/docs/screenshots/$name.png"
 done
 # the install guide describes the page: a page changed after the guide was last touched may not be in it
 page_changed=$(git log -1 --format=%ct -- tools/console)
@@ -283,6 +282,13 @@ fi
 BATCH=$(command grep -o 'YUE2CPP_BATCH:-[0-9]*' "$ROOT/start.sh" | head -1 | cut -d- -f2)
 CDP=$(command grep -o '[0-9]* passed' "$ROOT/tmp/cdp-console.log" 2>/dev/null | tail -1 | cut -d' ' -f1 || true)
 [ -n "$CDP" ] || { CDP="all"; note "no page-test log: run node tools/cdp-console.mjs first for the check count"; }
+# the README's download list: every model, VAE, slider set and LoRA with its link, pin and size
+if ! python3 "$ROOT/tools/kit/readme_downloads.py" "$STAGE/app/tools/hf-revisions.txt" "$UPSTREAM" "$BASE7" "$GGML" "$NPATCH" \
+     "$ROOT/tmp/showcase/props.json" > "$ROOT/tmp/kit-downloads.md" 2> "$ROOT/tmp/kit-downloads.err" || [ -s "$ROOT/tmp/kit-downloads.err" ]; then
+  [ "$RELEASE" = 1 ] && fail "the README's download list is incomplete: $(head -3 "$ROOT/tmp/kit-downloads.err" | tr '\n' ' ')"
+  note "the README's download list is incomplete (offline?): $(head -1 "$ROOT/tmp/kit-downloads.err")"
+fi
+[ -f "$ROOT/tmp/showcase/props.json" ] || note "no tmp/showcase/props.json: the README cannot say which half each LoRA steers (node tools/screenshots.mjs URL)"
 for pair in INSTALL-PROMPT.md:INSTALL.md README.md:README.md; do
   python3 - "$ROOT/tools/kit/${pair%%:*}" "$STAGE/${pair#*:}" "$ROOT/settings.json" "$FACTS" <<PY
 import json, sys
@@ -297,7 +303,8 @@ fill = {"HOME": "$HOME", "DATE": "$DATE", "KITVER": "$KITVER", "BASE": "$BASE7",
         "UPSTREAM": "$UPSTREAM", "GGML": "$GGML", "BATCH": "$BATCH", "CDP_CHECKS": "$CDP", "SETTINGS": settings,
         "QUANTIZE": quant, "MODELS": ", ".join(facts["models"]), "NLORA": str(facts["loras"]),
         "NLORAREPO": str(facts["lora_repos"]), "NSLIDER": str(facts["sliders"]),
-        "NMODEL": str(len(facts["models"])), "NGGUF": str(len(facts["models"]) + facts["sliders"])}
+        "NMODEL": str(len(facts["models"])), "NGGUF": str(len(facts["models"]) + facts["sliders"]),
+        "DOWNLOADS": open("$ROOT/tmp/kit-downloads.md", encoding="utf-8").read().strip()}
 for k, v in fill.items():
     s = s.replace("{{" + k + "}}", v)
 assert "{{" not in s, "unfilled placeholder in " + sys.argv[1]

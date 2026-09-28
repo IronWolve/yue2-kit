@@ -248,6 +248,7 @@ class Mock:
         self.outputs = Path(args.outputs).resolve() if args.outputs else TMP / "mock-outputs"
         self.vaes = [v for v in VAES if v["name"] in args.vaes.split(",")]
         self.sliders = [] if args.no_sliders else SLIDERS
+        self.version = "mock (2026-09-24)"
         threading.Thread(target=self.worker, daemon=True).start()
 
     # ------------------------------------------------------------------ log
@@ -729,7 +730,7 @@ def make_handler(mock):
                 return self.send(200, {"status": "ok"})
             if path == "/props":
                 return self.send(200, {
-                    "version": "mock (2026-09-24)", "model": "models/YuE2-3B-%s.gguf" % mock.settings["model"],
+                    "version": mock.version, "model": "models/YuE2-3B-%s.gguf" % mock.settings["model"],
                     "vae": "models/YuE2-Vae-F32.gguf", "sample_rate": 48000, "frame_rate": 25, "context": 24576,
                     "vaes": mock.vaes, "default_vae": mock.vaes[0]["name"],
                     "sliders": [{"id": s[0], "label": s[1], "description": s[2]} for s in mock.sliders],
@@ -742,7 +743,7 @@ def make_handler(mock):
                 return self.send(200, self.settings_json())
             if path == "/hardware":
                 gpus = [] if mock.args.no_gpu else [{
-                    "name": "CUDA0", "description": "Mock GPU (32 GB)", "total_bytes": 34190917632,
+                    "name": "CUDA0", "description": mock.args.gpu_name, "total_bytes": 34190917632,
                     "free_bytes": 34190917632 - 1181116006 - sum(mock.loaded.values())}]
                 return self.send(200, {"gpus": gpus, "loaded_bytes": sum(mock.loaded.values()),
                                        "loaded_modules": len(mock.loaded), "busy": mock.active is not None})
@@ -1043,9 +1044,19 @@ def main():
     parser.add_argument("--no-sliders", action="store_true")
     parser.add_argument("--no-gpu", action="store_true", help="/hardware lists no GPU, like a CPU-only run")
     parser.add_argument("--quiet", action="store_true", help="do not echo the log lines")
+    parser.add_argument("--props", help="a /props saved from a real server (curl .../props > tmp/x.json): its LoRAs, "
+                                        "sliders, sources and version stand in for the made-up ones (for screenshots)")
+    parser.add_argument("--gpu-name", default="Mock GPU (32 GB)", help="the GPU name /hardware reports")
     args = parser.parse_args()
 
     mock = Mock(args)
+    if args.props:
+        global LORAS, SOURCES
+        real = json.loads(Path(args.props).read_text(encoding="utf-8"))
+        LORAS, SOURCES = real.get("loras", LORAS), real.get("sources", SOURCES)
+        if not args.no_sliders and real.get("sliders"):
+            mock.sliders = [(x["id"], x["label"], x.get("description", "")) for x in real["sliders"]]
+        mock.version = real.get("version", mock.version)
     outputs = mock.outputs
     if TMP.resolve() not in outputs.parents:
         sys.exit(R + "refusing: --outputs must be a folder under " + str(TMP) + X)

@@ -63,9 +63,10 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - lyrics, an official **Instrumental** switch, and three modes: Full plan, Melody only, Direct;
   - a supplied or editable ABC score, covers from a recording or from a take;
   - sampling controls, versions per pass, and Plan score only;
-  - **Start from an idea**: a local chat server drafts title, style and lyrics. A square button beside it
-    says **Chat Server Connected** (green) or **Chat Server Offline** (red), always the same size; its
-    tip says what to do, and a click checks again.
+  - **Start from an idea**: a local chat model drafts title, style and lyrics. An Idea line that grows as you
+    type; Structure and the writer model side by side; then, under a thin line, a square **Chat Server
+    Connected** (green) or **Chat Server Offline** (red) button and **Write the brief**, the same size on the
+    left, and "Generate the song right after". The chat button's tip says what to do; a click checks again.
 - **Add-ons, marked ADD-ON everywhere**:
   - **VAE**: Standard and Legacy are stock; Blend is an add-on. One per song. Each explains itself on
     hover (Standard: the quality choice and the newer model; Blend: two thirds Standard, one third Legacy).
@@ -520,8 +521,8 @@ Compare with the kit's `docs/screenshots/`:
 - `engine-about.png`: the end of the Engine page, with the About card;
 - `theme-picker.png`: the 50 themes.
 
-The screenshots were taken against a stand-in server, so their songs, names and hardware
-readouts are placeholders. The layout, text, colours and controls are what I should see.
+The screenshots were taken against a stand-in server that had his real LoRAs, VAEs and sliders; the
+songs and the hardware readout are examples. The layout, text, colours and controls are what I should see.
 
 - The default theme is **Studio (warm)**, a dark warm palette with amber accents. The theme menu in
   the top bar changes it per browser (and the browser remembers).
