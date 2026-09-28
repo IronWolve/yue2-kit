@@ -1,7 +1,7 @@
 From a981672ea4ae28b44e199815a16002d76e513bec Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Fri, 25 Sep 2026 20:52:24 -0700
-Subject: [PATCH 11/39] List LoRAs in the Engine panel; grow the style box and
+Subject: [PATCH 11/40] List LoRAs in the Engine panel; grow the style box and
  count the prompt
 
 The Engine panel lists every LoRA in loras/ under the VAEs: what it steers,

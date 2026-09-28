@@ -756,8 +756,12 @@
           "carry no lyrics, so the model may or may not leave them wordless."
   };
 
+  // the chosen structure's note rides in the Structure (i), after its help text
   function paintStructureHint() {
-    $("structureHint").textContent = STRUCTURE_NOTES[$("structure").value] || "";
+    var info = $("structure").closest(".field").querySelector(".info");
+    if (!info) return;
+    info.dataset.base = info.dataset.base || info.dataset.tip;
+    info.dataset.tip = info.dataset.base + " Now: " + (STRUCTURE_NOTES[$("structure").value] || "");
   }
   $("structure").addEventListener("change", paintStructureHint);
   paintStructureHint();
@@ -3983,8 +3987,9 @@
       : (status.available ? "The server answers but reports no loaded model. Load one there first."
          : (status.error || "Uses whatever model the server has loaded. This page never loads, switches or unloads a model on it."));
     $("museModel").innerHTML = status.use
-      ? '<option value="' + escape(status.use) + '">' + escape(status.use) + " (loaded on the server)</option>"
-      : '<option value="">no writer model yet — see Engine</option>';
+      ? escape(status.use) + ' <span class="dim">loaded on the chat server</span>'
+      : '<span class="dim">none yet · ' + (!status.configured ? "set the chat server under Engine"
+        : (status.available ? "load a model in the chat server" : "the chat server is not answering")) + "</span>";
     $("museBtn").disabled = !status.use;
     // the state is the Chat Server button; what to do about it is its tip
     var link = $("chatLink");
@@ -4056,6 +4061,7 @@
   $("chatLink").addEventListener("click", function () { refreshChat().catch(function () {}); });
 
   $("museDrawer").addEventListener("toggle", function () {
+    if (this.open) paintStructureHint();
     if (this.open) refreshChat().catch(function () {});
   });
 

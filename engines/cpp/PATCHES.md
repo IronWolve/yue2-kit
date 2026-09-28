@@ -528,3 +528,13 @@ Files:
 - `tools/console/app.css` (+8 −1)
 - `tools/console/app.js` (+1 −1)
 - `tools/console/index.html` (+7 −5)
+
+## 0040 Clean up the idea drawer; the Compose heading stands alone
+
+2026-09-27. The drawer gets labels like the rest of the form (Idea, Structure, Writer model, each (i) on its label), the writer model as a read-only box instead of a disabled menu, and the structure's note inside its (i). The small chat server tag goes: the Chat Server button already says it. Under a thin line, the Chat Server button and Write the brief sit together on the left at the same size, then the checkbox; a run's result line goes under them. The Compose heading loses its tagline.
+
+Files:
+- `tools/console/app.css` (+13 −27)
+- `tools/console/app.js` (+9 −3)
+- `tools/console/help.js` (+0 −1)
+- `tools/console/index.html` (+11 −16)

@@ -1,7 +1,7 @@
 From e613b42bcbe08761340b7faef9de13deab6c9eb1 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 18:29:25 -0700
-Subject: [PATCH 39/39] Make the idea box a full line that grows; Write the
+Subject: [PATCH 39/40] Make the idea box a full line that grows; Write the
  brief beside the chat state
 
 The idea is a one-line box across the whole drawer that grows with its text, like the style box (Shift+Enter for a new line; Enter still writes). Write the brief moves down beside the Chat Server button, the same height, the two kept together on the right; a run's result line goes under them.

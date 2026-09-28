@@ -179,7 +179,6 @@
       el.closest(".field") ? el.closest(".field").querySelector(".label") : null;
     if (el.id === "modes") host = el.closest("fieldset").querySelector(".label");
     if (el.id === "abc") host = document.querySelector("#scoreDrawer .hint");
-    if (el.id === "museModel" || el.id === "idea") host = null;
     if (host && host.querySelector(".info")) return;      // it already has one
     var info = makeInfo(text, name);
     if (!host) {

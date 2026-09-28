@@ -1,7 +1,7 @@
 From 67900111749ad2f5cfe9651ae9fb5e40e1785d51 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 14:35:29 -0700
-Subject: [PATCH 29/39] Correct the key padding's note: near-identical, not
+Subject: [PATCH 29/40] Correct the key padding's note: near-identical, not
  identical, on newer cards
 
 Measured on his desktop GPU with a 242 s song: each sound-stage step 690 -> 443 ms, and the output is no longer the same bytes, since the faster path adds up in another order; its spectrum stays 0.99998 alike. On his laptop's older GPU it was the same bytes.

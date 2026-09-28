@@ -201,25 +201,20 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   <section class="col compose-col" id="view-compose">
     <div class="col-head">
       <h2>Compose</h2>
-      <span class="col-note">symbols in, sound out</span>
       <div class="spacer"></div>
       <button type="button" class="btn ghost small" id="newSong" data-tip="Start a new song: every field, both seeds, the score, loaded music codes, the mode, sampling, sliders, LoRAs and Instrumental back to their defaults. Your VAE, output and theme choices stay.">＋ New song</button>
     </div>
 
     <details class="drawer" id="museDrawer">
-      <summary><span class="chev" aria-hidden="true"></span> Start from an idea <em class="summary-note">a local model drafts title, style and lyrics</em></summary>
+      <summary><span class="chev" aria-hidden="true"></span> Start from an idea <em class="summary-note">a local chat model drafts the title, style and lyrics</em></summary>
       <div class="drawer-body">
     <section class="muse" id="muse">
-      <div class="muse-head">
-        <span class="muse-tag" id="museTag">chat server</span>
-        <div class="spacer"></div>
-        <select id="museModel" title="The model loaded on the chat server; this page never picks another" disabled></select>
-      </div>
-      <div class="muse-row">
+      <label class="field">
+        <span class="label">Idea <em>a line about the song; the box grows as you type</em></span>
         <textarea id="idea" rows="1" autocomplete="off"
                   placeholder="a slow song about missing the last train home"></textarea>
-      </div>
-      <div class="muse-row secondary">
+      </label>
+      <div class="field-row">
         <label class="field grow">
           <span class="label">Structure</span>
           <select id="structure">
@@ -229,21 +224,21 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
             <option value="full">Full arc — intro, pre-chorus, bridge, outro</option>
           </select>
         </label>
+        <div class="field grow">
+          <span class="label">Writer model</span>
+          <div class="static-field" id="museModel"><span class="dim">none yet</span></div>
+        </div>
       </div>
-      <p class="row-hint" id="structureHint"></p>
       <div class="muse-foot">
-        <label class="check"><input type="checkbox" id="autoRun" />
-          <span><strong>Write and generate</strong> — go straight on to the song</span></label>
-        <span class="muse-status mono" id="museStatus"></span>
-        <div class="muse-actions">
         <button type="button" class="chat-link" id="chatLink" data-s="off" data-tip="Set the chat server address under Engine">
           <span class="on">Chat Server Connected</span><span class="off">Chat Server Offline</span>
         </button>
         <button type="button" class="btn writer" id="museBtn">
           <span id="museGlyph" aria-hidden="true">✎</span> <span id="museLabel">Write the brief</span>
         </button>
-        </div>
+        <label class="check"><input type="checkbox" id="autoRun" /> <span>Generate the song right after</span></label>
       </div>
+      <p class="muse-status mono" id="museStatus"></p>
     </section>
       </div>
     </details>
