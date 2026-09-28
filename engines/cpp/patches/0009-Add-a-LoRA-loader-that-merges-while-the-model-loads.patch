@@ -1,0 +1,2197 @@
+From 97c86569d54f82e4db3200a5a5b9e2a94ea6fe1b Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 20:27:24 -0700
+Subject: [PATCH 09/36] Add a LoRA loader that merges while the model loads
+
+src/lora.h reads the published YuE2 LoRA layouts straight from
+.safetensors (the same rules as the other console's loader: unfused and
+fused keys, lora_A/B or lora_down/up, per-module alpha, metadata or
+adapter_config.json scale, .diff/.diff_b deltas, small full replacements;
+a file with a tensor that does not land on the model is refused with the
+reason). --loras <dir> lists every file under it in /props loras.
+
+A request names LoRAs with a music and a sound strength (0..2). The
+pipeline checks every target against the model's shapes before anything
+loads, and the loader adds the scaled B @ A to each touched weight as it
+reads it, a block of rows per thread (AVX2 build with a fallback), then
+stores it in the weight's own type. In a quantized model the touched
+weights are kept at Q8_0: re-quantizing to Q5_K lost the change wherever
+a LoRA moves a weight less than Q5 rounding. Each half's store key carries
+its own LoRA signature, so a new set reloads only the half it touches, and
+with models kept loaded the old copy is swapped out instead of kept.
+A failed merge discards the load and the job says why.
+
+tests/test-lora dumps catalogs and merged weights for the parity script.
+The console gains the shared LoRA picker (tools/console/loras.js). Takes
+record their LoRAs; strengths are written rounded to 3 decimals.
+---
+ CMakeLists.txt           |   1 +
+ src/gguf-weights.h       | 247 +++++++++++-
+ src/lora.h               | 801 +++++++++++++++++++++++++++++++++++++++
+ src/model-store.cpp      |  46 ++-
+ src/model-store.h        |   5 +
+ src/pipeline.h           |  84 +++-
+ src/request.cpp          |  27 ++
+ src/request.h            |   9 +
+ tests/CMakeLists.txt     |   3 +
+ tests/test-lora.cpp      | 188 +++++++++
+ tools/console/app.css    |  22 ++
+ tools/console/app.js     |  23 ++
+ tools/console/index.html |  20 +
+ tools/console/loras.js   | 179 +++++++++
+ tools/yue-server.cpp     |  87 ++++-
+ 15 files changed, 1720 insertions(+), 22 deletions(-)
+ create mode 100644 src/lora.h
+ create mode 100644 tests/test-lora.cpp
+ create mode 100644 tools/console/loras.js
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 45d4a31..09d00ce 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -79,6 +79,7 @@ macro(link_ggml_backends target)
+                               -Wno-unused-parameter -Wno-unused-function -Wno-sign-conversion)
+     endif()
+     target_link_libraries(${target} PRIVATE ggml Threads::Threads)
++    target_link_libraries(${target} PRIVATE yyjson)  # Local addition: lora.h reads LoRA headers
+     if(TARGET ggml-base)
+         target_link_libraries(${target} PRIVATE ggml-base)
+     endif()
+diff --git a/src/gguf-weights.h b/src/gguf-weights.h
+index c9ff266..15c01c3 100644
+--- a/src/gguf-weights.h
++++ b/src/gguf-weights.h
+@@ -15,7 +15,9 @@
+ 
+ #include "gguf.h"
+ #include "weight-ctx.h"
++#include "lora.h"  // Local addition
+ 
++#include <atomic>
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
+@@ -172,13 +174,183 @@ inline bool g_gf_weights_f32 = false;
+ 
+ static struct ggml_tensor * gf_load_tensor_f32(WeightCtx * wctx, const GGUFModel & gf, const std::string & name);
+ 
++// Local addition: the LoRA set merged into weights as they load. The store sets
++// it around one module's load; a merge that fails leaves its reason in
++// g_gf_lora_error and the store throws that load away.
++inline LoraSet *   g_gf_lora = nullptr;
++inline std::string g_gf_lora_error;
++
++static int64_t gf_lora_rows(void * ctx, const std::string & name, int64_t * cols) {
++    const GGUFModel *    gf = static_cast<const GGUFModel *>(ctx);
++    struct ggml_tensor * t  = ggml_get_tensor(gf->meta, name.c_str());
++    if (!t) {
++        return 0;
++    }
++    if (ggml_n_dims(t) == 1) {
++        *cols = 1;
++        return t->ne[0];
++    }
++    *cols = t->ne[0];
++    return t->ne[1];
++}
++
++// The type a LoRA-merged weight is kept in: float types keep theirs; quantized
++// ones become Q8_0, because a LoRA's change is often smaller than Q6_K/Q5_K
++// rounding and would be lost by re-quantizing to them (measured: no closer to
++// the merged weights than leaving the LoRA out, on the weights it barely moves).
++static enum ggml_type gf_lora_type(enum ggml_type t) {
++    return (t == GGML_TYPE_F32 || t == GGML_TYPE_BF16 || t == GGML_TYPE_F16) ? t : GGML_TYPE_Q8_0;
++}
++
++static bool gf_lora_hits(const GGUFModel & gf, const std::vector<std::string> & names) {
++    if (!g_gf_lora) {
++        return false;
++    }
++    std::string error;
++    if (!lora_bind(g_gf_lora, gf_lora_rows, (void *) &gf, &error)) {
++        if (g_gf_lora_error.empty()) {
++            g_gf_lora_error = error;
++        }
++        return false;
++    }
++    for (const auto & n : names) {
++        if (lora_touches(g_gf_lora, n)) {
++            return true;
++        }
++    }
++    return false;
++}
++
++static const void * gf_lora_stage(WeightCtx * wctx, const GGUFModel & gf, const std::string & name,
++                                  const struct ggml_tensor * src, const void * raw, enum ggml_type want, size_t * nbytes,
++                                  bool force);
++
++// One part of a fused weight converted to `type` (merged if a LoRA touches it);
++// on a failed merge a zero buffer keeps the offsets valid (the load is discarded)
++static void gf_lora_push_part(WeightCtx * wctx, const GGUFModel & gf, struct ggml_tensor * fused, const std::string & name,
++                              const struct ggml_tensor * src, const void * raw, enum ggml_type type, size_t at) {
++    size_t       bytes  = 0;
++    const void * merged = gf_lora_stage(wctx, gf, name, src, raw, type, &bytes, true);
++    if (!merged) {
++        bytes    = ggml_row_size(type, src->ne[0]) * (size_t) src->ne[1];
++        auto buf = std::make_unique<float[]>((bytes + 3) / 4);
++        merged   = buf.get();
++        wctx->staging.push_back(std::move(buf));
++    }
++    wctx->pending.push_back({ fused, merged, bytes, at });
++}
++
++// When the set touches `name`: the merged tensor in `want` (F32, or the file's own
++// type, re-quantized if need be) in a staging buffer, and its size; else NULL.
++static const void * gf_lora_stage(WeightCtx * wctx, const GGUFModel & gf, const std::string & name,
++                                  const struct ggml_tensor * src, const void * raw, enum ggml_type want, size_t * nbytes,
++                                  bool force) {
++    if (!g_gf_lora) {
++        return NULL;
++    }
++    std::string error;
++    if (!lora_bind(g_gf_lora, gf_lora_rows, (void *) &gf, &error)) {
++        if (g_gf_lora_error.empty()) {
++            g_gf_lora_error = error;
++        }
++        return NULL;
++    }
++    if (!lora_touches(g_gf_lora, name) && !force) {
++        return NULL;
++    }
++    int64_t cols = 1, rows = gf_lora_rows((void *) &gf, name, &cols);
++    size_t  n    = (size_t) (rows * cols);
++    std::vector<LoraPrepared> ps;
++    if (!lora_prepare(g_gf_lora, name, rows, cols, &ps, &error)) {
++        if (g_gf_lora_error.empty()) {
++            g_gf_lora_error = error;
++        }
++        return NULL;
++    }
++    if (want != GGML_TYPE_F32 && want != GGML_TYPE_BF16 && want != GGML_TYPE_F16 && ggml_quantize_requires_imatrix(want)) {
++        if (g_gf_lora_error.empty()) {
++            g_gf_lora_error = std::string("LoRAs cannot be merged into ") + ggml_type_name(want) +
++                              " weights (re-quantizing needs an importance matrix); use a BF16, Q8_0, Q6_K or Q5_K_M model";
++        }
++        return NULL;
++    }
++    // One pass per block of rows, on several threads: decode, add, check, encode
++    const size_t src_row = ggml_row_size(src->type, cols), out_row = ggml_row_size(want, cols);
++    auto         f32     = std::make_unique<float[]>(n);
++    size_t       bytes   = want == GGML_TYPE_F32 ? n * sizeof(float) : out_row * (size_t) rows;
++    std::unique_ptr<float[]> out;
++    if (want != GGML_TYPE_F32) {
++        out = std::make_unique<float[]>((bytes + 3) / 4);
++    }
++    bool has_replace = false;
++    for (const auto & p : ps) {
++        has_replace |= p.kind == LoraGroup::REPLACE;
++    }
++    std::vector<float> base;
++    if (has_replace) {
++        base.resize(n);
++    }
++    std::atomic<bool> finite{ true };
++    lora_parallel_rows(rows, [&](int64_t r0, int64_t r1) {
++        float *      w   = f32.get() + r0 * cols;
++        const char * in  = static_cast<const char *>(raw) + (size_t) r0 * src_row;
++        int64_t      cnt = (r1 - r0) * cols;
++        if (src->type == GGML_TYPE_F32) {
++            memcpy(w, in, (size_t) cnt * sizeof(float));
++        } else {
++            ggml_get_type_traits(src->type)->to_float(in, w, cnt);
++        }
++        if (has_replace) {
++            memcpy(base.data() + r0 * cols, w, (size_t) cnt * sizeof(float));
++        }
++        lora_apply_rows(ps, f32.get(), base.data(), r0, r1, cols);
++        for (int64_t i = 0; i < cnt; i++) {
++            if (!std::isfinite(w[i])) {
++                finite = false;
++                break;
++            }
++        }
++        if (want == GGML_TYPE_BF16) {
++            ggml_fp32_to_bf16_row(w, reinterpret_cast<ggml_bf16_t *>(out.get()) + r0 * cols, cnt);
++        } else if (want == GGML_TYPE_F16) {
++            ggml_fp32_to_fp16_row(w, reinterpret_cast<ggml_fp16_t *>(out.get()) + r0 * cols, cnt);
++        } else if (want != GGML_TYPE_F32) {
++            ggml_quantize_chunk(want, f32.get(), out.get(), r0 * cols, r1 - r0, cols, nullptr);
++        }
++    });
++    if (!finite) {
++        if (g_gf_lora_error.empty()) {
++            g_gf_lora_error = "the merge made " + name + " non-finite; lower the strength";
++        }
++        return NULL;
++    }
++    if (want == GGML_TYPE_F32) {
++        *nbytes             = bytes;
++        const void * merged = f32.get();
++        wctx->staging.push_back(std::move(f32));
++        return merged;
++    }
++    *nbytes             = bytes;
++    const void * merged = out.get();
++    wctx->staging.push_back(std::move(out));
++    return merged;
++}
++
+ static bool gf_widen(enum ggml_type t) {
+     return g_gf_weights_f32 && (t == GGML_TYPE_BF16 || t == GGML_TYPE_F16);
+ }
+ 
+ // One part of a fused weight, converted to F32 into a staging buffer
+ static void gf_push_part_f32(WeightCtx * wctx, struct ggml_tensor * fused, const struct ggml_tensor * src,
+-                             const void * raw, size_t offset_bytes) {
++                             const void * raw, size_t offset_bytes, const GGUFModel * gf = nullptr,
++                             const std::string & name = std::string()) {
++    size_t lora_bytes = 0;
++    if (gf) {
++        if (const void * merged = gf_lora_stage(wctx, *gf, name, src, raw, GGML_TYPE_F32, &lora_bytes, false)) {
++            wctx->pending.push_back({ fused, merged, lora_bytes, offset_bytes });
++            return;
++        }
++    }
+     size_t n   = ggml_nelements(src);
+     auto   buf = std::make_unique<float[]>(n);
+     ggml_get_type_traits(src->type)->to_float(raw, buf.get(), (int64_t) n);
+@@ -225,14 +397,17 @@ static struct ggml_tensor * gf_load_tensor(WeightCtx *         wctx,
+         }
+     }
+ 
+-    struct ggml_tensor * tensor = ggml_new_tensor(wctx->ctx, src->type, n_dims, ne);
++    enum ggml_type       type   = gf_lora_hits(gf, { name }) ? gf_lora_type(src->type) : src->type;
++    struct ggml_tensor * tensor = ggml_new_tensor(wctx->ctx, type, n_dims, ne);
+     ggml_set_name(tensor, name.c_str());
+ 
+     size_t       offset = gguf_get_tensor_offset(gf.gguf, idx);
+     const void * data   = gf.mapping + gf.data_offset + offset;
+     size_t       nbytes = ggml_nbytes(src);
+ 
+-    wctx->pending.push_back({ tensor, data, nbytes, 0 });
++    size_t       lora_bytes = 0;
++    const void * merged     = gf_lora_stage(wctx, gf, name, src, data, type, &lora_bytes, type != src->type);
++    wctx->pending.push_back({ tensor, merged ? merged : data, merged ? lora_bytes : nbytes, 0 });
+     return tensor;
+ }
+ 
+@@ -290,6 +465,13 @@ static struct ggml_tensor * gf_load_tensor_f32(WeightCtx * wctx, const GGUFModel
+     const void * raw    = gf.mapping + gf.data_offset + offset;
+ 
+     traits->to_float(raw, data, (int64_t) n);
++    if (g_gf_lora) {
++        size_t lora_bytes = 0;
++        if (const void * merged = gf_lora_stage(wctx, gf, name, src, raw, GGML_TYPE_F32, &lora_bytes, false)) {
++            wctx->pending.push_back({ tensor, merged, lora_bytes, 0 });
++            return tensor;
++        }
++    }
+ 
+     wctx->pending.push_back({ tensor, data, n * sizeof(float), 0 });
+     wctx->staging.push_back(std::move(buf));
+@@ -322,7 +504,11 @@ static struct ggml_tensor * gf_load_qkv_fused(WeightCtx *         wctx,
+     int64_t              fused_ne1 = q_src->ne[1] + k_src->ne[1] + v_src->ne[1];
+     int64_t              ne[2]     = { ne0, fused_ne1 };
+     bool                 widen     = gf_widen(q_src->type);
+-    struct ggml_tensor * fused     = ggml_new_tensor(wctx->ctx, widen ? GGML_TYPE_F32 : q_src->type, 2, ne);
++    enum ggml_type       type      = widen ? GGML_TYPE_F32 : q_src->type;
++    if (!widen && gf_lora_hits(gf, { q_name, k_name, v_name })) {
++        type = gf_lora_type(type);   // Local addition: one type for all three parts
++    }
++    struct ggml_tensor * fused     = ggml_new_tensor(wctx->ctx, type, 2, ne);
+ 
+     size_t row_size = ggml_row_size(q_src->type, ne0);
+     size_t q_bytes  = q_src->ne[1] * row_size;
+@@ -337,14 +523,28 @@ static struct ggml_tensor * gf_load_qkv_fused(WeightCtx *         wctx,
+ 
+     if (widen) {
+         size_t row_f32 = ggml_row_size(GGML_TYPE_F32, ne0);
+-        gf_push_part_f32(wctx, fused, q_src, get_data(q_name), 0);
+-        gf_push_part_f32(wctx, fused, k_src, get_data(k_name), q_src->ne[1] * row_f32);
+-        gf_push_part_f32(wctx, fused, v_src, get_data(v_name), (q_src->ne[1] + k_src->ne[1]) * row_f32);
++        gf_push_part_f32(wctx, fused, q_src, get_data(q_name), 0, &gf, q_name);
++        gf_push_part_f32(wctx, fused, k_src, get_data(k_name), q_src->ne[1] * row_f32, &gf, k_name);
++        gf_push_part_f32(wctx, fused, v_src, get_data(v_name), (q_src->ne[1] + k_src->ne[1]) * row_f32, &gf, v_name);
+         return fused;
+     }
+-    wctx->pending.push_back({ fused, get_data(q_name), q_bytes, 0 });
+-    wctx->pending.push_back({ fused, get_data(k_name), k_bytes, q_bytes });
+-    wctx->pending.push_back({ fused, get_data(v_name), v_bytes, q_bytes + k_bytes });
++    if (type != q_src->type) {   // re-typed for a LoRA: every part converted, merged or not
++        size_t out_row = ggml_row_size(type, ne0);
++        gf_lora_push_part(wctx, gf, fused, q_name, q_src, get_data(q_name), type, 0);
++        gf_lora_push_part(wctx, gf, fused, k_name, k_src, get_data(k_name), type, (size_t) q_src->ne[1] * out_row);
++        gf_lora_push_part(wctx, gf, fused, v_name, v_src, get_data(v_name), type,
++                          (size_t) (q_src->ne[1] + k_src->ne[1]) * out_row);
++        return fused;
++    }
++    auto part = [&](const std::string & name, const struct ggml_tensor * src, size_t bytes, size_t at) {
++        size_t       lora_bytes = 0;
++        const void * raw        = get_data(name);
++        const void * merged     = gf_lora_stage(wctx, gf, name, src, raw, src->type, &lora_bytes, false);
++        wctx->pending.push_back({ fused, merged ? merged : raw, merged ? lora_bytes : bytes, at });
++    };
++    part(q_name, q_src, q_bytes, 0);
++    part(k_name, k_src, k_bytes, q_bytes);
++    part(v_name, v_src, v_bytes, q_bytes + k_bytes);
+     return fused;
+ }
+ 
+@@ -366,7 +566,11 @@ static struct ggml_tensor * gf_load_pair_fused(WeightCtx *         wctx,
+     int64_t              ne0   = a_src->ne[0];
+     int64_t              ne[2] = { ne0, a_src->ne[1] + b_src->ne[1] };
+     bool                 widen = gf_widen(a_src->type);
+-    struct ggml_tensor * fused = ggml_new_tensor(wctx->ctx, widen ? GGML_TYPE_F32 : a_src->type, 2, ne);
++    enum ggml_type       type  = widen ? GGML_TYPE_F32 : a_src->type;
++    if (!widen && gf_lora_hits(gf, { a_name, b_name })) {
++        type = gf_lora_type(type);   // Local addition: one type for both parts
++    }
++    struct ggml_tensor * fused = ggml_new_tensor(wctx->ctx, type, 2, ne);
+ 
+     size_t row_size = ggml_row_size(a_src->type, ne0);
+     size_t a_bytes  = a_src->ne[1] * row_size;
+@@ -379,12 +583,25 @@ static struct ggml_tensor * gf_load_pair_fused(WeightCtx *         wctx,
+     };
+ 
+     if (widen) {
+-        gf_push_part_f32(wctx, fused, a_src, get_data(a_name), 0);
+-        gf_push_part_f32(wctx, fused, b_src, get_data(b_name), a_src->ne[1] * ggml_row_size(GGML_TYPE_F32, ne0));
++        gf_push_part_f32(wctx, fused, a_src, get_data(a_name), 0, &gf, a_name);
++        gf_push_part_f32(wctx, fused, b_src, get_data(b_name), a_src->ne[1] * ggml_row_size(GGML_TYPE_F32, ne0), &gf,
++                         b_name);
+         return fused;
+     }
+-    wctx->pending.push_back({ fused, get_data(a_name), a_bytes, 0 });
+-    wctx->pending.push_back({ fused, get_data(b_name), b_bytes, a_bytes });
++    if (type != a_src->type) {   // re-typed for a LoRA: both parts converted, merged or not
++        gf_lora_push_part(wctx, gf, fused, a_name, a_src, get_data(a_name), type, 0);
++        gf_lora_push_part(wctx, gf, fused, b_name, b_src, get_data(b_name), type,
++                          (size_t) a_src->ne[1] * ggml_row_size(type, ne0));
++        return fused;
++    }
++    auto part = [&](const std::string & name, const struct ggml_tensor * src, size_t bytes, size_t at) {
++        size_t       lora_bytes = 0;
++        const void * raw        = get_data(name);
++        const void * merged     = gf_lora_stage(wctx, gf, name, src, raw, src->type, &lora_bytes, false);
++        wctx->pending.push_back({ fused, merged ? merged : raw, merged ? lora_bytes : bytes, at });
++    };
++    part(a_name, a_src, a_bytes, 0);
++    part(b_name, b_src, b_bytes, a_bytes);
+     return fused;
+ }
+ 
+diff --git a/src/lora.h b/src/lora.h
+new file mode 100644
+index 0000000..c285d6f
+--- /dev/null
++++ b/src/lora.h
+@@ -0,0 +1,801 @@
++#pragma once
++// Local addition: LoRA adapters for YuE2, read straight from .safetensors and
++// merged into the weights while the model loads (weight + strength x alpha/rank
++// x B @ A, computed in F32, then stored in the weight's own type: F32, BF16,
++// F16, or re-quantized for Q8_0/Q6_K/Q5_K). The music (AR) and sound (NAR)
++// halves take separate strengths, so each half's store key names only its own.
++//
++// The same rules as the other console's loras.py (keep them in step):
++//   unfused  model.layers.N.{self_attn,mlp,nar_self_attn,nar_mlp}.<proj>.lora_A/lora_B
++//            (+ .weight / .default.weight, base_model.model. prefix, bare layers.N.)
++//   fused    text_encoders.* = music half, diffusion_model.* = sound half, qkv_proj
++//            and gate_up_proj split by the rows of B (exact for shared A and for
++//            block-diagonal files)
++//   lora_A/lora_B or lora_down/lora_up, per-module .alpha, .diff / .diff_b deltas,
++//   full .weight/.bias replacements of llm2vae / vae2llm / time_embedder.
++//   Scale: .alpha / rank, else metadata alpha / rank, else adapter_config.json
++//   beside the file (alpha|lora_alpha over r|rank, rsLoRA: sqrt), else 1.
++//   Every tensor must land on the model, or the file is refused with the reason.
++
++#include "ggml.h"
++#include "yyjson.h"
++
++#include <algorithm>
++#include <cmath>
++#include <cstdint>
++#include <cstdio>
++#include <cstring>
++#include <filesystem>
++#include <fstream>
++#include <map>
++#include <memory>
++#include <mutex>
++#include <set>
++#include <sstream>
++#include <string>
++#include <thread>
++#include <unordered_map>
++#include <vector>
++
++// ------------------------------------------------------------ safetensors
++
++struct StTensor {
++    std::string          dtype;
++    std::vector<int64_t> shape;
++    uint64_t             begin = 0, end = 0;  // byte range in the file (absolute)
++};
++
++struct StFile {
++    std::string                     path;
++    std::map<std::string, StTensor> tensors;
++    std::map<std::string, std::string> meta;
++};
++
++static std::string lora_read_text(const std::filesystem::path & p) {
++    std::ifstream     f(p, std::ios::binary);
++    std::stringstream s;
++    s << f.rdbuf();
++    return s.str();
++}
++
++static bool st_read_header(const std::string & path, StFile * out, std::string * error) {
++    std::ifstream f(path, std::ios::binary);
++    uint64_t      size = 0;
++    if (!f.read(reinterpret_cast<char *>(&size), 8) || size == 0 || size > (100ull << 20)) {
++        *error = "not a safetensors file";
++        return false;
++    }
++    std::string header(size, '\0');
++    if (!f.read(&header[0], (std::streamsize) size)) {
++        *error = "not a safetensors file";
++        return false;
++    }
++    yyjson_doc * doc = yyjson_read(header.data(), header.size(), 0);
++    if (!doc || !yyjson_is_obj(yyjson_doc_get_root(doc))) {
++        if (doc) {
++            yyjson_doc_free(doc);
++        }
++        *error = "not a safetensors file";
++        return false;
++    }
++    out->path = path;
++    out->tensors.clear();
++    out->meta.clear();
++    size_t       idx, max;
++    yyjson_val * key, *val;
++    yyjson_obj_foreach(yyjson_doc_get_root(doc), idx, max, key, val) {
++        std::string name = yyjson_get_str(key);
++        if (name == "__metadata__") {
++            size_t       i2, m2;
++            yyjson_val * k2, *v2;
++            yyjson_obj_foreach(val, i2, m2, k2, v2) {
++                if (yyjson_is_str(v2)) {
++                    out->meta[yyjson_get_str(k2)] = yyjson_get_str(v2);
++                }
++            }
++            continue;
++        }
++        StTensor     t;
++        yyjson_val * dt = yyjson_obj_get(val, "dtype");
++        yyjson_val * sh = yyjson_obj_get(val, "shape");
++        yyjson_val * of = yyjson_obj_get(val, "data_offsets");
++        if (!dt || !sh || !of || !yyjson_is_arr(sh) || yyjson_arr_size(of) != 2) {
++            yyjson_doc_free(doc);
++            *error = "bad tensor entry " + name;
++            return false;
++        }
++        t.dtype = yyjson_get_str(dt);
++        size_t       si, sm;
++        yyjson_val * d;
++        yyjson_arr_foreach(sh, si, sm, d) {
++            t.shape.push_back(yyjson_get_sint(d));
++        }
++        t.begin = 8 + size + (uint64_t) yyjson_get_uint(yyjson_arr_get(of, 0));
++        t.end   = 8 + size + (uint64_t) yyjson_get_uint(yyjson_arr_get(of, 1));
++        out->tensors[name] = t;
++    }
++    yyjson_doc_free(doc);
++    return true;
++}
++
++// A whole tensor as F32 (F32, BF16 and F16 files)
++static bool st_read_f32(const StFile & f, const std::string & name, std::vector<float> * out, std::string * error) {
++    auto it = f.tensors.find(name);
++    if (it == f.tensors.end()) {
++        *error = "missing tensor " + name;
++        return false;
++    }
++    const StTensor & t     = it->second;
++    size_t           bytes = (size_t) (t.end - t.begin);
++    int64_t          n     = 1;
++    for (int64_t d : t.shape) {
++        n *= d;
++    }
++    size_t width = t.dtype == "F32" ? 4 : (t.dtype == "BF16" || t.dtype == "F16") ? 2 : 0;
++    if (!width || bytes != (size_t) n * width) {
++        *error = name + ": unsupported dtype " + t.dtype;
++        return false;
++    }
++    std::vector<uint8_t> raw(bytes);
++    std::ifstream        in(f.path, std::ios::binary);
++    in.seekg((std::streamoff) t.begin);
++    if (!in.read(reinterpret_cast<char *>(raw.data()), (std::streamsize) bytes)) {
++        *error = "cannot read " + name;
++        return false;
++    }
++    out->resize((size_t) n);
++    if (width == 4) {
++        memcpy(out->data(), raw.data(), bytes);
++    } else if (t.dtype == "BF16") {
++        const uint16_t * p = reinterpret_cast<const uint16_t *>(raw.data());
++        for (int64_t i = 0; i < n; i++) {
++            uint32_t u = (uint32_t) p[i] << 16;
++            memcpy(&(*out)[i], &u, 4);
++        }
++    } else {
++        ggml_fp16_to_fp32_row(reinterpret_cast<const ggml_fp16_t *>(raw.data()), out->data(), n);
++    }
++    return true;
++}
++
++// ------------------------------------------------------------ layout rules
++
++struct LoraGroup {
++    enum Kind { LORA, DIFF, DIFF_B, REPLACE } kind = LORA;
++    std::string              module;
++    int                      half = 0;  // 0 music (AR), 1 sound (NAR)
++    std::vector<std::string> targets;   // model Linear names, in the row order of B
++    std::string              a, b, alpha, key, leaf;
++    int64_t                  rank = 0, in = 0, out = 0;
++    double                   scale = 1.0;  // when there is no per-module alpha
++};
++
++struct LoraFile {
++    std::string            path;
++    StFile                 st;
++    std::vector<LoraGroup> groups;
++    std::string            error;  // empty when it loads
++};
++
++static bool lora_starts(const std::string & s, const std::string & p) {
++    return s.compare(0, p.size(), p) == 0;
++}
++
++static bool lora_ends(const std::string & s, const std::string & p) {
++    return s.size() >= p.size() && s.compare(s.size() - p.size(), p.size(), p) == 0;
++}
++
++static const char * const LORA_OUTSIDE[] = { "llm2vae", "vae2llm", "time_embedder.mlp.0", "time_embedder.mlp.2" };
++
++static bool lora_outside(const std::string & n) {
++    for (const char * o : LORA_OUTSIDE) {
++        if (n == o) {
++            return true;
++        }
++    }
++    return false;
++}
++
++// A LoRA module name -> half and model Linear names; false with the reason
++static bool lora_resolve(const std::string & module, int * half, std::vector<std::string> * targets, std::string * error) {
++    std::string name = module;
++    int         h    = -1;
++    if (lora_starts(name, "base_model.model.")) {
++        name = name.substr(17);
++    }
++    if (lora_starts(name, "text_encoders.")) {
++        name = name.substr(14);
++        h    = 0;
++    } else if (lora_starts(name, "diffusion_model.")) {
++        name = name.substr(16);
++        h    = 1;
++    }
++    if (lora_starts(name, "layers.")) {
++        name = "model." + name;
++    }
++    targets->clear();
++    if (lora_outside(name)) {
++        *half = 1;
++        targets->push_back(name);
++        return true;
++    }
++    // model.layers.<N>.<branch>.<proj>
++    if (!lora_starts(name, "model.layers.")) {
++        *error = "does not know where to put " + module;
++        return false;
++    }
++    std::string rest = name.substr(13);
++    size_t      d1   = rest.find('.');
++    size_t      d2   = d1 == std::string::npos ? d1 : rest.find('.', d1 + 1);
++    if (d1 == std::string::npos || d2 == std::string::npos || rest.find('.', d2 + 1) != std::string::npos || d1 == 0 ||
++        rest.find_first_not_of("0123456789") != d1) {
++        *error = "does not know where to put " + module;
++        return false;
++    }
++    std::string index = rest.substr(0, d1), branch = rest.substr(d1 + 1, d2 - d1 - 1), proj = rest.substr(d2 + 1);
++    bool        nar_branch = lora_starts(branch, "nar_");
++    if (h == 1 && !nar_branch) {
++        branch = branch == "self_attn" ? "nar_self_attn" : branch == "mlp" ? "nar_mlp" : branch;
++    } else if (h == 0 && nar_branch) {
++        *error = "music-half key names a sound layer: " + module;
++        return false;
++    } else if (h < 0) {
++        h = nar_branch ? 1 : 0;
++    }
++    std::vector<std::string> projs;
++    if (proj == "qkv_proj") {
++        projs = { "q_proj", "k_proj", "v_proj" };
++    } else if (proj == "gate_up_proj") {
++        projs = { "gate_proj", "up_proj" };
++    } else {
++        projs = { proj };
++    }
++    static const std::set<std::string> attn = { "q_proj", "k_proj", "v_proj", "o_proj" };
++    static const std::set<std::string> mlp  = { "gate_proj", "up_proj", "down_proj" };
++    const std::set<std::string> *      ok   = (branch == "self_attn" || branch == "nar_self_attn") ? &attn :
++                                              (branch == "mlp" || branch == "nar_mlp")             ? &mlp :
++                                                                                                     nullptr;
++    for (const std::string & p : projs) {
++        if (!ok || !ok->count(p)) {
++            *error = "does not know where to put " + module;
++            return false;
++        }
++        targets->push_back("model.layers." + index + "." + branch + "." + p);
++    }
++    *half = h;
++    return true;
++}
++
++static bool lora_number(const std::string & s, double * v) {
++    if (s.empty()) {
++        return false;
++    }
++    char * end = nullptr;
++    double x   = strtod(s.c_str(), &end);
++    if (!end || *end || !std::isfinite(x)) {
++        return false;
++    }
++    *v = x;
++    return true;
++}
++
++// alpha / rank from adapter_config.json beside the file
++static bool lora_sidecar(const std::string & path, double * alpha, double * rank, bool * rs) {
++    std::filesystem::path cfg = std::filesystem::path(path).parent_path() / "adapter_config.json";
++    if (!std::filesystem::is_regular_file(cfg)) {
++        return false;
++    }
++    std::string  text = lora_read_text(cfg);
++    yyjson_doc * doc  = yyjson_read(text.data(), text.size(), 0);
++    if (!doc) {
++        return false;
++    }
++    yyjson_val * root = yyjson_doc_get_root(doc);
++    yyjson_val * a    = yyjson_obj_get(root, "lora_alpha");
++    if (!a) {
++        a = yyjson_obj_get(root, "alpha");
++    }
++    yyjson_val * r = yyjson_obj_get(root, "r");
++    if (!r) {
++        r = yyjson_obj_get(root, "rank");
++    }
++    yyjson_val * u  = yyjson_obj_get(root, "use_rslora");
++    bool         ok = a && r && yyjson_is_num(a) && yyjson_is_num(r) && yyjson_get_num(r) > 0;
++    if (ok) {
++        *alpha = yyjson_get_num(a);
++        *rank  = yyjson_get_num(r);
++        *rs    = u && yyjson_is_true(u);
++    }
++    yyjson_doc_free(doc);
++    return ok;
++}
++
++static bool lora_plan(const std::string & path, LoraFile * lf) {
++    lf->path = path;
++    lf->groups.clear();
++    lf->error.clear();
++    if (!st_read_header(path, &lf->st, &lf->error)) {
++        return false;
++    }
++    const auto & T = lf->st.tensors;
++    if (T.empty()) {
++        lf->error = "the file holds no tensors";
++        return false;
++    }
++    static const std::pair<const char *, const char *> AB[] = {
++        { ".lora_A.default.weight", ".lora_B.default.weight" },
++        { ".lora_A.weight",         ".lora_B.weight"         },
++        { ".lora_A",                ".lora_B"                },
++        { ".lora_down.weight",      ".lora_up.weight"        },
++    };
++    std::set<std::string> used;
++    double                meta_alpha = 0, sc_alpha = 0, sc_rank = 0;
++    bool                  has_meta   = false, sc_rs = false;
++    auto                  ma         = lf->st.meta.find("alpha");
++    if (ma == lf->st.meta.end()) {
++        ma = lf->st.meta.find("lora_alpha");
++    }
++    if (ma != lf->st.meta.end()) {
++        has_meta = lora_number(ma->second, &meta_alpha);
++    }
++    bool has_sidecar = lora_sidecar(path, &sc_alpha, &sc_rank, &sc_rs);
++    for (const auto & kv : T) {
++        const std::string & key = kv.first;
++        for (const auto & ab : AB) {
++            if (!lora_ends(key, ab.first)) {
++                continue;
++            }
++            std::string module = key.substr(0, key.size() - strlen(ab.first));
++            std::string b_key  = module + ab.second;
++            auto        bi     = T.find(b_key);
++            if (bi == T.end()) {
++                lf->error = key + " has no matching " + ab.second;
++                return false;
++            }
++            const auto & as = kv.second.shape;
++            const auto & bs = bi->second.shape;
++            if (as.size() != 2 || bs.size() != 2 || bs[1] != as[0]) {
++                lf->error = "mismatched LoRA matrices for " + module;
++                return false;
++            }
++            LoraGroup g;
++            if (!lora_resolve(module, &g.half, &g.targets, &lf->error)) {
++                return false;
++            }
++            g.kind   = LoraGroup::LORA;
++            g.module = module;
++            g.a      = key;
++            g.b      = b_key;
++            g.rank   = as[0];
++            g.in     = as[1];
++            g.out    = bs[0];
++            if (T.count(module + ".alpha")) {
++                g.alpha = module + ".alpha";
++                used.insert(g.alpha);
++            } else if (has_meta) {
++                g.scale = meta_alpha / (double) g.rank;
++            } else if (has_sidecar) {
++                g.scale = sc_rs ? sc_alpha / std::sqrt(sc_rank) : sc_alpha / sc_rank;
++            }
++            lf->groups.push_back(g);
++            used.insert(key);
++            used.insert(b_key);
++            break;
++        }
++    }
++    for (const auto & kv : T) {
++        const std::string & key = kv.first;
++        if (used.count(key)) {
++            continue;
++        }
++        if (lora_ends(key, ".diff") || lora_ends(key, ".diff_b")) {
++            LoraGroup g;
++            g.kind   = lora_ends(key, ".diff_b") ? LoraGroup::DIFF_B : LoraGroup::DIFF;
++            g.module = key.substr(0, key.rfind('.'));
++            g.key    = key;
++            if (!lora_resolve(g.module, &g.half, &g.targets, &lf->error)) {
++                return false;
++            }
++            lf->groups.push_back(g);
++            used.insert(key);
++            continue;
++        }
++        std::string base = lora_starts(key, "diffusion_model.") ? key.substr(16) : key;
++        size_t      dot  = base.rfind('.');
++        if (dot != std::string::npos) {
++            std::string stem = base.substr(0, dot), leaf = base.substr(dot + 1);
++            if (lora_outside(stem) && (leaf == "weight" || leaf == "bias")) {
++                LoraGroup g;
++                g.kind    = LoraGroup::REPLACE;
++                g.module  = stem;
++                g.half    = 1;
++                g.targets = { stem };
++                g.key     = key;
++                g.leaf    = leaf;
++                lf->groups.push_back(g);
++                used.insert(key);
++            }
++        }
++    }
++    std::vector<std::string> left;
++    for (const auto & kv : T) {
++        if (!used.count(kv.first)) {
++            left.push_back(kv.first);
++        }
++    }
++    if (!left.empty()) {
++        lf->error = std::to_string(left.size()) + " tensors do not land on the model, e.g. " + left.front();
++        return false;
++    }
++    if (lf->groups.empty()) {
++        lf->error = "no LoRA pairs found";
++        return false;
++    }
++    return true;
++}
++
++// ------------------------------------------------------------ catalog
++
++struct LoraInfo {
++    std::string id, name, trigger, hint, mode, layout, error;
++    bool        ar = false, nar = false;
++    int64_t     rank = 0, pairs = 0;
++    double      size_mb = 0;
++};
++
++static std::string lora_json_str(const std::filesystem::path & p, const char * field) {
++    if (!std::filesystem::is_regular_file(p)) {
++        return "";
++    }
++    std::string  text = lora_read_text(p);
++    yyjson_doc * doc  = yyjson_read(text.data(), text.size(), 0);
++    std::string  out;
++    if (doc) {
++        yyjson_val * v = yyjson_obj_get(yyjson_doc_get_root(doc), field);
++        if (v && yyjson_is_str(v)) {
++            out = yyjson_get_str(v);
++        }
++        yyjson_doc_free(doc);
++    }
++    size_t a = out.find_first_not_of(" \t\r\n"), b = out.find_last_not_of(" \t\r\n");
++    return a == std::string::npos ? "" : out.substr(a, b - a + 1);
++}
++
++static LoraInfo lora_describe(const std::filesystem::path & path, const std::filesystem::path & root) {
++    LoraInfo info;
++    info.id                             = path.lexically_relative(root).generic_string();
++    std::filesystem::path folder        = path.parent_path();
++    info.size_mb                        = std::round((double) std::filesystem::file_size(path) / 1e5) / 10.0;
++    std::string named                   = lora_json_str(folder / "lora.json", "name");
++    static const std::set<std::string> generic = { "lora", "adapter_model", "pytorch_lora_weights", "model", "adapter" };
++    std::string                         stem    = path.stem().string();
++    std::string                         lower   = stem;
++    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
++    std::vector<std::string> parts;
++    for (const auto & part : path.lexically_relative(root)) {
++        parts.push_back(part.string());
++    }
++    if (!named.empty()) {
++        info.name = named;
++    } else if (generic.count(lower) && parts.size() > 1) {
++        for (size_t i = 0; i + 1 < parts.size(); i++) {
++            info.name += (i ? " / " : "") + parts[i];
++        }
++    } else {
++        info.name = stem;
++    }
++    LoraFile lf;
++    if (!lora_plan(path.string(), &lf)) {
++        info.error = lf.error;
++        return info;
++    }
++    for (const LoraGroup & g : lf.groups) {
++        (g.half ? info.nar : info.ar) = true;
++        info.rank = std::max(info.rank, g.rank);
++        if (lora_ends(g.module, "qkv_proj") || lora_ends(g.module, "gate_up_proj")) {
++            info.layout = "fused";
++        }
++    }
++    if (info.layout.empty()) {
++        info.layout = "unfused";
++    }
++    info.pairs = (int64_t) lf.groups.size();
++    // trigger: lora.json, the file's metadata, training_config.json, the tag list
++    info.trigger = lora_json_str(folder / "lora.json", "trigger");
++    auto & meta  = lf.st.meta;
++    if (info.trigger.empty() && meta.count("trigger_word")) {
++        info.trigger = meta["trigger_word"];
++        size_t a = info.trigger.find_first_not_of(" \t"), b = info.trigger.find_last_not_of(" \t");
++        info.trigger = a == std::string::npos ? "" : info.trigger.substr(a, b - a + 1);
++    }
++    if (info.trigger.empty()) {
++        info.trigger = lora_json_str(folder / "training_config.json", "trigger_word");
++    }
++    if (info.trigger.empty() && meta.count("ss_tag_frequency")) {
++        const std::string & tf  = meta["ss_tag_frequency"];
++        yyjson_doc *        doc = yyjson_read(tf.data(), tf.size(), 0);
++        if (doc) {
++            yyjson_val * tags = yyjson_doc_get_root(doc);
++            if (yyjson_is_obj(tags) && yyjson_obj_size(tags) > 0) {
++                size_t       i, m;
++                yyjson_val * k, *v;
++                yyjson_obj_foreach(tags, i, m, k, v) {
++                    std::string t = yyjson_get_str(k);
++                    size_t      u = t.find('_');
++                    if (u != std::string::npos && u > 0 && t.find_first_not_of("0123456789") == u) {
++                        t = t.substr(u + 1);
++                    }
++                    info.trigger = t;
++                    break;
++                }
++            }
++            yyjson_doc_free(doc);
++        }
++    }
++    info.hint = lora_json_str(folder / "training_config.json", "style_description");
++    std::string mode = meta.count("intended_cot") ? meta["intended_cot"] : meta.count("source_cot") ? meta["source_cot"] : "";
++    info.mode        = (mode == "off" || mode == "none") ? "direct" : mode;
++    return info;
++}
++
++// Every .safetensors under root (links followed, dot folders skipped), sorted by id
++static std::vector<LoraInfo> lora_catalog(const std::string & root_dir) {
++    std::vector<LoraInfo> out;
++    std::filesystem::path root(root_dir);
++    std::error_code       ec;
++    if (root_dir.empty() || !std::filesystem::is_directory(root, ec)) {
++        return out;
++    }
++    std::vector<std::filesystem::path> found;
++    auto opts = std::filesystem::directory_options::follow_directory_symlink |
++                std::filesystem::directory_options::skip_permission_denied;
++    for (auto it = std::filesystem::recursive_directory_iterator(root, opts, ec);
++         it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
++        if (ec) {
++            break;
++        }
++        std::string name = it->path().filename().string();
++        if (!name.empty() && name[0] == '.') {
++            if (it->is_directory(ec)) {
++                it.disable_recursion_pending();
++            }
++            continue;
++        }
++        if (it->is_regular_file(ec) && lora_ends(name, ".safetensors")) {
++            found.push_back(it->path());
++        }
++    }
++    std::sort(found.begin(), found.end(), [&](const auto & a, const auto & b) {
++        return a.lexically_relative(root).generic_string() < b.lexically_relative(root).generic_string();
++    });
++    for (const auto & p : found) {
++        out.push_back(lora_describe(p, root));
++    }
++    return out;
++}
++
++// ------------------------------------------------------------ a set to merge
++
++struct LoraContribution {
++    const LoraFile *  file;
++    const LoraGroup * group;
++    int64_t           row0, rows;  // slice of B (or of a fused delta) for this weight
++    double            strength;
++};
++
++struct LoraSet {
++    std::vector<std::shared_ptr<LoraFile>> files;
++    std::vector<std::pair<double, double>> strengths;  // (music, sound) per file
++    std::string                            sig[2];     // store-key signature per half
++    // GGUF tensor name (".weight"/".bias") -> what to add, built by lora_bind
++    std::unordered_map<std::string, std::vector<LoraContribution>> index;
++    bool                                                           bound = false;
++    std::mutex                                                     mtx;
++};
++
++// Build a set from (path, music, sound) choices; false with the reason
++static bool lora_set_open(const std::vector<std::tuple<std::string, double, double>> & choices, LoraSet * set,
++                          std::string * error) {
++    for (const auto & c : choices) {
++        auto lf = std::make_shared<LoraFile>();
++        if (!lora_plan(std::get<0>(c), lf.get())) {
++            *error = std::get<0>(c) + ": " + lf->error;
++            return false;
++        }
++        std::error_code ec;
++        auto            mtime = std::filesystem::last_write_time(std::get<0>(c), ec).time_since_epoch().count();
++        for (int h = 0; h < 2; h++) {
++            double s = h ? std::get<2>(c) : std::get<1>(c);
++            bool   has = false;
++            for (const auto & g : lf->groups) {
++                has |= g.half == h;
++            }
++            if (s != 0.0 && has) {
++                char buf[64];
++                snprintf(buf, sizeof(buf), "@%.4f:%lld;", s, (long long) mtime);
++                set->sig[h] += std::get<0>(c) + buf;
++            }
++        }
++        set->files.push_back(lf);
++        set->strengths.push_back({ std::get<1>(c), std::get<2>(c) });
++    }
++    return true;
++}
++
++// Rows of a model weight, from the GGUF's metadata (ne[1]; 1-D biases have ne[0] rows)
++using LoraRowsFn = int64_t (*)(void * ctx, const std::string & name, int64_t * cols);
++
++// Index every contribution by GGUF tensor name and check the shapes; false with the reason
++static bool lora_bind(LoraSet * set, LoraRowsFn rows_of, void * ctx, std::string * error) {
++    std::lock_guard<std::mutex> lock(set->mtx);
++    if (set->bound) {
++        return true;
++    }
++    for (size_t f = 0; f < set->files.size(); f++) {
++        const LoraFile * lf = set->files[f].get();
++        for (const LoraGroup & g : lf->groups) {
++            double s = g.half ? set->strengths[f].second : set->strengths[f].first;
++            if (s == 0.0) {
++                continue;
++            }
++            bool    bias = g.kind == LoraGroup::DIFF_B || (g.kind == LoraGroup::REPLACE && g.leaf == "bias");
++            int64_t off  = 0;
++            for (const std::string & t : g.targets) {
++                std::string name = t + (bias ? ".bias" : ".weight");
++                int64_t     cols = 0, rows = rows_of(ctx, name, &cols);
++                if (rows <= 0) {
++                    *error = "the model has no " + name;
++                    return false;
++                }
++                if (g.kind == LoraGroup::LORA && g.in != cols) {
++                    *error = g.module + ": A takes " + std::to_string(g.in) + " inputs, " + name + " has " +
++                             std::to_string(cols);
++                    return false;
++                }
++                set->index[name].push_back({ lf, &g, off, rows, s });
++                off += rows;
++            }
++            if (g.kind == LoraGroup::LORA && off != g.out) {
++                *error = g.module + ": B has " + std::to_string(g.out) + " rows, the model's targets take " +
++                         std::to_string(off);
++                return false;
++            }
++        }
++    }
++    set->bound = true;
++    return true;
++}
++
++static bool lora_touches(const LoraSet * set, const std::string & name) {
++    return set && set->index.count(name) > 0;
++}
++
++// One contribution, read and scaled once per weight
++struct LoraPrepared {
++    LoraGroup::Kind    kind;
++    int64_t            rank = 0;
++    std::vector<float> a, b;  // LORA: A [rank x cols], B slice [rows x rank] scaled by strength x alpha/rank
++    std::vector<float> d;     // DIFF / DIFF_B: the delta slice [rows x cols] x strength; REPLACE: full x strength
++    double             strength = 0;
++};
++
++static bool lora_prepare(LoraSet * set, const std::string & name, int64_t rows, int64_t cols,
++                         std::vector<LoraPrepared> * out, std::string * error) {
++    out->clear();
++    auto it = set->index.find(name);
++    if (it == set->index.end()) {
++        return true;
++    }
++    for (const LoraContribution & c : it->second) {
++        const LoraGroup & g = *c.group;
++        LoraPrepared      p;
++        p.kind     = g.kind;
++        p.strength = c.strength;
++        if (g.kind == LoraGroup::LORA) {
++            std::vector<float> b;
++            if (!st_read_f32(c.file->st, g.a, &p.a, error) || !st_read_f32(c.file->st, g.b, &b, error)) {
++                return false;
++            }
++            double scale = g.scale;
++            if (!g.alpha.empty()) {
++                std::vector<float> al;
++                if (!st_read_f32(c.file->st, g.alpha, &al, error) || al.size() != 1) {
++                    return false;
++                }
++                scale = al[0] / (double) g.rank;
++            }
++            p.rank = g.rank;
++            p.b.resize((size_t) (rows * g.rank));
++            const double factor = scale * c.strength;
++            for (int64_t i = 0; i < rows * g.rank; i++) {
++                p.b[(size_t) i] = (float) (b[(size_t) (c.row0 * g.rank + i)] * factor);
++            }
++        } else {
++            std::vector<float> d;
++            if (!st_read_f32(c.file->st, g.key, &d, error)) {
++                return false;
++            }
++            if ((int64_t) d.size() < (c.row0 + rows) * cols || (g.kind == LoraGroup::REPLACE && (int64_t) d.size() != rows * cols)) {
++                *error = g.key + ": shape does not match " + name;
++                return false;
++            }
++            p.d.assign(d.begin() + c.row0 * cols, d.begin() + (c.row0 + rows) * cols);
++        }
++        out->push_back(std::move(p));
++    }
++    return true;
++}
++
++// The hot loop: out[r] += sum_k b[r][k] * a[k], for rows r0..r1 (AVX2/FMA build with a fallback)
++#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__)) && !defined(__clang__)
++__attribute__((target_clones("arch=x86-64-v3", "default")))
++#endif
++static void lora_rows_update(float * w, int64_t r0, int64_t r1, int64_t cols, const float * b, int64_t rank,
++                             const float * a) {
++    for (int64_t r = r0; r < r1; r++) {
++        float * __restrict__       out = w + r * cols;
++        const float * __restrict__ br  = b + r * rank;
++        for (int64_t k = 0; k < rank; k++) {
++            const float                coef = br[k];
++            const float * __restrict__ ar   = a + k * cols;
++            for (int64_t i = 0; i < cols; i++) {
++                out[i] += coef * ar[i];
++            }
++        }
++    }
++}
++
++// Rows r0..r1 of w (the weight in F32; `base` the original, for replacements) get every contribution
++static void lora_apply_rows(const std::vector<LoraPrepared> & ps, float * w, const float * base, int64_t r0, int64_t r1,
++                            int64_t cols) {
++    for (const LoraPrepared & p : ps) {
++        if (p.kind == LoraGroup::LORA) {
++            lora_rows_update(w, r0, r1, cols, p.b.data(), p.rank, p.a.data());
++        } else {
++            const float s = (float) p.strength;
++            for (int64_t i = r0 * cols; i < r1 * cols; i++) {
++                w[i] += s * (p.kind == LoraGroup::REPLACE ? p.d[(size_t) i] - base[i] : p.d[(size_t) i]);
++            }
++        }
++    }
++}
++
++// Split rows over up to 8 threads (fewer for small weights)
++template <typename F> static void lora_parallel_rows(int64_t rows, F fn) {
++    int     n_threads = (int) std::min<unsigned>(8, std::max(1u, std::thread::hardware_concurrency()));
++    n_threads         = (int) std::min<int64_t>(n_threads, std::max<int64_t>(1, rows / 32));
++    int64_t step      = (rows + n_threads - 1) / n_threads;
++    std::vector<std::thread> pool;
++    for (int t = 0; t < n_threads; t++) {
++        int64_t r0 = t * step, r1 = std::min(rows, r0 + step);
++        if (r0 < r1) {
++            pool.emplace_back(fn, r0, r1);
++        }
++    }
++    for (auto & th : pool) {
++        th.join();
++    }
++}
++
++// Add every contribution for `name` into w (F32, rows x cols, the weight already in it)
++static bool lora_merge(LoraSet * set, const std::string & name, float * w, int64_t rows, int64_t cols, std::string * error) {
++    std::vector<LoraPrepared> ps;
++    if (!lora_prepare(set, name, rows, cols, &ps, error)) {
++        return false;
++    }
++    std::vector<float> base;
++    for (const auto & p : ps) {
++        if (p.kind == LoraGroup::REPLACE) {
++            base.assign(w, w + rows * cols);
++            break;
++        }
++    }
++    lora_parallel_rows(rows, [&](int64_t r0, int64_t r1) { lora_apply_rows(ps, w, base.data(), r0, r1, cols); });
++    for (int64_t i = 0; i < rows * cols; i++) {
++        if (!std::isfinite(w[i])) {
++            *error = "the merge made " + name + " non-finite; lower the strength";
++            return false;
++        }
++    }
++    return true;
++}
+diff --git a/src/model-store.cpp b/src/model-store.cpp
+index 063e44b..0a82518 100644
+--- a/src/model-store.cpp
++++ b/src/model-store.cpp
+@@ -39,13 +39,14 @@ struct ModelKeyHash {
+     size_t operator()(const ModelKey & k) const noexcept {
+         size_t h = std::hash<int>{}(static_cast<int>(k.kind));
+         h ^= std::hash<std::string>{}(k.path) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
++        h ^= std::hash<std::string>{}(k.lora_sig) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+         return h;
+     }
+ };
+ 
+ struct ModelKeyEq {
+     bool operator()(const ModelKey & a, const ModelKey & b) const noexcept {
+-        return a.kind == b.kind && a.path == b.path;
++        return a.kind == b.kind && a.path == b.path && a.lora_sig == b.lora_sig;
+     }
+ };
+ 
+@@ -212,16 +213,53 @@ static size_t bytes_of_ss2(const SheetSage2 * m) {
+     return m && m->wctx.buffer ? ggml_backend_buffer_get_size(m->wctx.buffer) : 0;
+ }
+ 
++// Local addition: with models kept loaded, a half loaded with other LoRAs (or
++// another file) is swapped out when idle rather than kept beside the new one.
++static void evict_same_kind_idle(ModelStore * s, const ModelKey & keep) {
++    ModelKeyEq eq;
++    for (auto it = s->gpu.begin(); it != s->gpu.end();) {
++        if (it->first.kind == keep.kind && !eq(it->first, keep) && it->second.refcount == 0) {
++            fprintf(stderr, "[Store] Swap out %s (%.1f MB)\n", it->second.label, (float) it->second.bytes / (1024.0f * 1024.0f));
++            s->handle_to_key.erase(it->second.ptr);
++            it->second.deleter(it->second.ptr);
++            it = s->gpu.erase(it);
++        } else {
++            ++it;
++        }
++    }
++}
++
++// Local addition: load with the key's LoRAs merged; a failed merge discards the load
++template <typename T> static bool load_with_loras(const ModelKey & k, T * m, bool (*load)(T *, const char *),
++                                                   void (*unload)(T *)) {
++    g_gf_lora = k.lora.get();
++    g_gf_lora_error.clear();
++    Timer t;
++    bool  ok = load(m, k.path.c_str());
++    g_gf_lora = nullptr;
++    if (ok && !g_gf_lora_error.empty()) {
++        fprintf(stderr, "[LoRA] FATAL: %s\n", g_gf_lora_error.c_str());
++        unload(m);
++        return false;
++    }
++    if (ok && k.lora) {
++        fprintf(stderr, "[LoRA] Merged while loading (%.0f ms in all)\n", t.ms());
++    }
++    return ok;
++}
++
+ Qwen3LM * store_require_lm(ModelStore * s, const ModelKey & k) {
+     if (auto * hit = cache_hit<Qwen3LM>(s, k)) {
+         return hit;
+     }
+     if (s->policy == EVICT_STRICT) {
+         evict_conflicts(s, k);
++    } else {
++        evict_same_kind_idle(s, k);
+     }
+     Timer     t;
+     Qwen3LM * m = new Qwen3LM();
+-    if (!qw3lm_load(m, k.path.c_str())) {
++    if (!load_with_loras<Qwen3LM>(k, m, qw3lm_load, qw3lm_free)) {
+         delete m;
+         return nullptr;
+     }
+@@ -236,10 +274,12 @@ Yue2NAR * store_require_nar(ModelStore * s, const ModelKey & k) {
+     }
+     if (s->policy == EVICT_STRICT) {
+         evict_conflicts(s, k);
++    } else {
++        evict_same_kind_idle(s, k);
+     }
+     Timer     t;
+     Yue2NAR * m = new Yue2NAR();
+-    if (!nar_load(m, k.path.c_str())) {
++    if (!load_with_loras<Yue2NAR>(k, m, nar_load, nar_free)) {
+         delete m;
+         return nullptr;
+     }
+diff --git a/src/model-store.h b/src/model-store.h
+index eca0070..aea732f 100644
+--- a/src/model-store.h
++++ b/src/model-store.h
+@@ -59,6 +59,7 @@
+ #include "vae.h"
+ 
+ #include <cstddef>
++#include <memory>
+ #include <string>
+ 
+ struct ModelStore;
+@@ -73,6 +74,10 @@ enum ModelKind {
+ struct ModelKey {
+     ModelKind   kind;
+     std::string path;  // GGUF path the module is loaded from
++    // Local addition: LoRAs merged into this half while it loads. The signature
++    // (files, strengths, mtimes) is part of the key; the set is what gets merged.
++    std::string              lora_sig = {};
++    std::shared_ptr<LoraSet> lora     = {};
+ };
+ 
+ enum EvictPolicy {
+diff --git a/src/pipeline.h b/src/pipeline.h
+index 484dc98..6c3afe4 100644
+--- a/src/pipeline.h
++++ b/src/pipeline.h
+@@ -60,6 +60,11 @@ struct Yue2Pipeline {
+     // its path) and the slider catalog, id -> GGUF path
+     std::vector<std::pair<std::string, std::string>> vaes;
+     std::vector<std::pair<std::string, std::string>> slider_files;
++    // Local additions: the LoRA folder (a request names files by their path under
++    // it), the set merged for the run in progress, and why the last run failed
++    std::string              lora_dir;
++    std::shared_ptr<LoraSet> loras;
++    std::string              last_error;
+     DebugDumper        dumper;
+ 
+     // The cache, bound at configure to its config with the context override
+@@ -159,8 +164,15 @@ static void pipeline_free(Yue2Pipeline * p) {
+ // (idempotent on cache hits). The NAR bakes them into its graph at build
+ // time, the LM reads them at every forward.
+ static Qwen3LM * require_lm(Yue2Pipeline * p) {
+-    ModelKey  k = { MODEL_LM, p->model_path };
++    ModelKey k = { MODEL_LM, p->model_path };
++    if (p->loras && !p->loras->sig[0].empty()) {   // Local addition: the music half's LoRAs
++        k.lora_sig = p->loras->sig[0];
++        k.lora     = p->loras;
++    }
+     Qwen3LM * m = store_require_lm(p->store, k);
++    if (!m && !g_gf_lora_error.empty()) {
++        p->last_error = "LoRA: " + g_gf_lora_error;
++    }
+     if (m) {
+         m->use_flash_attn = m->use_flash_attn && !p->params.no_fa;
+         m->clamp_fp16     = p->params.clamp_fp16;
+@@ -169,8 +181,15 @@ static Qwen3LM * require_lm(Yue2Pipeline * p) {
+ }
+ 
+ static Yue2NAR * require_nar(Yue2Pipeline * p) {
+-    ModelKey  k = { MODEL_NAR, p->model_path };
++    ModelKey k = { MODEL_NAR, p->model_path };
++    if (p->loras && !p->loras->sig[1].empty()) {   // Local addition: the sound half's LoRAs
++        k.lora_sig = p->loras->sig[1];
++        k.lora     = p->loras;
++    }
+     Yue2NAR * m = store_require_nar(p->store, k);
++    if (!m && !g_gf_lora_error.empty()) {
++        p->last_error = "LoRA: " + g_gf_lora_error;
++    }
+     if (m) {
+         m->use_flash_attn = m->use_flash_attn && !p->params.no_fa;
+         m->clamp_fp16     = p->params.clamp_fp16;
+@@ -198,6 +217,47 @@ static bool pipeline_vae_path(const Yue2Pipeline * p, const std::string & name,
+     return false;
+ }
+ 
++// Local addition: open the run's LoRAs and check every target against the model's
++// shapes before anything loads; false with the reason
++static bool pipeline_open_loras(Yue2Pipeline * p, const std::vector<Yue2LoraChoice> & choices, std::string * error) {
++    if (p->lora_dir.empty()) {
++        *error = "this server was started without a LoRA folder (--loras)";
++        return false;
++    }
++    std::vector<std::tuple<std::string, double, double>> list;
++    for (const Yue2LoraChoice & c : choices) {
++        if (c.id.empty() || c.id[0] == '/' || c.id.find("..") != std::string::npos) {
++            *error = "bad LoRA id '" + c.id + "'";
++            return false;
++        }
++        std::string path = p->lora_dir + "/" + c.id;
++        if (!std::filesystem::is_regular_file(path)) {
++            *error = "no LoRA file '" + c.id + "'";
++            return false;
++        }
++        if (!(c.ar >= 0.0f && c.ar <= 2.0f && c.nar >= 0.0f && c.nar <= 2.0f)) {
++            *error = "LoRA strengths go from 0 to 2";
++            return false;
++        }
++        list.emplace_back(path, c.ar, c.nar);
++    }
++    auto set = std::make_shared<LoraSet>();
++    if (!lora_set_open(list, set.get(), error)) {
++        return false;
++    }
++    GGUFModel gf;
++    if (!gf_load(&gf, p->model_path.c_str())) {
++        *error = "cannot read the model to check the LoRAs";
++        return false;
++    }
++    bool ok = lora_bind(set.get(), gf_lora_rows, (void *) &gf, error);
++    gf_close(&gf);
++    if (ok) {
++        p->loras = set;
++    }
++    return ok;
++}
++
+ // Local addition: the GGUF path of a slider id, "" when unknown
+ static std::string pipeline_slider_path(const Yue2Pipeline * p, const std::string & id) {
+     for (const auto & s : p->slider_files) {
+@@ -282,6 +342,26 @@ static bool pipeline_generate(Yue2Pipeline *          p,
+ 
+     KvScope kv_scope = { p };
+ 
++    // Local addition: the run's LoRAs, merged into each half as it loads and
++    // dropped from the pipeline when the run ends (the store keys keep them apart)
++    struct LoraScope {
++        Yue2Pipeline * p;
++
++        ~LoraScope() { p->loras.reset(); }
++    } lora_scope = { p };
++    p->last_error.clear();
++    if (!r.loras.empty()) {
++        std::string error;
++        if (!pipeline_open_loras(p, r.loras, &error)) {
++            fprintf(stderr, "[LoRA] FATAL: %s\n", error.c_str());
++            p->last_error = "LoRA: " + error;
++            return false;
++        }
++        for (const Yue2LoraChoice & c : r.loras) {
++            fprintf(stderr, "[LoRA] %s: music %.2f, sound %.2f\n", c.id.c_str(), c.ar, c.nar);
++        }
++    }
++
+     BPETokenizer * tok    = store_bpe(p->store, p->model_path.c_str());
+     auto           encode = [tok](const std::string & text) {
+         return bpe_encode(tok, text);
+diff --git a/src/request.cpp b/src/request.cpp
+index 60c2f87..e6c444d 100644
+--- a/src/request.cpp
++++ b/src/request.cpp
+@@ -2,6 +2,8 @@
+ 
+ #include "request.h"
+ 
++#include <cmath>
++
+ #include "task-types.h"
+ #include "yyjson.h"
+ 
+@@ -40,6 +42,7 @@ void request_init(Yue2Request * r) {
+     r->title     = "";
+     r->vae       = "";
+     r->sliders   = {};
++    r->loras     = {};
+     r->plan_only = false;
+     r->parent    = "";
+ }
+@@ -192,6 +195,19 @@ static void request_parse_obj(yyjson_val * obj, Yue2Request * r) {
+             }
+         }
+     }
++    if ((v = yyjson_obj_get(obj, "loras")) && yyjson_is_arr(v)) {
++        size_t       idx, max;
++        yyjson_val * item;
++        yyjson_arr_foreach(v, idx, max, item) {
++            yyjson_val * id  = yyjson_obj_get(item, "id");
++            yyjson_val * ar  = yyjson_obj_get(item, "ar");
++            yyjson_val * nar = yyjson_obj_get(item, "nar");
++            if (id && yyjson_is_str(id)) {
++                r->loras.push_back({ yy_str(id), ar && yyjson_is_num(ar) ? (float) yyjson_get_num(ar) : 1.0f,
++                                     nar && yyjson_is_num(nar) ? (float) yyjson_get_num(nar) : 1.0f });
++            }
++        }
++    }
+ }
+ 
+ bool request_parse_json(Yue2Request * r, const char * json) {
+@@ -302,6 +318,17 @@ std::string request_to_json(const Yue2Request * r, bool sparse) {
+         }
+         yyjson_mut_obj_add_val(doc, root, "sliders", list);
+     }
++    if (!sparse || !r->loras.empty()) {
++        yyjson_mut_val * list = yyjson_mut_arr(doc);
++        for (const Yue2LoraChoice & c : r->loras) {
++            yyjson_mut_val * item = yyjson_mut_obj(doc);
++            yyjson_mut_obj_add_strncpy(doc, item, "id", c.id.c_str(), c.id.size());
++            yyjson_mut_obj_add_real(doc, item, "ar", std::round((double) c.ar * 1000.0) / 1000.0);
++            yyjson_mut_obj_add_real(doc, item, "nar", std::round((double) c.nar * 1000.0) / 1000.0);
++            yyjson_mut_arr_append(list, item);
++        }
++        yyjson_mut_obj_add_val(doc, root, "loras", list);
++    }
+     if (!sparse || r->plan_only != d.plan_only) {
+         yyjson_mut_obj_add_bool(doc, root, "plan_only", r->plan_only);
+     }
+diff --git a/src/request.h b/src/request.h
+index fda8f46..7ec5c3d 100644
+--- a/src/request.h
++++ b/src/request.h
+@@ -17,6 +17,14 @@ struct Yue2SliderChoice {
+     float       strength;
+ };
+ 
++// Local addition: one LoRA file (its path under the server's --loras folder) and
++// its strength on the music (AR) and the sound (NAR) half, each 0..2
++struct Yue2LoraChoice {
++    std::string id;
++    float       ar;
++    float       nar;
++};
++
+ struct Yue2Request {
+     // text content
+     std::string style;   // ""
+@@ -82,6 +90,7 @@ struct Yue2Request {
+     std::string                   title;      // ""
+     std::string                   vae;        // "" = the server's default decoder
+     std::vector<Yue2SliderChoice> sliders;    // applied while the music tokens are written
++    std::vector<Yue2LoraChoice>   loras;      // merged into the weights for the whole run
+     bool                          plan_only;  // false; stop after the score
+     std::string                   parent;     // "" or the library take this re-renders
+ };
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 1bf80ab..2a20397 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -11,6 +11,9 @@ add_executable(test-slider test-slider.cpp)
+ link_ggml_backends(test-slider)
+ add_executable(test-slider-unit test-slider-unit.cpp)
+ link_ggml_backends(test-slider-unit)
++# test-lora: LoRA catalog and merge harness (local addition), for tools/test_lora_parity.py
++add_executable(test-lora test-lora.cpp)
++link_ggml_backends(test-lora)
+ 
+ # test-nar: backbone NAR path parity harness against the torch reference.
+ add_executable(test-nar test-nar.cpp)
+diff --git a/tests/test-lora.cpp b/tests/test-lora.cpp
+new file mode 100644
+index 0000000..63efdc7
+--- /dev/null
++++ b/tests/test-lora.cpp
+@@ -0,0 +1,188 @@
++// test-lora (local addition): LoRA harness for tools/test_lora_parity.py.
++//   test-lora catalog <lora-dir>
++//       the catalog as JSON, the same fields as /props loras
++//   test-lora merge <model.gguf> <lora-dir> <out-dir> <id>:<music>:<sound>[,...] <tensor>...
++//       merges the set into each named weight, writes it as raw little-endian F32
++//       (dequantized when the model is quantized) to <out-dir>/<tensor>.f32
++//   test-lora dump <model.gguf> <out-dir> <tensor>...
++//       the weights as stored, dequantized, to <out-dir>/<tensor>.plain.f32
++//   test-lora time <model.gguf> <lora-dir> <id>:<music>:<sound>[,...]
++//       merges every weight the set touches, in the model's own type, and times it
++#include "gguf-weights.h"
++
++#include <chrono>
++#include <cstdio>
++#include <string>
++#include <vector>
++
++static bool parse_set(const std::string & dir, const std::string & spec, std::vector<std::tuple<std::string, double, double>> * out) {
++    size_t at = 0;
++    while (at <= spec.size()) {
++        size_t      comma = spec.find(',', at);
++        std::string item  = spec.substr(at, comma == std::string::npos ? std::string::npos : comma - at);
++        size_t      c2 = item.rfind(':'), c1 = c2 == std::string::npos ? c2 : item.rfind(':', c2 - 1);
++        if (c1 == std::string::npos) {
++            fprintf(stderr, "bad set item '%s' (id:music:sound)\n", item.c_str());
++            return false;
++        }
++        out->emplace_back(dir + "/" + item.substr(0, c1), atof(item.substr(c1 + 1, c2 - c1 - 1).c_str()),
++                          atof(item.substr(c2 + 1).c_str()));
++        if (comma == std::string::npos) {
++            break;
++        }
++        at = comma + 1;
++    }
++    return true;
++}
++
++static int open_set(const char * model, const char * dir, const char * spec, GGUFModel * gf, LoraSet * set) {
++    std::vector<std::tuple<std::string, double, double>> list;
++    std::string                                          error;
++    if (!parse_set(dir, spec, &list) || !lora_set_open(list, set, &error)) {
++        fprintf(stderr, "open: %s\n", error.c_str());
++        return 1;
++    }
++    if (!gf_load(gf, model)) {
++        return 1;
++    }
++    if (!lora_bind(set, gf_lora_rows, (void *) gf, &error)) {
++        fprintf(stderr, "bind: %s\n", error.c_str());
++        return 1;
++    }
++    return 0;
++}
++
++int main(int argc, char ** argv) {
++    std::string mode = argc > 1 ? argv[1] : "";
++    if (mode == "catalog" && argc == 3) {
++        yyjson_mut_doc * doc = yyjson_mut_doc_new(nullptr);
++        yyjson_mut_val * list = yyjson_mut_arr(doc);
++        for (const LoraInfo & l : lora_catalog(argv[2])) {
++            yyjson_mut_val * item = yyjson_mut_obj(doc);
++            yyjson_mut_obj_add_strcpy(doc, item, "id", l.id.c_str());
++            yyjson_mut_obj_add_strcpy(doc, item, "name", l.name.c_str());
++            yyjson_mut_obj_add_real(doc, item, "size_mb", l.size_mb);
++            yyjson_mut_val * halves = yyjson_mut_arr(doc);
++            if (l.ar) {
++                yyjson_mut_arr_add_str(doc, halves, "ar");
++            }
++            if (l.nar) {
++                yyjson_mut_arr_add_str(doc, halves, "nar");
++            }
++            yyjson_mut_obj_add_val(doc, item, "halves", halves);
++            if (!l.error.empty()) {
++                yyjson_mut_obj_add_strcpy(doc, item, "error", l.error.c_str());
++            } else {
++                yyjson_mut_obj_add_int(doc, item, "rank", l.rank);
++                yyjson_mut_obj_add_strcpy(doc, item, "layout", l.layout.c_str());
++                yyjson_mut_obj_add_int(doc, item, "pairs", l.pairs);
++                yyjson_mut_obj_add_strcpy(doc, item, "trigger", l.trigger.c_str());
++                yyjson_mut_obj_add_strcpy(doc, item, "hint", l.hint.c_str());
++                yyjson_mut_obj_add_strcpy(doc, item, "mode", l.mode.c_str());
++            }
++            yyjson_mut_arr_append(list, item);
++        }
++        yyjson_mut_doc_set_root(doc, list);
++        char * json = yyjson_mut_write(doc, 0, nullptr);
++        printf("%s\n", json);
++        free(json);
++        yyjson_mut_doc_free(doc);
++        return 0;
++    }
++    if (mode == "merge" && argc >= 7) {
++        GGUFModel gf;
++        LoraSet   set;
++        if (open_set(argv[2], argv[3], argv[5], &gf, &set)) {
++            return 1;
++        }
++        g_gf_lora = &set;
++        for (int i = 6; i < argc; i++) {
++            std::string          name = argv[i];
++            struct ggml_tensor * src  = ggml_get_tensor(gf.meta, name.c_str());
++            if (!src) {
++                fprintf(stderr, "no tensor %s\n", name.c_str());
++                return 1;
++            }
++            WeightCtx wctx;
++            wctx_init(&wctx, 4);
++            size_t       bytes  = 0;
++            enum ggml_type type = gf_lora_type(src->type);
++            const void * merged = gf_lora_stage(&wctx, gf, name, src, gf_get_data(gf, name.c_str()), type, &bytes, type != src->type);
++            if (!merged) {
++                fprintf(stderr, "%s: not merged (%s)\n", name.c_str(), g_gf_lora_error.empty() ? "no LoRA touches it" : g_gf_lora_error.c_str());
++                return 1;
++            }
++            int64_t            n = ggml_nelements(src);
++            std::vector<float> f32((size_t) n);
++            if (type == GGML_TYPE_F32) {
++                memcpy(f32.data(), merged, (size_t) n * sizeof(float));
++            } else {
++                ggml_get_type_traits(type)->to_float(merged, f32.data(), n);
++            }
++            std::string path = std::string(argv[4]) + "/" + name + ".f32";
++            FILE *      f    = fopen(path.c_str(), "wb");
++            fwrite(f32.data(), sizeof(float), f32.size(), f);
++            fclose(f);
++            printf("{\"name\": \"%s\", \"type\": \"%s\", \"stored\": \"%s\", \"elements\": %lld}\n", name.c_str(), ggml_type_name(src->type), ggml_type_name(type), (long long) n);
++            ggml_free(wctx.ctx);
++        }
++        gf_close(&gf);
++        return 0;
++    }
++    if (mode == "dump" && argc >= 5) {   // the weights as they are, dequantized, for a baseline
++        GGUFModel gf;
++        if (!gf_load(&gf, argv[2])) {
++            return 1;
++        }
++        for (int i = 4; i < argc; i++) {
++            struct ggml_tensor * src = ggml_get_tensor(gf.meta, argv[i]);
++            if (!src) {
++                fprintf(stderr, "no tensor %s\n", argv[i]);
++                return 1;
++            }
++            int64_t            n = ggml_nelements(src);
++            std::vector<float> f32((size_t) n);
++            if (src->type == GGML_TYPE_F32) {
++                memcpy(f32.data(), gf_get_data(gf, argv[i]), (size_t) n * sizeof(float));
++            } else {
++                ggml_get_type_traits(src->type)->to_float(gf_get_data(gf, argv[i]), f32.data(), n);
++            }
++            std::string path = std::string(argv[3]) + "/" + argv[i] + ".plain.f32";
++            FILE *      f    = fopen(path.c_str(), "wb");
++            fwrite(f32.data(), sizeof(float), f32.size(), f);
++            fclose(f);
++        }
++        gf_close(&gf);
++        return 0;
++    }
++    if (mode == "time" && argc == 5) {
++        GGUFModel gf;
++        LoraSet   set;
++        if (open_set(argv[2], argv[3], argv[4], &gf, &set)) {
++            return 1;
++        }
++        g_gf_lora  = &set;
++        auto   t0  = std::chrono::steady_clock::now();
++        size_t n   = 0, bytes_all = 0;
++        for (const auto & kv : set.index) {
++            struct ggml_tensor * src = ggml_get_tensor(gf.meta, kv.first.c_str());
++            WeightCtx            wctx;
++            wctx_init(&wctx, 4);
++            size_t bytes = 0;
++            enum ggml_type type = gf_lora_type(src->type);
++            if (!gf_lora_stage(&wctx, gf, kv.first, src, gf_get_data(gf, kv.first.c_str()), type, &bytes, type != src->type)) {
++                fprintf(stderr, "%s: %s\n", kv.first.c_str(), g_gf_lora_error.c_str());
++                return 1;
++            }
++            n++;
++            bytes_all += bytes;
++            ggml_free(wctx.ctx);
++        }
++        double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
++        printf("{\"weights\": %zu, \"mb\": %.1f, \"seconds\": %.2f}\n", n, (double) bytes_all / 1e6, s);
++        gf_close(&gf);
++        return 0;
++    }
++    fprintf(stderr, "usage: test-lora catalog <dir> | merge <gguf> <dir> <out> <set> <tensor>... | time <gguf> <dir> <set>\n");
++    return 2;
++}
+diff --git a/tools/console/app.css b/tools/console/app.css
+index 78493b3..a1ab64c 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1514,3 +1514,25 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+ /* instrumental switch under the planning modes */
+ .instrumental-check { margin-top: 10px; align-items: center; gap: 8px; }
+ .instrumental-check .info { margin-left: 2px; }
++
++/* LoRAs: one row per active LoRA, a strength for each half */
++.lora-active { display: grid; gap: 6px; margin-bottom: 6px; }
++.lora-active:empty { display: none; }
++.lora-row {
++  display: grid; grid-template-columns: minmax(90px, 1fr) minmax(120px, 1.1fr) minmax(120px, 1.1fr) auto 30px;
++  align-items: center; gap: 10px;
++  padding: 6px 8px 6px 12px; border: 1px solid var(--amber-dim); border-radius: var(--r-md); background: var(--field);
++}
++.lora-row.is-missing { border-style: dashed; opacity: .6; }
++.lora-name { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++.lora-half { display: grid; grid-template-columns: auto minmax(0, 1fr) 34px; align-items: center; gap: 6px; font-size: 11px; color: var(--dim); }
++.lora-half input[type="range"] { width: 100%; accent-color: var(--amber); }
++.lora-half output { font: 12px var(--mono); color: var(--muted); text-align: right; }
++.lora-half.is-off { opacity: .4; }
++.lora-trigger { font-size: 11px; padding: 3px 8px; }
++.chip .chip-sub { margin-left: 6px; font-size: 10px; color: var(--dim); }
++.lora-hint { margin-top: 8px; }
++@media (max-width: 720px) {
++  .lora-row { grid-template-columns: minmax(0, 1fr) 30px; }
++  .lora-row .lora-half, .lora-row .lora-trigger { grid-column: 1 / -1; }
++}
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 7276042..3bc8ea1 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -664,6 +664,21 @@
+ 
+   all('input[name="cot"]').forEach(function (radio) { radio.addEventListener("change", paintSliders); });
+ 
++  /* ---------------------------------------------------------------- LoRAs */
++  // The picker is shared with the other console (loras.js); the catalog comes with /props.
++  YueLoras.mount($("loraPicker"), {
++    cot: function () { return currentCot(); },
++    addToStyle: function (word) {
++      var style = $("style").value;
++      if (new RegExp("(^|[^\\w])" + word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^\\w]|$)", "i").test(style)) {
++        return toast("The style already has \u201c" + word + "\u201d");
++      }
++      $("style").value = word + (style.trim() ? ", " + style.trim() : "");
++      toast("Added \u201c" + word + "\u201d to the style");
++    }
++  });
++  all('input[name="cot"]').forEach(function (radio) { radio.addEventListener("change", function () { YueLoras.repaint(); }); });
++
+   /* ------------------------------------------------------- reused codes */
+   // A take's music codes in the form: Generate renders exactly that music
+   // again, with whatever sound settings the form now holds.
+@@ -730,6 +745,7 @@
+     $("cfg").dataset.touched = "";
+     fillCfg();
+     STATE.sliderChoice = [];
++    YueLoras.set([]);
+     setCodes(null);
+     growLyrics();
+     toast("Form cleared");
+@@ -808,6 +824,10 @@
+     if (STATE.sliderChoice.length) {
+       body.sliders = STATE.sliderChoice.map(function (c) { return { id: c.id, strength: c.strength }; });
+     }
++    var loras = YueLoras.value();
++    if (loras.length) {
++      body.loras = loras;
++    }
+     var out = readOutput();
+     Object.keys(out).forEach(function (key) { body[key] = out[key]; });
+     if (plan) {
+@@ -1006,6 +1026,7 @@
+       var strength = typeof c.strength === "number" ? c.strength : 1;
+       return { id: String(c.id), strength: round(Math.min(1, Math.max(0, strength)), 2) };
+     });
++    YueLoras.set(Array.isArray(req.loras) ? req.loras : []);
+     if (typeof req.steps === "number") $("odeSteps").value = req.steps;
+     if (typeof req.duration === "number") $("maxLength").value = round(req.duration, 3);
+     $("variations").value = typeof req.synth_batch_size === "number" ? Math.max(1, Math.min(9, req.synth_batch_size)) : 1;
+@@ -2202,6 +2223,7 @@
+       : [{ name: "standard", label: "Standard", repo: "m-a-p/YuE2-Vae" }];
+     STATE.defaultVae = props.default_vae || STATE.vaes[0].name;
+     STATE.sliderCatalog = Array.isArray(props.sliders) ? props.sliders : [];
++    YueLoras.setCatalog(Array.isArray(props.loras) ? props.loras : []);
+     STATE.maxBatch = Math.max(1, parseInt(props.max_batch, 10) || 1);
+     STATE.transcriber = !!props.transcriber;
+     STATE.library = props.outputs !== false;
+@@ -2641,6 +2663,7 @@
+       ["Precision", take.precision === "f32" ? "F32" : "BF16"],
+       ["Sliders", (take.sliders || []).length ? take.sliders.map(function (c) {
+         return (labels[c.id] || c.id) + " " + round(c.strength, 2); }).join(", ") : "none"],
++      ["LoRAs", (take.loras || []).length ? YueLoras.describe(take.loras) : "none"],
+       ["Steps", take.steps || "—"],
+       ["Guidance", cfg],
+       ["Format", FORMAT_LABELS[take.format] || take.format || "—"],
+diff --git a/tools/console/index.html b/tools/console/index.html
+index cb60b58..cca0c3e 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -240,6 +240,11 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+         <p class="row-hint" id="sliderHint"></p>
+       </fieldset>
+ 
++      <fieldset class="field sound">
++        <span class="label">LoRAs <span class="info" tabindex="0" role="img" aria-label="About LoRAs" data-tip-ref="tip-loras">i</span><em>trained add-ons: a strength for the music half and for the sound half</em></span>
++        <div id="loraPicker"></div>
++      </fieldset>
++
+       <label class="field">
+         <span class="label">Lyrics <em>section tags on their own line</em></span>
+         <textarea id="lyrics" rows="14" spellcheck="false" placeholder="[Verse]&#10;&#10;[Chorus]"></textarea>
+@@ -570,6 +575,20 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+   With a score already under <i>Supply your own score</i> (planned, pasted or transcribed from a recording), that score is converted instead.
+   Your style and lyrics fields stay as you wrote them.
+ </template>
++<template id="tip-loras">
++  <span class="tip-kind">LoRA &middot; a trained add-on</span>
++  <p>A LoRA is a small file of weight changes someone trained on a style, a genre or an artist.
++    It is added into the model for this song, then taken out again.</p>
++  <dl>
++    <dt>Music</dt><dd>the half that writes the score and the music tokens: melody, words, arrangement</dd>
++    <dt>Sound</dt><dd>the half that turns them into audio: timbre, mix, production</dd>
++  </dl>
++  <p>1 is the strength it was trained at, 0 turns that half off. Above 1 on the music half the vocal
++    often falls apart; if a style comes out too strong, try 0.5 there first. Several can be stacked.</p>
++  <p>Many LoRAs need their trigger word in the style prompt, and were trained in one planning mode;
++    the hints below say so when the file does. Files live in the app's <code>loras/</code> folder
++    (files, folders or links); community ones are mostly CC BY-NC.</p>
++</template>
+ <template id="tip-vae">
+   <span class="tip-kind">VAE &middot; sound decoder</span>
+   <p>The last step of every song. The model writes the song as a compact description, and the VAE
+@@ -662,6 +681,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+ <script src="examples.js"></script>
+ <script src="instrumental.js"></script>
+ <script src="help.js"></script>
++<script src="loras.js"></script>
+ <script src="app.js"></script>
+ </body>
+ </html>
+diff --git a/tools/console/loras.js b/tools/console/loras.js
+new file mode 100644
+index 0000000..5bb2bc0
+--- /dev/null
++++ b/tools/console/loras.js
+@@ -0,0 +1,179 @@
++/* The LoRA picker: tap a LoRA to add it, set its strength on the music half
++   (score and music tokens) and on the sound half (the acoustic stage), and
++   see its trigger word and how it was trained. The same file ships in both
++   consoles; each page hands it the server's catalog and reads value().
++
++   window.YueLoras:
++     mount(host, opts)     opts: { cot() -> "full"|"melody"|"off", addToStyle(word), onChange() }
++     setCatalog(list)      [{id, name, halves:["ar","nar"], rank, layout, trigger, hint, mode, size_mb, error}]
++     set(list)             [{id, ar, nar}] from a take, to render it again
++     value()               [{id, ar, nar}] for the request (installed files only)
++     describe(list)        "sv-billie (music 0.8 · sound 1.0), ..." for a song's info */
++(function (root) {
++  "use strict";
++
++  var S = { catalog: [], choice: [], host: null, opts: {} };
++
++  function escape(text) {
++    return String(text === undefined || text === null ? "" : text).replace(/[&<>"']/g, function (c) {
++      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
++    });
++  }
++
++  function entry(id) {
++    for (var i = 0; i < S.catalog.length; i++) if (S.catalog[i].id === id) return S.catalog[i];
++    return null;
++  }
++
++  // A name for an id whose file is gone: the file stem, or its folders when the stem is generic
++  function fallbackName(id) {
++    var parts = String(id).split("/"), stem = parts[parts.length - 1].replace(/\.safetensors$/, "");
++    return /^(lora|adapter_model|pytorch_lora_weights|model|adapter)$/i.test(stem) && parts.length > 1
++      ? parts.slice(0, -1).join(" / ") : stem;
++  }
++
++  function nameOf(id) {
++    var e = entry(id);
++    return e ? e.name : fallbackName(id);
++  }
++
++  function has(e, half) { return !!e && (e.halves || []).indexOf(half) >= 0; }
++
++  function halvesText(e) {
++    return has(e, "ar") && has(e, "nar") ? "music + sound" : has(e, "ar") ? "music" : has(e, "nar") ? "sound" : "";
++  }
++
++  function chipTip(e) {
++    if (e.error) return e.name + "\nCannot load: " + e.error;
++    var lines = [e.name + " · " + halvesText(e) + " half" + (has(e, "ar") && has(e, "nar") ? "s" : ""),
++      "rank " + e.rank + ", " + e.layout + " layout, " + e.size_mb + " MB"];
++    if (e.trigger) lines.push("Trigger word: " + e.trigger);
++    if (e.mode) lines.push("Trained in " + (e.mode === "direct" ? "Direct" : e.mode) + " mode");
++    if (e.hint) lines.push(e.hint);
++    lines.push("loras/" + e.id);
++    return lines.join("\n");
++  }
++
++  function halfControl(choice, e, half) {
++    var label = half === "ar" ? "Music" : "Sound", on = has(e, half) || !e;
++    var value = on ? choice[half] : 0;
++    return '<label class="lora-half' + (on ? "" : " is-off") + '" data-tip="' + escape(on
++      ? (half === "ar" ? "Strength on the music half: the score and the music tokens (0 off, 1 as trained)"
++                       : "Strength on the sound half: the acoustic stage that turns music tokens into sound (0 off, 1 as trained)")
++      : "This file has no " + label.toLowerCase() + " half") + '"><span>' + label + "</span>" +
++      '<input type="range" min="0" max="2" step="0.05" value="' + value + '"' + (on ? "" : " disabled") +
++      ' data-lora="' + escape(choice.id) + '" data-half="' + half + '" aria-label="' + escape(nameOf(choice.id)) + " " + label + ' strength" />' +
++      "<output>" + (on ? Number(value).toFixed(2) : "—") + "</output></label>";
++  }
++
++  function hints() {
++    var notes = [];
++    if (!S.catalog.length) return ["No LoRAs found. Put .safetensors files (or folders, or links to them) in the app's loras/ folder."];
++    if (!S.choice.length) return ["None active. Tap a LoRA to add it; each can steer the music half, the sound half, or both."];
++    var cot = S.opts.cot ? S.opts.cot() : "";
++    S.choice.forEach(function (c) {
++      var e = entry(c.id);
++      if (!e) { notes.push(fallbackName(c.id) + " is no longer in loras/ and will be left out."); return; }
++      if (e.trigger) notes.push(e.name + ": put its trigger word “" + e.trigger + "” in the style.");
++      if (e.mode === "direct" && cot && cot !== "off") notes.push(e.name + " was trained in Direct mode.");
++      if (e.mode && e.mode !== "direct" && cot === "off") notes.push(e.name + " was trained with a score (" + e.mode + " mode).");
++      if (c.ar > 1) notes.push(e.name + ": above 1.0 on the music half, vocals often fall apart.");
++    });
++    if (S.choice.length > 1) notes.push(S.choice.length + " stacked: their changes add up.");
++    return notes;
++  }
++
++  function paint() {
++    if (!S.host) return;
++    var on = {};
++    S.choice.forEach(function (c) { on[c.id] = true; });
++    var active = S.host.querySelector(".lora-active"), chips = S.host.querySelector(".lora-chips");
++    active.innerHTML = S.choice.map(function (c) {
++      var e = entry(c.id);
++      return '<div class="lora-row' + (e ? "" : " is-missing") + '"><span class="lora-name" data-tip="' + escape(e ? chipTip(e) : "Not in loras/ any more") + '">' +
++        escape(nameOf(c.id)) + "</span>" + halfControl(c, e, "ar") + halfControl(c, e, "nar") +
++        (e && e.trigger ? '<button type="button" class="chip lora-trigger" data-trigger="' + escape(e.trigger) +
++          '" data-tip="Add the trigger word to the style prompt">+ ' + escape(e.trigger) + "</button>" : "<span></span>") +
++        '<button type="button" class="icon-btn" data-remove-lora="' + escape(c.id) + '" aria-label="Remove ' + escape(nameOf(c.id)) + '">✕</button></div>';
++    }).join("");
++    chips.innerHTML = S.catalog.map(function (e) {
++      return '<button type="button" class="chip' + (on[e.id] ? " is-on" : "") + '" data-lora-chip="' + escape(e.id) + '"' +
++        (e.error ? " disabled" : "") + ' aria-pressed="' + (on[e.id] ? "true" : "false") + '" data-tip="' + escape(chipTip(e)) + '">' +
++        escape(e.name) + (e.error ? "" : '<span class="chip-sub">' + escape(halvesText(e)) + "</span>") + "</button>";
++    }).join("");
++    S.host.querySelector(".lora-hint").textContent = hints().join(" ");
++  }
++
++  function changed() {
++    paint();
++    if (S.opts.onChange) S.opts.onChange();
++  }
++
++  function mount(host, opts) {
++    S.host = host;
++    S.opts = opts || {};
++    host.innerHTML = '<div class="lora-active"></div><div class="slider-chips lora-chips"></div><p class="row-hint lora-hint"></p>';
++    host.addEventListener("click", function (event) {
++      var chip = event.target.closest("[data-lora-chip]"), remove = event.target.closest("[data-remove-lora]");
++      var trigger = event.target.closest("[data-trigger]");
++      if (chip && !chip.disabled) {
++        var id = chip.dataset.loraChip, at = -1;
++        S.choice.forEach(function (c, i) { if (c.id === id) at = i; });
++        if (at >= 0) {
++          S.choice.splice(at, 1);
++        } else {
++          var e = entry(id);
++          S.choice.push({ id: id, ar: has(e, "ar") ? 1 : 0, nar: has(e, "nar") ? 1 : 0 });
++        }
++        changed();
++      } else if (remove) {
++        S.choice = S.choice.filter(function (c) { return c.id !== remove.dataset.removeLora; });
++        changed();
++      } else if (trigger && S.opts.addToStyle) {
++        S.opts.addToStyle(trigger.dataset.trigger);
++      }
++    });
++    host.addEventListener("input", function (event) {
++      var id = event.target.dataset.lora, half = event.target.dataset.half;
++      if (!id || !half) return;
++      S.choice.forEach(function (c) { if (c.id === id) c[half] = parseFloat(event.target.value); });
++      event.target.nextElementSibling.textContent = parseFloat(event.target.value).toFixed(2);
++      S.host.querySelector(".lora-hint").textContent = hints().join(" ");
++    });
++    paint();
++  }
++
++  function setCatalog(list) {
++    var before = JSON.stringify(S.catalog);
++    S.catalog = (list || []).slice();
++    if (JSON.stringify(S.catalog) !== before) paint();
++  }
++
++  function set(list) {
++    S.choice = (list || []).map(function (c) {
++      return { id: String(c.id), ar: Number(c.ar) || 0, nar: Number(c.nar) || 0 };
++    }).filter(function (c) { return c.id && (c.ar || c.nar); });
++    changed();
++  }
++
++  function value() {
++    return S.choice.filter(function (c) {
++      var e = entry(c.id);
++      return e && !e.error && ((has(e, "ar") && c.ar > 0) || (has(e, "nar") && c.nar > 0));
++    }).map(function (c) {
++      var e = entry(c.id);
++      return { id: c.id, ar: has(e, "ar") ? Math.round(c.ar * 1000) / 1000 : 0, nar: has(e, "nar") ? Math.round(c.nar * 1000) / 1000 : 0 };
++    });
++  }
++
++  function describe(list) {
++    return (list || []).map(function (c) {
++      var parts = [];
++      if (Number(c.ar)) parts.push("music " + Number(c.ar).toFixed(1));
++      if (Number(c.nar)) parts.push("sound " + Number(c.nar).toFixed(1));
++      return (c.name || nameOf(c.id)) + " (" + parts.join(" · ") + ")";
++    }).join(", ");
++  }
++
++  root.YueLoras = { mount: mount, setCatalog: setCatalog, set: set, value: value, describe: describe, repaint: paint };
++})(window);
+diff --git a/tools/yue-server.cpp b/tools/yue-server.cpp
+index e0a7b1d..14b0656 100644
+--- a/tools/yue-server.cpp
++++ b/tools/yue-server.cpp
+@@ -460,6 +460,38 @@ static std::mutex          mtx_settings;
+ static std::atomic<size_t> g_loaded_bytes{ 0 };
+ static std::atomic<int>    g_loaded_modules{ 0 };
+ static std::vector<SliderInfo>                           g_sliders;
++
++// Local addition: the LoRA catalog (every .safetensors under --loras), described
++// the same way as the other console's loras.py
++static yyjson_mut_val * lora_catalog_json(yyjson_mut_doc * doc) {
++    yyjson_mut_val * list = yyjson_mut_arr(doc);
++    for (const LoraInfo & l : lora_catalog(g_pipeline.lora_dir)) {
++        yyjson_mut_val * item = yyjson_mut_obj(doc);
++        yyjson_mut_obj_add_strcpy(doc, item, "id", l.id.c_str());
++        yyjson_mut_obj_add_strcpy(doc, item, "name", l.name.c_str());
++        yyjson_mut_obj_add_real(doc, item, "size_mb", l.size_mb);
++        yyjson_mut_val * halves = yyjson_mut_arr(doc);
++        if (l.ar) {
++            yyjson_mut_arr_add_str(doc, halves, "ar");
++        }
++        if (l.nar) {
++            yyjson_mut_arr_add_str(doc, halves, "nar");
++        }
++        yyjson_mut_obj_add_val(doc, item, "halves", halves);
++        if (!l.error.empty()) {
++            yyjson_mut_obj_add_strcpy(doc, item, "error", l.error.c_str());
++        } else {
++            yyjson_mut_obj_add_int(doc, item, "rank", l.rank);
++            yyjson_mut_obj_add_strcpy(doc, item, "layout", l.layout.c_str());
++            yyjson_mut_obj_add_int(doc, item, "pairs", l.pairs);
++            yyjson_mut_obj_add_strcpy(doc, item, "trigger", l.trigger.c_str());
++            yyjson_mut_obj_add_strcpy(doc, item, "hint", l.hint.c_str());
++            yyjson_mut_obj_add_strcpy(doc, item, "mode", l.mode.c_str());
++        }
++        yyjson_mut_arr_append(list, item);
++    }
++    return list;
++}
+ static std::string                                       g_outputs_dir;
+ static std::mutex                                        mtx_library;
+ 
+@@ -616,6 +648,15 @@ static yyjson_mut_val * library_entry(yyjson_mut_doc * out, const std::string &
+             yyjson_mut_arr_append(sl, item);
+         }
+         yyjson_mut_obj_add_val(out, e, "sliders", sl);
++        yyjson_mut_val * lo = yyjson_mut_arr(out);
++        for (const Yue2LoraChoice & c : r.loras) {
++            yyjson_mut_val * item = yyjson_mut_obj(out);
++            yyjson_mut_obj_add_strcpy(out, item, "id", c.id.c_str());
++            yyjson_mut_obj_add_real(out, item, "ar", std::round((double) c.ar * 1000.0) / 1000.0);
++            yyjson_mut_obj_add_real(out, item, "nar", std::round((double) c.nar * 1000.0) / 1000.0);
++            yyjson_mut_arr_append(lo, item);
++        }
++        yyjson_mut_obj_add_val(out, e, "loras", lo);
+         yyjson_mut_obj_add_int(out, e, "steps", r.steps);
+         yyjson_mut_obj_add_real(out, e, "cfg_scale", r.cfg_scale);
+         yyjson_mut_obj_add_real(out, e, "duration", r.duration);
+@@ -1083,6 +1124,7 @@ static void handle_props(const httplib::Request &, httplib::Response & res) {
+         yyjson_mut_arr_append(sliders, item);
+     }
+     yyjson_mut_obj_add_val(doc, root, "sliders", sliders);
++    yyjson_mut_obj_add_val(doc, root, "loras", lora_catalog_json(doc));
+     yyjson_mut_obj_add_int(doc, root, "max_batch", g_pipeline.params.max_batch);
+     yyjson_mut_obj_add_bool(doc, root, "transcriber", !g_transcriber_path.empty());
+     yyjson_mut_obj_add_bool(doc, root, "outputs", !g_outputs_dir.empty());
+@@ -1174,6 +1216,42 @@ static bool validate(const httplib::Request & req, httplib::Response & res, Yue2
+             }
+         }
+     }
++    if (!r->loras.empty()) {
++        // Local addition: installed LoRAs, each once, strengths 0..2; a half the file
++        // lacks is set to 0, and a LoRA with both at 0 is dropped
++        if (g_pipeline.lora_dir.empty()) {
++            return fail("this server has no LoRA folder (--loras)");
++        }
++        std::map<std::string, LoraInfo> known;
++        for (const LoraInfo & l : lora_catalog(g_pipeline.lora_dir)) {
++            known[l.id] = l;
++        }
++        std::vector<Yue2LoraChoice> kept;
++        for (Yue2LoraChoice c : r->loras) {
++            auto it = known.find(c.id);
++            if (it == known.end()) {
++                return fail("unknown LoRA (see /props loras)");
++            }
++            if (!it->second.error.empty()) {
++                std::string msg = "the LoRA " + it->second.name + " cannot load: " + it->second.error;
++                return fail(msg.c_str());
++            }
++            if (!(c.ar >= 0.0f && c.ar <= 2.0f && c.nar >= 0.0f && c.nar <= 2.0f)) {
++                return fail("LoRA strengths go from 0 to 2");
++            }
++            for (const auto & k : kept) {
++                if (k.id == c.id) {
++                    return fail("a LoRA is listed twice");
++                }
++            }
++            c.ar  = it->second.ar ? c.ar : 0.0f;
++            c.nar = it->second.nar ? c.nar : 0.0f;
++            if (c.ar != 0.0f || c.nar != 0.0f) {
++                kept.push_back(c);
++            }
++        }
++        r->loras = kept;
++    }
+     if (r->plan_only && (cot == YUE2_COT_OFF || !r->abc.empty() || !r->semantic_tokens.empty())) {
+         return fail("plan_only needs full or melody mode, no supplied score and no semantic stream");
+     }
+@@ -1219,7 +1297,7 @@ static void run_job(std::shared_ptr<Job> job, Yue2Request request) {
+ 
+     if (!ok) {
+         active_job_set(nullptr);
+-        job->error = "generation failed; the server log has the reason";
++        job->error = g_pipeline.last_error.empty() ? "generation failed; the server log has the reason" : g_pipeline.last_error;
+         job->status.store(job->cancel.load() ? JobStatus::CANCELLED : JobStatus::FAILED);
+         return;
+     }
+@@ -1290,6 +1368,7 @@ static void print_usage(const char * prog) {
+             "  --transcriber <gguf>   SheetSage2 GGUF, enables /transcribe\n"
+             "  --vae <name>=<gguf>    Another named decoder, selectable per request (repeatable)\n"
+             "  --sliders <dir>        Slider GGUFs + catalog.json (voice and genre sliders)\n"
++            "  --loras <dir>          LoRA .safetensors files or folders (links are followed)\n"
+             "  --outputs <dir>        Save every track into this song library\n"
+             "  --settings <json>      Engine settings the console can change (model, keep loaded, context, VAE tiles)\n"
+             "  --host <addr>          Listen address (default: 0.0.0.0)\n"
+@@ -1358,6 +1437,10 @@ int main(int argc, char ** argv) {
+             if (!load_slider_catalog(dir)) {
+                 return 1;
+             }
++        } else if (!strcmp(argv[i], "--loras") && !last) {
++            g_pipeline.lora_dir = argv[++i];
++            fprintf(stderr, "[Server] LoRAs: %zu from %s\n", lora_catalog(g_pipeline.lora_dir).size(),
++                    g_pipeline.lora_dir.c_str());
+         } else if (!strcmp(argv[i], "--outputs") && !last) {
+             g_outputs_dir = argv[++i];
+         } else if (!strcmp(argv[i], "--transcriber") && !last) {
+@@ -1719,7 +1802,7 @@ int main(int argc, char ** argv) {
+                 return;
+             }
+             fprintf(stderr, "[Library] FLAC %d-bit for %s: %.1f MB (%.0f%% of the WAV), %.0f ms\n", bits, name.c_str(),
+-                    flac.size() / 1e6, 100.0 * flac.size() / std::max<size_t>(wav.size(), 1),
++                    (double) flac.size() / 1e6, 100.0 * (double) flac.size() / (double) std::max<size_t>(wav.size(), 1),
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+             res.set_header("Content-Disposition", "attachment; filename=\"" + name + ".flac\"");
+             res.set_content(std::move(flac), "audio/flac");

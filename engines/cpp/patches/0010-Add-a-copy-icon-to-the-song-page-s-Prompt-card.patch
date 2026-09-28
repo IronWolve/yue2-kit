@@ -1,0 +1,60 @@
+From f34962a0549a0c16de91c52ad4188bb6962c4807 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 20:39:55 -0700
+Subject: [PATCH 10/36] Add a copy icon to the song page's Prompt card
+
+It copies the prompt exactly as the card shows it and says so in a toast.
+---
+ tools/console/app.css    | 4 ++++
+ tools/console/app.js     | 9 +++++++++
+ tools/console/index.html | 5 ++++-
+ 3 files changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index a1ab64c..ba60e01 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1536,3 +1536,7 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+   .lora-row { grid-template-columns: minmax(0, 1fr) 30px; }
+   .lora-row .lora-half, .lora-row .lora-trigger { grid-column: 1 / -1; }
+ }
++
++/* copy icon in the Prompt card's corner */
++.panel-head .copy-icon { align-self: center; color: var(--dim); }
++.panel-head .copy-icon:hover, .panel-head .copy-icon:focus-visible { color: var(--amber); }
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 3bc8ea1..9c99842 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -2715,6 +2715,15 @@
+     });
+   });
+ 
++  // the prompt exactly as the song page shows it
++  $("copyPrompt").addEventListener("click", function () {
++    var text = $("metaStyle").textContent;
++    if (!text) return toast("This take has no prompt", "bad");
++    navigator.clipboard.writeText(text)
++      .then(function () { toast("Prompt copied"); })
++      .catch(function () { toast("The browser refused clipboard access", "bad"); });
++  });
++
+   $("copyLyrics").addEventListener("click", function () {
+     var text = STATE.take ? STATE.take.lyrics : "";
+     if (!text) return;
+diff --git a/tools/console/index.html b/tools/console/index.html
+index cca0c3e..e83f96d 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -478,7 +478,10 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+       <!-- what the song actually is: prompt first, words under it -->
+       <div class="word-row">
+         <section class="panel">
+-          <div class="panel-head"><h3>Prompt</h3></div>
++          <div class="panel-head"><h3>Prompt</h3><div class="spacer"></div>
++            <button type="button" class="icon-btn copy-icon" id="copyPrompt" aria-label="Copy the prompt" data-tip="Copy the prompt">
++              <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 4.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v7.5A1.5 1.5 0 0 0 4 13h.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
++            </button></div>
+           <p class="prompt-text" id="metaStyle"></p>
+           <p class="prompt-text dim" id="metaCover"></p>
+         </section>

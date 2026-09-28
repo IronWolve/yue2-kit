@@ -1,0 +1,1068 @@
+From 142f15ecdf701ddd0154b24bc9b8951b5fa1fc1f Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 19:00:09 -0700
+Subject: [PATCH 06/36] Add MP3 and FLAC downloads and a model picker in the
+ top bar
+
+The song page offers a WAV take as MP3 at a chosen bitrate (320/256/192/128,
+remembered per browser) and as lossless FLAC. Library cards get an mp3 chip
+and the player an MP3 button for what it holds. Takes made as MP3, and songs
+kept only in the tab, offer no conversions.
+
+/library/mp3 encodes once per bitrate and keeps the file beside the take,
+remaking it if the audio is newer, with an ID3 title and lyrics.
+/library/flac encodes on request with a new built-in lossless encoder
+(src/flac-enc.h: fixed predictors, partitioned Rice residuals, stereo
+decorrelation, MD5 in STREAMINFO, Vorbis comment tags); about a second for a
+four-minute song, three quarters of the WAV's size.
+
+A Model select in the top bar lists every backbone the server was started
+with, with its size; the change loads with the next song.
+---
+ src/flac-enc.h           | 686 +++++++++++++++++++++++++++++++++++++++
+ tools/console/app.css    |  24 ++
+ tools/console/app.js     |  72 ++++
+ tools/console/index.html |  13 +
+ tools/yue-server.cpp     | 129 ++++++++
+ 5 files changed, 924 insertions(+)
+ create mode 100644 src/flac-enc.h
+
+diff --git a/src/flac-enc.h b/src/flac-enc.h
+new file mode 100644
+index 0000000..20d59f7
+--- /dev/null
++++ b/src/flac-enc.h
+@@ -0,0 +1,686 @@
++#pragma once
++// flac-enc.h: a small lossless FLAC encoder for the server's song downloads.
++//
++// Takes integer PCM (16 or 24 bits, 1 to 8 channels) and writes a standard FLAC
++// stream: STREAMINFO (with the MD5 of the audio, so `flac -t` can verify every
++// sample) and a VORBIS_COMMENT block (title, lyrics), then frames of 4096 samples.
++// Each channel is coded CONSTANT, VERBATIM or FIXED (orders 0-4) with partitioned
++// Rice residuals; stereo takes the cheapest of left/right, left/side, side/right
++// and mid/side per frame. No LPC, so files come out a few percent larger than the
++// reference encoder's default, but decode to exactly the same samples.
++//
++// flac_encode_wav() reads a RIFF WAV (16/24-bit PCM, or 32-bit float, which is
++// rounded to 24-bit since FLAC holds integers only) and returns the FLAC file.
++
++#include <algorithm>
++#include <array>
++#include <cmath>
++#include <cstdint>
++#include <cstring>
++#include <string>
++#include <utility>
++#include <vector>
++
++namespace flac_enc {
++
++static const int BLOCK = 4096;
++
++// MSB-first bit writer
++struct Bits {
++    std::string out;
++    uint64_t    acc = 0;  // pending bits, fewer than 8 between calls
++    int         n   = 0;
++
++    void put(uint32_t v, int bits) {
++        if (bits <= 0) {
++            return;
++        }
++        uint64_t mask = bits >= 32 ? 0xFFFFFFFFull : ((1ull << bits) - 1);
++        acc           = (acc << bits) | (v & mask);
++        n += bits;
++        while (n >= 8) {
++            n -= 8;
++            out.push_back((char) ((acc >> n) & 0xFF));
++        }
++        acc &= (1ull << n) - 1;
++    }
++
++    void put_signed(int32_t v, int bits) { put((uint32_t) v, bits); }
++
++    // q zeros, then a one
++    void put_unary(uint32_t q) {
++        while (q >= 31) {
++            put(0, 31);
++            q -= 31;
++        }
++        put(1, (int) q + 1);
++    }
++
++    void align() {
++        if (n) {
++            put(0, 8 - n);
++        }
++    }
++};
++
++static uint8_t crc8(const std::string & s) {
++    uint8_t c = 0;
++    for (unsigned char b : s) {
++        c ^= b;
++        for (int i = 0; i < 8; i++) {
++            c = (c & 0x80) ? (uint8_t) ((c << 1) ^ 0x07) : (uint8_t) (c << 1);
++        }
++    }
++    return c;
++}
++
++static uint16_t crc16(const std::string & s) {
++    static const std::array<uint16_t, 256> table = [] {
++        std::array<uint16_t, 256> t{};
++        for (int i = 0; i < 256; i++) {
++            uint16_t c = (uint16_t) (i << 8);
++            for (int j = 0; j < 8; j++) {
++                c = (c & 0x8000) ? (uint16_t) ((c << 1) ^ 0x8005) : (uint16_t) (c << 1);
++            }
++            t[i] = c;
++        }
++        return t;
++    }();
++    uint16_t c = 0;
++    for (unsigned char b : s) {
++        c = (uint16_t) ((c << 8) ^ table[((c >> 8) ^ b) & 0xFF]);
++    }
++    return c;
++}
++
++// RFC 1321, for the STREAMINFO signature of the unencoded audio
++struct Md5 {
++    uint32_t h[4]  = { 0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476 };
++    uint64_t len   = 0;
++    uint8_t  buf[64];
++    size_t   fill = 0;
++
++    static uint32_t rotl(uint32_t x, int c) { return (x << c) | (x >> (32 - c)); }
++
++    void block(const uint8_t * p) {
++        static const uint32_t K[64] = {
++            0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
++            0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
++            0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
++            0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
++            0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
++            0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
++            0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
++            0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
++        };
++        static const int S[64] = { 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9,  14, 20, 5, 9,
++                                   14, 20, 5, 9,  14, 20, 5, 9,  14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
++                                   4,  11, 16, 23, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21 };
++        uint32_t         M[16];
++        for (int i = 0; i < 16; i++) {
++            M[i] = (uint32_t) p[i * 4] | ((uint32_t) p[i * 4 + 1] << 8) | ((uint32_t) p[i * 4 + 2] << 16) |
++                   ((uint32_t) p[i * 4 + 3] << 24);
++        }
++        uint32_t A = h[0], B = h[1], C = h[2], D = h[3];
++        for (int i = 0; i < 64; i++) {
++            uint32_t F;
++            int      g;
++            if (i < 16) {
++                F = (B & C) | (~B & D);
++                g = i;
++            } else if (i < 32) {
++                F = (D & B) | (~D & C);
++                g = (5 * i + 1) % 16;
++            } else if (i < 48) {
++                F = B ^ C ^ D;
++                g = (3 * i + 5) % 16;
++            } else {
++                F = C ^ (B | ~D);
++                g = (7 * i) % 16;
++            }
++            F = F + A + K[i] + M[g];
++            A = D;
++            D = C;
++            C = B;
++            B = B + rotl(F, S[i]);
++        }
++        h[0] += A;
++        h[1] += B;
++        h[2] += C;
++        h[3] += D;
++    }
++
++    void update(const uint8_t * p, size_t size) {
++        len += size;
++        while (size) {
++            size_t take = std::min(64 - fill, size);
++            memcpy(buf + fill, p, take);
++            fill += take;
++            p += take;
++            size -= take;
++            if (fill == 64) {
++                block(buf);
++                fill = 0;
++            }
++        }
++    }
++
++    void finish(uint8_t digest[16]) {
++        uint64_t      bits = len * 8;
++        const uint8_t one = 0x80, zero = 0;
++        update(&one, 1);
++        while (fill != 56) {
++            update(&zero, 1);
++        }
++        uint8_t tail[8];
++        for (int i = 0; i < 8; i++) {
++            tail[i] = (uint8_t) (bits >> (8 * i));
++        }
++        update(tail, 8);
++        for (int i = 0; i < 4; i++) {
++            for (int j = 0; j < 4; j++) {
++                digest[i * 4 + j] = (uint8_t) (h[i] >> (8 * j));
++            }
++        }
++    }
++};
++
++// One channel of one frame, as it will be written
++struct Sub {
++    int                   kind   = 1;  // 0 constant, 1 verbatim, 2 fixed predictor
++    int                   order  = 0;
++    int                   po     = 0;  // Rice partition order
++    int                   method = 0;  // 0: 4-bit Rice parameters, 1: 5-bit
++    std::vector<int>      ks;
++    std::vector<uint32_t> u;           // zigzagged residual
++    uint64_t              bits   = 0;
++};
++
++static inline int64_t fixed_error(const int32_t * x, int i, int order) {
++    switch (order) {
++        case 0:
++            return x[i];
++        case 1:
++            return (int64_t) x[i] - x[i - 1];
++        case 2:
++            return (int64_t) x[i] - 2 * (int64_t) x[i - 1] + x[i - 2];
++        case 3:
++            return (int64_t) x[i] - 3 * (int64_t) x[i - 1] + 3 * (int64_t) x[i - 2] - x[i - 3];
++        default:
++            return (int64_t) x[i] - 4 * (int64_t) x[i - 1] + 6 * (int64_t) x[i - 2] - 4 * (int64_t) x[i - 3] + x[i - 4];
++    }
++}
++
++static inline uint32_t zigzag(int64_t e) {
++    return e >= 0 ? (uint32_t) (e << 1) : (uint32_t) (((-e) << 1) - 1);
++}
++
++// Rice parameter with the fewest estimated bits for a partition
++static inline int rice_k(uint64_t sum, uint64_t count, uint64_t * cost) {
++    int      best_k    = 0;
++    uint64_t best_cost = UINT64_MAX;
++    for (int k = 0; k <= 30; k++) {
++        uint64_t c = count * (uint64_t) (k + 1) + (sum >> k);
++        if (c < best_cost) {
++            best_cost = c;
++            best_k    = k;
++        }
++    }
++    *cost = best_cost;
++    return best_k;
++}
++
++static Sub choose(const int32_t * x, int n, int bps) {
++    Sub best;
++    best.kind = 1;
++    best.bits = 8 + (uint64_t) n * bps;
++
++    bool constant = true;
++    for (int i = 1; i < n && constant; i++) {
++        constant = x[i] == x[0];
++    }
++    if (constant) {
++        best.kind = 0;
++        best.bits = 8 + (uint64_t) bps;
++        return best;
++    }
++
++    // predictor order with the smallest total |residual|, over the same span for every order
++    int      max_order = std::min(4, n - 1);
++    int      order     = 0;
++    uint64_t least     = UINT64_MAX;
++    for (int p = 0; p <= max_order; p++) {
++        uint64_t sum = 0;
++        for (int i = max_order; i < n; i++) {
++            int64_t e = fixed_error(x, i, p);
++            sum += (uint64_t) (e < 0 ? -e : e);
++        }
++        if (sum < least) {
++            least = sum;
++            order = p;
++        }
++    }
++
++    Sub fx;
++    fx.kind  = 2;
++    fx.order = order;
++    fx.u.resize(n - order);
++    for (int i = order; i < n; i++) {
++        fx.u[i - order] = zigzag(fixed_error(x, i, order));
++    }
++
++    // finest partitioning allowed, then merge pairs level by level
++    int max_po = 0;
++    while (max_po < 8 && (n % (2 << max_po)) == 0 && (n >> (max_po + 1)) > order) {
++        max_po++;
++    }
++    int                   parts = 1 << max_po, psize = n >> max_po;
++    std::vector<uint64_t> sum(parts), cnt(parts);
++    for (int p = 0; p < parts; p++) {
++        int      lo = p == 0 ? order : p * psize, hi = (p + 1) * psize;
++        uint64_t s  = 0;
++        for (int i = lo; i < hi; i++) {
++            s += fx.u[i - order];
++        }
++        sum[p] = s;
++        cnt[p] = (uint64_t) (hi - lo);
++    }
++    uint64_t best_rice = UINT64_MAX;
++    for (int po = max_po; po >= 0; po--) {
++        int              np    = 1 << po;
++        uint64_t         total = 6;
++        bool             wide  = false;
++        std::vector<int> ks(np);
++        for (int p = 0; p < np; p++) {
++            uint64_t cost;
++            ks[p] = rice_k(sum[p], cnt[p], &cost);
++            wide |= ks[p] > 14;
++            total += cost;
++        }
++        total += (uint64_t) np * (wide ? 5 : 4);
++        if (total < best_rice) {
++            best_rice = total;
++            fx.po     = po;
++            fx.method = wide ? 1 : 0;
++            fx.ks     = ks;
++        }
++        for (int p = 0; p < np / 2; p++) {
++            sum[p] = sum[2 * p] + sum[2 * p + 1];
++            cnt[p] = cnt[2 * p] + cnt[2 * p + 1];
++        }
++    }
++
++    // exact size of the chosen coding
++    uint64_t bits = 8 + (uint64_t) order * bps + 6 + (uint64_t) (1 << fx.po) * (fx.method ? 5 : 4);
++    int      np = 1 << fx.po, pn = n >> fx.po;
++    size_t   at = 0;
++    for (int p = 0; p < np; p++) {
++        int k     = fx.ks[p];
++        int count = pn - (p == 0 ? order : 0);
++        for (int i = 0; i < count; i++, at++) {
++            bits += (fx.u[at] >> k) + 1 + (uint64_t) k;
++        }
++    }
++    fx.bits = bits;
++    return fx.bits < best.bits ? fx : best;
++}
++
++static void write_sub(Bits & w, const int32_t * x, int n, int bps, const Sub & s) {
++    if (s.kind == 0) {
++        w.put(0x00, 8);
++        w.put_signed(x[0], bps);
++        return;
++    }
++    if (s.kind == 1) {
++        w.put(0x02, 8);
++        for (int i = 0; i < n; i++) {
++            w.put_signed(x[i], bps);
++        }
++        return;
++    }
++    w.put((uint32_t) (0x10 | (s.order << 1)), 8);
++    for (int i = 0; i < s.order; i++) {
++        w.put_signed(x[i], bps);
++    }
++    w.put((uint32_t) s.method, 2);
++    w.put((uint32_t) s.po, 4);
++    int    np = 1 << s.po, pn = n >> s.po;
++    size_t at = 0;
++    for (int p = 0; p < np; p++) {
++        int k = s.ks[p];
++        w.put((uint32_t) k, s.method ? 5 : 4);
++        int      count = pn - (p == 0 ? s.order : 0);
++        uint32_t mask  = k ? ((1u << k) - 1) : 0;
++        for (int i = 0; i < count; i++, at++) {
++            uint32_t v = s.u[at];
++            w.put_unary(v >> k);
++            w.put(v & mask, k);
++        }
++    }
++}
++
++static void put_utf8(Bits & w, uint32_t v) {
++    if (v < 0x80) {
++        w.put(v, 8);
++        return;
++    }
++    int lead_bits, extra;
++    if (v < 0x800) {
++        extra = 1;
++    } else if (v < 0x10000) {
++        extra = 2;
++    } else if (v < 0x200000) {
++        extra = 3;
++    } else if (v < 0x4000000) {
++        extra = 4;
++    } else {
++        extra = 5;
++    }
++    lead_bits = 6 - extra;  // payload bits in the first byte
++    uint32_t lead = (0xFF00u >> (extra + 1)) & 0xFF;
++    w.put(lead | ((v >> (6 * extra)) & ((1u << lead_bits) - 1)), 8);
++    for (int i = extra - 1; i >= 0; i--) {
++        w.put(0x80 | ((v >> (6 * i)) & 0x3F), 8);
++    }
++}
++
++// Frame-header sample rate: a table code, or a code plus a value after the block size
++static int rate_code(int rate, uint32_t * value, int * value_bits) {
++    *value_bits = 0;
++    switch (rate) {
++        case 88200:
++            return 1;
++        case 176400:
++            return 2;
++        case 192000:
++            return 3;
++        case 8000:
++            return 4;
++        case 16000:
++            return 5;
++        case 22050:
++            return 6;
++        case 24000:
++            return 7;
++        case 32000:
++            return 8;
++        case 44100:
++            return 9;
++        case 48000:
++            return 10;
++        case 96000:
++            return 11;
++    }
++    if (rate % 1000 == 0 && rate / 1000 <= 255) {
++        *value      = (uint32_t) (rate / 1000);
++        *value_bits = 8;
++        return 12;
++    }
++    if (rate <= 65535) {
++        *value      = (uint32_t) rate;
++        *value_bits = 16;
++        return 13;
++    }
++    if (rate % 10 == 0 && rate / 10 <= 65535) {
++        *value      = (uint32_t) (rate / 10);
++        *value_bits = 16;
++        return 14;
++    }
++    return 0;  // from STREAMINFO
++}
++
++static void le32(std::string & s, uint32_t v) {
++    for (int i = 0; i < 4; i++) {
++        s.push_back((char) ((v >> (8 * i)) & 0xFF));
++    }
++}
++
++// pcm: interleaved integers, frames x channels; bits 16 or 24
++static std::string encode(const int32_t * pcm, int64_t frames, int channels, int rate, int bits,
++                          const std::vector<std::pair<std::string, std::string>> & tags) {
++    if (frames <= 0 || channels < 1 || channels > 8 || (bits != 16 && bits != 24) || rate <= 0 ||
++        rate >= (1 << 20)) {
++        return std::string();
++    }
++    const int block = (int) std::min<int64_t>(BLOCK, frames);
++    const int bytes = bits / 8;
++
++    std::string                       body;
++    uint32_t                          min_frame = UINT32_MAX, max_frame = 0;
++    Md5                               md5;
++    std::vector<uint8_t>              raw((size_t) block * channels * bytes);
++    std::vector<std::vector<int32_t>> x(channels, std::vector<int32_t>(block));
++    std::vector<int32_t>              mid(block), side(block);
++    uint32_t                          rate_value = 0;
++    int                               rate_bits  = 0;
++    const int                         rcode      = rate_code(rate, &rate_value, &rate_bits);
++    const int                         scode      = bits == 16 ? 4 : 6;
++
++    uint32_t frame_no = 0;
++    for (int64_t start = 0; start < frames; start += block, frame_no++) {
++        const int n = (int) std::min<int64_t>(block, frames - start);
++        size_t    r = 0;
++        for (int i = 0; i < n; i++) {
++            for (int c = 0; c < channels; c++) {
++                int32_t v  = pcm[(start + i) * channels + c];
++                x[c][i]    = v;
++                raw[r++]   = (uint8_t) v;
++                raw[r++]   = (uint8_t) (v >> 8);
++                if (bytes == 3) {
++                    raw[r++] = (uint8_t) (v >> 16);
++                }
++            }
++        }
++        md5.update(raw.data(), r);
++
++        // subframes first, so the header can name the channel coding
++        int              assign;
++        std::vector<Sub> subs;
++        std::vector<const int32_t *> src;
++        std::vector<int> width;
++        if (channels == 2) {
++            for (int i = 0; i < n; i++) {
++                side[i] = x[0][i] - x[1][i];
++                mid[i]  = (x[0][i] + x[1][i]) >> 1;
++            }
++            Sub      L = choose(x[0].data(), n, bits), R = choose(x[1].data(), n, bits);
++            Sub      S = choose(side.data(), n, bits + 1), M = choose(mid.data(), n, bits);
++            uint64_t lr = L.bits + R.bits, ls = L.bits + S.bits, sr = S.bits + R.bits, ms = M.bits + S.bits;
++            uint64_t least = std::min(std::min(lr, ls), std::min(sr, ms));
++            if (least == lr) {
++                assign = 1;
++                subs   = { L, R };
++                src    = { x[0].data(), x[1].data() };
++                width  = { bits, bits };
++            } else if (least == ms) {
++                assign = 10;
++                subs   = { M, S };
++                src    = { mid.data(), side.data() };
++                width  = { bits, bits + 1 };
++            } else if (least == ls) {
++                assign = 8;
++                subs   = { L, S };
++                src    = { x[0].data(), side.data() };
++                width  = { bits, bits + 1 };
++            } else {
++                assign = 9;
++                subs   = { S, R };
++                src    = { side.data(), x[1].data() };
++                width  = { bits + 1, bits };
++            }
++        } else {
++            assign = channels - 1;
++            for (int c = 0; c < channels; c++) {
++                subs.push_back(choose(x[c].data(), n, bits));
++                src.push_back(x[c].data());
++                width.push_back(bits);
++            }
++        }
++
++        Bits w;
++        w.put(0x3FFE, 14);  // sync
++        w.put(0, 1);
++        w.put(0, 1);        // fixed block size
++        const int bcode = n == 4096 ? 12 : (n <= 256 ? 6 : 7);
++        w.put((uint32_t) bcode, 4);
++        w.put((uint32_t) rcode, 4);
++        w.put((uint32_t) assign, 4);
++        w.put((uint32_t) scode, 3);
++        w.put(0, 1);
++        put_utf8(w, frame_no);
++        if (bcode == 6) {
++            w.put((uint32_t) (n - 1), 8);
++        } else if (bcode == 7) {
++            w.put((uint32_t) (n - 1), 16);
++        }
++        w.put(rate_value, rate_bits);
++        w.put(crc8(w.out), 8);
++        for (size_t c = 0; c < subs.size(); c++) {
++            write_sub(w, src[c], n, width[c], subs[c]);
++        }
++        w.align();
++        w.put(crc16(w.out), 16);
++
++        min_frame = std::min(min_frame, (uint32_t) w.out.size());
++        max_frame = std::max(max_frame, (uint32_t) w.out.size());
++        body += w.out;
++    }
++
++    uint8_t digest[16];
++    md5.finish(digest);
++
++    std::string comments;
++    std::string vendor = "yue-server flac-enc";
++    le32(comments, (uint32_t) vendor.size());
++    comments += vendor;
++    std::vector<std::string> fields;
++    for (const auto & t : tags) {
++        if (!t.second.empty()) {
++            fields.push_back(t.first + "=" + t.second);
++        }
++    }
++    le32(comments, (uint32_t) fields.size());
++    for (const auto & f : fields) {
++        le32(comments, (uint32_t) f.size());
++        comments += f;
++    }
++    if (comments.size() >= (1u << 24)) {
++        comments.clear();  // absurdly long tags: drop them rather than the song
++        le32(comments, (uint32_t) vendor.size());
++        comments += vendor;
++        le32(comments, 0);
++    }
++
++    Bits h;
++    h.out = "fLaC";
++    h.put(0, 1);  // STREAMINFO, more blocks follow
++    h.put(0, 7);
++    h.put(34, 24);
++    h.put((uint32_t) std::max(block, 16), 16);  // decoders refuse a smaller minimum, even for a tiny file
++    h.put((uint32_t) std::max(block, 16), 16);
++    h.put(min_frame, 24);
++    h.put(max_frame, 24);
++    h.put((uint32_t) rate, 20);
++    h.put((uint32_t) (channels - 1), 3);
++    h.put((uint32_t) (bits - 1), 5);
++    h.put((uint32_t) ((uint64_t) frames >> 32) & 0xF, 4);
++    h.put((uint32_t) frames, 32);
++    for (int i = 0; i < 16; i++) {
++        h.put(digest[i], 8);
++    }
++    h.put(1, 1);  // VORBIS_COMMENT, the last block
++    h.put(4, 7);
++    h.put((uint32_t) comments.size(), 24);
++    return h.out + comments + body;
++}
++
++// RIFF WAV -> interleaved integers. 32-bit float is rounded to 24-bit.
++static bool wav_pcm(const std::string & wav, std::vector<int32_t> & pcm, int64_t & frames, int & channels,
++                    int & rate, int & bits, std::string & err) {
++    auto rd16 = [&](size_t o) { return (uint32_t) (uint8_t) wav[o] | ((uint32_t) (uint8_t) wav[o + 1] << 8); };
++    auto rd32 = [&](size_t o) { return rd16(o) | (rd16(o + 2) << 16); };
++    if (wav.size() < 12 || wav.compare(0, 4, "RIFF") != 0 || wav.compare(8, 4, "WAVE") != 0) {
++        err = "not a WAV file";
++        return false;
++    }
++    size_t at = 12, data_at = 0, data_len = 0;
++    int    tag = 0, width = 0;
++    bool   have_fmt = false, have_data = false;
++    channels = rate = 0;
++    while (at + 8 <= wav.size()) {
++        size_t len  = rd32(at + 4);
++        size_t body = at + 8;
++        if (wav.compare(at, 4, "fmt ") == 0 && len >= 16 && body + 16 <= wav.size()) {
++            tag      = (int) rd16(body);
++            channels = (int) rd16(body + 2);
++            rate     = (int) rd32(body + 4);
++            width    = (int) rd16(body + 14);
++            if (tag == 0xFFFE && len >= 40 && body + 26 <= wav.size()) {
++                tag = (int) rd16(body + 24);  // WAVE_FORMAT_EXTENSIBLE: the sub-format's code
++            }
++            have_fmt = true;
++        } else if (wav.compare(at, 4, "data") == 0) {
++            data_at   = body;
++            data_len  = std::min(len, wav.size() - body);
++            have_data = true;
++            break;
++        }
++        at = body + len + (len & 1);
++    }
++    if (!have_fmt || !have_data || channels < 1 || channels > 8 || rate <= 0) {
++        err = "WAV file without a usable format or data chunk";
++        return false;
++    }
++    const bool pcm16 = tag == 1 && width == 16, pcm24 = tag == 1 && width == 24, f32 = tag == 3 && width == 32;
++    if (!pcm16 && !pcm24 && !f32) {
++        err = "only 16/24-bit PCM or 32-bit float WAV can become FLAC";
++        return false;
++    }
++    const size_t step = (size_t) (width / 8) * channels;
++    frames            = (int64_t) (data_len / step);
++    bits              = pcm16 ? 16 : 24;
++    pcm.resize((size_t) frames * channels);
++    const uint8_t * p = (const uint8_t *) wav.data() + data_at;
++    for (size_t i = 0; i < pcm.size(); i++) {
++        if (pcm16) {
++            pcm[i] = (int16_t) (p[0] | (p[1] << 8));
++            p += 2;
++        } else if (pcm24) {
++            int32_t v = (int32_t) (p[0] | (p[1] << 8) | (p[2] << 16));
++            pcm[i]    = (v & 0x800000) ? v - 0x1000000 : v;
++            p += 3;
++        } else {
++            float f;
++            memcpy(&f, p, 4);
++            p += 4;
++            if (!(f == f)) {
++                f = 0.0f;
++            }
++            f          = std::max(-1.0f, std::min(1.0f, f));
++            long v     = lrint((double) f * 8388607.0);
++            pcm[i]     = (int32_t) std::max(-8388608L, std::min(8388607L, v));
++        }
++    }
++    return true;
++}
++
++}  // namespace flac_enc
++
++// WAV bytes -> FLAC bytes (title and lyrics as Vorbis comments). Empty on failure, reason in err.
++static std::string flac_encode_wav(const std::string & wav, const std::string & title, const std::string & lyrics,
++                                   std::string & err, int * bits_out = nullptr) {
++    std::vector<int32_t> pcm;
++    int64_t              frames = 0;
++    int                  channels = 0, rate = 0, bits = 0;
++    if (!flac_enc::wav_pcm(wav, pcm, frames, channels, rate, bits, err)) {
++        return std::string();
++    }
++    if (frames <= 0) {
++        err = "the WAV file holds no audio";
++        return std::string();
++    }
++    if (bits_out) {
++        *bits_out = bits;
++    }
++    return flac_enc::encode(pcm.data(), frames, channels, rate, bits, { { "TITLE", title }, { "LYRICS", lyrics } });
++}
+diff --git a/tools/console/app.css b/tools/console/app.css
+index 8dccf0d..70381b8 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1094,6 +1094,30 @@ pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-br
+ .take:hover .take-del, .take:hover .take-fav, .take:focus-within .take-del, .take:focus-within .take-fav,
+ .take:hover .take-dl, .take:focus-within .take-dl { opacity: 1; }
+ .take-dl:hover { color: var(--amber); border-color: var(--amber-dim); }
++.take-mp3 {
++  position: absolute;
++  top: 8px; right: 98px;
++  padding: 3px 6px;
++  background: var(--sunk);
++  border: 1px solid var(--line);
++  border-radius: var(--r-sm);
++  color: var(--dim);
++  font-size: 10.5px;
++  line-height: 1.2;
++  text-decoration: none;
++  opacity: 0;
++  transition: opacity .13s ease;
++}
++.take:hover .take-mp3, .take:focus-within .take-mp3 { opacity: 1; }
++.take-mp3:hover { color: var(--amber); border-color: var(--amber-dim); }
++.mp3-rate {
++  padding: 4px 8px;
++  background: var(--field);
++  border: 1px solid var(--line);
++  border-radius: var(--r-sm);
++  color: var(--muted);
++  font-size: 12px;
++}
+ .take-del:hover { color: var(--bad); border-color: var(--bad-line); }
+ .take-fav:hover { color: var(--amber); border-color: var(--amber-dim); }
+ .take.is-fav .take-fav { opacity: 1; color: var(--amber); border-color: var(--amber-dim); }
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 72ee6c4..8560ac7 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -2181,8 +2181,32 @@
+     return found;
+   }
+ 
++  // Top-bar model choice: the backbone files the server was started with.
++  var MODEL_SIZES = { BF16: "7.2 GB", Q8_0: "3.8 GB", Q6_K: "2.9 GB", Q5_K_M: "2.6 GB" };
++
++  function paintModelPick(settings) {
++    var pick = $("modelPick"), models = (settings && settings.models) || [];
++    pick.innerHTML = models.length ? models.map(function (m) {
++      return '<option value="' + escape(m) + '">Model: ' + escape(m) + (MODEL_SIZES[m] ? " (" + MODEL_SIZES[m] + ")" : "") + "</option>";
++    }).join("") : '<option value="">Model: as started</option>';
++    pick.value = (settings && settings.model) || "";
++    pick.disabled = models.length < 2;
++  }
++
++  $("modelPick").addEventListener("change", function () {
++    var name = this.value;
++    post("/settings", { model: name }).then(function (data) {
++      paintSettings(data, true);
++      toast("Model " + name + (data.applied ? " — it loads with the next song" : " — it applies before the next song"), "good");
++    }).catch(function (error) {
++      toast(error.message, "bad");
++      paintModelPick(STATE.settings);
++    });
++  });
++
+   function paintSettings(settings, force) {
+     STATE.settings = settings;
++    paintModelPick(settings);
+     // A background refresh must not wipe fields you are still editing; Save repaints them.
+     if (STATE.settingsDirty && !force) {
+       paintStrip();
+@@ -2391,6 +2415,49 @@
+   // Downloads carry the library name (date, time and title), like the other console
+   function audioFileName(take) { return take.name + "." + formatExt(take.format); }
+ 
++  // MP3 copies for sharing: made on the server at the bitrate chosen on the song page
++  function mp3Rate() {
++    var saved = 320;
++    try { saved = parseInt(localStorage.getItem("yue2.mp3kbps") || "320", 10); } catch (error) { saved = 320; }
++    return [128, 192, 256, 320].indexOf(saved) >= 0 ? saved : 320;
++  }
++
++  function mp3Url(take) {
++    return "/library/mp3?name=" + encodeURIComponent(take.name) + "&kbps=" + mp3Rate();
++  }
++
++  // Conversions need a saved WAV: a song still being made (session) has no library copy yet,
++  // and a take made as MP3 is already the MP3 (its own download).
++  function convertible(take) { return !!take && !take.session && take.format !== "mp3"; }
++
++  function paintMp3Link(link, take, label) {
++    link.classList.toggle("is-hidden", !convertible(take));
++    if (!convertible(take)) return;
++    link.href = mp3Url(take);
++    link.setAttribute("download", take.name + ".mp3");
++    link.textContent = label;
++  }
++
++  function paintMp3() {
++    var take = STATE.take, flac = $("dlTakeFlac");
++    $("mp3Rate").value = String(mp3Rate());
++    $("mp3Rate").classList.toggle("is-hidden", !convertible(take));
++    paintMp3Link($("dlTakeMp3"), take, "MP3 · " + mp3Rate() + "k");
++    paintMp3Link($("dlMp3Bar"), STATE.playerTake, "MP3");
++    flac.classList.toggle("is-hidden", !convertible(take));
++    if (convertible(take)) {
++      flac.href = "/library/flac?name=" + encodeURIComponent(take.name);
++      flac.setAttribute("download", take.name + ".flac");
++    }
++  }
++
++  $("mp3Rate").addEventListener("change", function () {
++    try { localStorage.setItem("yue2.mp3kbps", $("mp3Rate").value); } catch (error) { /* private mode */ }
++    paintMp3();
++    paintLibrary();
++    toast("MP3 downloads now at " + mp3Rate() + " kbps");
++  });
++
+   // True while a song is audibly playing; finished runs must not replace it.
+   function isPlaying() { return !!audio.getAttribute("src") && !audio.paused && !audio.ended; }
+ 
+@@ -2437,6 +2504,7 @@
+     $("dlTakeAudio").href = url;
+     $("dlTakeAudio").textContent = "Audio ." + formatExt(take.format);
+     $("dlTakeAudio").setAttribute("download", audioFileName(take));
++    paintMp3();
+ 
+     paintTakeMeta();
+     $("metaStyle").textContent = take.style;
+@@ -2850,6 +2918,7 @@
+     $("timeTotal").textContent = "0:00";
+     drawWave();
+     paintPlayHere();
++    paintMp3();
+   }
+ 
+   function removeTake(take) {
+@@ -2933,6 +3002,7 @@
+     $("dlAudio").href = url;
+     $("dlAudio").textContent = take.format === "mp3" ? "MP3" : "WAV";
+     $("dlAudio").setAttribute("download", audioFileName(take));
++    paintMp3();
+     $("timeTotal").textContent = clock(take.seconds);
+     loadPeaks(take);
+     paintDecodeSwitch();
+@@ -3160,6 +3230,8 @@
+         '<button type="button" class="take-del" data-del="' + escape(take.name) + '" title="Delete take" aria-label="Delete take">✕</button>' +
+         '<a class="take-dl" data-dl="1" href="' + escape(takeAudioUrl(take)) + '" download="' + escape(audioFileName(take)) +
+         '" title="Download ' + formatExt(take.format).toUpperCase() + '" aria-label="Download">⤓</a>' +
++        (!convertible(take) ? "" : '<a class="take-mp3" data-dl="1" href="' + escape(mp3Url(take)) + '" download="' + escape(take.name) +
++        '.mp3" title="Download MP3 (' + mp3Rate() + ' kbps)" aria-label="Download MP3">mp3</a>') +
+         '<div class="take-title">' + escape(title) + "</div>" +
+         '<div class="take-style">' + escape(take.style || "") + "</div>" +
+         '<div class="take-foot">' + tags + "<span>" + clock(take.seconds) + "</span><span>" + ago(take.created) + "</span></div></article>";
+diff --git a/tools/console/index.html b/tools/console/index.html
+index b69592c..1c9f537 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -40,6 +40,12 @@
+   <div class="spacer"></div>
+ 
+   <div class="head-actions">
++    <select id="modelPick" class="theme-pick" aria-label="Model" data-tip="Which copy of the YuE2 model the engine loads.
++BF16: the full release, 7.2 GB.
++Q8_0: near lossless (the C++ author), 3.8 GB.
++Q6_K 2.9 GB and Q5_K_M 2.6 GB: smaller still; the author advises nothing below Q5.
++Smaller copies need less VRAM and write music a little faster. A change loads with the next song.
++Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+     <select id="themePick" class="theme-pick" title="Colour theme" aria-label="Colour theme"></select>
+     <button class="btn ghost small" id="openPrompt" title="Open a prompt saved as JSON or YAML">Open</button>
+     <input type="file" id="openFile" accept=".json,.yaml,.yml" hidden />
+@@ -442,6 +448,12 @@
+     <div class="take-body is-hidden" id="takeBody">
+       <div class="take-tools" id="takeTools">
+         <a class="btn ghost small" id="dlTakeAudio" download title="Download this song">Audio .wav</a>
++        <a class="btn ghost small" id="dlTakeFlac" download data-tip="FLAC: the same song, lossless (every sample identical to the WAV) at about three quarters of the size. Made on the spot in about a second; the title and lyrics are written into the file.">FLAC</a>
++        <a class="btn ghost small" id="dlTakeMp3" download data-tip="MP3 converter: makes a shareable MP3 from the lossless song on the server (a few seconds the first time, then kept). 320 kbps is near transparent (about 7 MB for 3 minutes); 256 is very good; 192 is good and smaller (about 4 MB); 128 is small, with audible loss on cymbals and reverb. The song title and lyrics are written into the file.">MP3 · 320k</a>
++        <select class="mp3-rate" id="mp3Rate" aria-label="MP3 bitrate" data-tip="MP3 converter: makes a shareable MP3 from the lossless song on the server (a few seconds the first time, then kept). 320 kbps is near transparent (about 7 MB for 3 minutes); 256 is very good; 192 is good and smaller (about 4 MB); 128 is small, with audible loss on cymbals and reverb. The song title and lyrics are written into the file.">
++          <option value="320">320 kbps</option><option value="256">256 kbps</option>
++          <option value="192">192 kbps</option><option value="128">128 kbps</option>
++        </select>
+         <button type="button" class="btn ghost small" id="reuseTake" title="Load this take's exact request into the form, music codes included">Reuse this take</button>
+         <button type="button" class="btn ghost small" id="rerenderSound" title="Same music, a new sound seed (seconds)">Re-render sound</button>
+         <button type="button" class="btn ghost small" id="dlRequest" title="The replay request: prompt, score, codes and both seeds">Request .json</button>
+@@ -532,6 +544,7 @@
+   </div>
+ 
+   <a class="btn ghost small" id="dlAudio" download>WAV</a>
++  <a class="btn ghost small" id="dlMp3Bar" download data-tip="Download the playing song as MP3 (bitrate from the song page)">MP3</a>
+   <audio id="audio" preload="auto"></audio>
+ </footer>
+ 
+diff --git a/tools/yue-server.cpp b/tools/yue-server.cpp
+index 2c975a6..e0a7b1d 100644
+--- a/tools/yue-server.cpp
++++ b/tools/yue-server.cpp
+@@ -10,6 +10,7 @@
+ // live in src/.
+ 
+ #include "audio-io.h"
++#include "flac-enc.h"
+ #include "httplib.h"
+ #include "index.html.gz.hpp"
+ #include "pipeline.h"
+@@ -952,6 +953,48 @@ static bool work_run_soon(std::function<void()> fn, int wait_ms) {
+     return fut.wait_for(std::chrono::milliseconds(wait_ms)) == std::future_status::ready;
+ }
+ 
++// ID3v2.4 tag with the title and the lyrics (UTF-8), for the shareable MP3 copies
++// A take's title (meta.json, else its library name) and lyrics (request.json), for file tags
++static void take_title_lyrics(const std::string & dir, const std::string & name, std::string & title, std::string & lyrics) {
++    title = name;
++    lyrics.clear();
++    std::string  meta_txt = read_file(dir + "/meta.json");
++    yyjson_doc * meta     = yyjson_read(meta_txt.c_str(), meta_txt.size(), 0);
++    yyjson_val * v        = meta ? yyjson_obj_get(yyjson_doc_get_root(meta), "title") : nullptr;
++    if (v && yyjson_is_str(v) && yyjson_get_len(v)) {
++        title = yyjson_get_str(v);
++    }
++    if (meta) {
++        yyjson_doc_free(meta);
++    }
++    Yue2Request r;
++    if (request_parse_json(&r, read_file(dir + "/request.json").c_str())) {
++        lyrics = r.lyrics;
++    }
++}
++
++static std::string id3_synchsafe(size_t n) {
++    std::string out(4, '\0');
++    for (int i = 3; i >= 0; i--) {
++        out[(size_t) i] = (char) (n & 0x7f);
++        n >>= 7;
++    }
++    return out;
++}
++
++static std::string id3_frame(const char * id, const std::string & payload) {
++    return std::string(id, 4) + id3_synchsafe(payload.size()) + std::string(2, '\0') + payload;
++}
++
++static std::string id3_tag(const std::string & title, const std::string & lyrics) {
++    std::string frames = id3_frame("TIT2", std::string(1, '\x03') + title);
++    if (!lyrics.empty()) {
++        // encoding, language, empty content descriptor, text
++        frames += id3_frame("USLT", std::string(1, '\x03') + "eng" + std::string(1, '\0') + lyrics);
++    }
++    return std::string("ID3\x04\x00\x00", 6) + id3_synchsafe(frames.size()) + frames;
++}
++
+ static std::string job_status_json(const Job & job) {
+     JobStatus        status = job.status.load();
+     yyjson_mut_doc * doc    = yyjson_mut_doc_new(NULL);
+@@ -1595,6 +1638,92 @@ int main(int argc, char ** argv) {
+             }
+             res.set_content(read_file(cache), "application/json");
+         });
++        // A shareable MP3 of a take, encoded once per bitrate and cached beside it
++        svr.Get("/library/mp3", [](const httplib::Request & req, httplib::Response & res) {
++            std::string name = req.get_param_value("name");
++            int         kbps = req.has_param("kbps") ? atoi(req.get_param_value("kbps").c_str()) : 320;
++            if (!library_name_ok(name)) {
++                res.status = 404;
++                res.set_content(json_string("error", "no such take"), "application/json");
++                return;
++            }
++            if (kbps != 128 && kbps != 192 && kbps != 256 && kbps != 320) {
++                res.status = 400;
++                res.set_content(json_string("error", "MP3 bitrate must be 128, 192, 256 or 320"), "application/json");
++                return;
++            }
++            std::string dir    = g_outputs_dir + "/" + name;
++            std::string source = audio_file_of(dir);
++            std::string cache  = source;   // a take made as MP3 is served as it is
++            if (source.size() < 4 || source.substr(source.size() - 4) != ".mp3") {
++                cache = dir + "/audio-" + std::to_string(kbps) + "k.mp3";
++                std::lock_guard<std::mutex> lock(mtx_library);
++                std::error_code ec;
++                bool fresh = std::filesystem::is_regular_file(cache) &&
++                             std::filesystem::last_write_time(cache, ec) >= std::filesystem::last_write_time(source, ec) && !ec;
++                if (!fresh) {
++                    std::string wav = read_file(source);
++                    int         T = 0, sr = 0;
++                    float *     planar = audio_read_buf((const uint8_t *) wav.data(), wav.size(), &T, &sr);
++                    if (!planar || T <= 0) {
++                        free(planar);
++                        res.status = 500;
++                        res.set_content(json_string("error", "cannot decode the audio"), "application/json");
++                        return;
++                    }
++                    std::string mp3 = audio_encode_mp3(planar, T, sr > 0 ? sr : YUE2_SAMPLE_RATE, kbps);
++                    free(planar);
++                    if (mp3.empty()) {
++                        res.status = 500;
++                        res.set_content(json_string("error", "the MP3 encoder failed"), "application/json");
++                        return;
++                    }
++                    std::string title, lyrics;
++                    take_title_lyrics(dir, name, title, lyrics);
++                    write_file(cache, id3_tag(title, lyrics) + mp3);
++                    fprintf(stderr, "[Library] MP3 %d kbps for %s\n", kbps, name.c_str());
++                }
++            }
++            res.set_header("Content-Disposition", "attachment; filename=\"" + name + ".mp3\"");
++            res.set_file_content(cache, "audio/mpeg");
++        });
++        // A lossless FLAC of a WAV take, made on the spot (about a second for a 4-minute song)
++        svr.Get("/library/flac", [](const httplib::Request & req, httplib::Response & res) {
++            std::string name = req.get_param_value("name");
++            if (!library_name_ok(name)) {
++                res.status = 404;
++                res.set_content(json_string("error", "no such take"), "application/json");
++                return;
++            }
++            std::string dir    = g_outputs_dir + "/" + name;
++            std::string source = audio_file_of(dir);
++            if (source.size() < 4 || source.substr(source.size() - 4) != ".wav") {
++                res.status = 400;
++                res.set_content(json_string("error", "this take was made as MP3; a FLAC of it would not sound any better"),
++                                "application/json");
++                return;
++            }
++            std::string wav, title, lyrics;
++            {
++                std::lock_guard<std::mutex> lock(mtx_library);
++                wav = read_file(source);
++                take_title_lyrics(dir, name, title, lyrics);
++            }
++            auto        t0   = std::chrono::steady_clock::now();
++            std::string err;
++            int         bits = 0;
++            std::string flac = flac_encode_wav(wav, title, lyrics, err, &bits);
++            if (flac.empty()) {
++                res.status = 500;
++                res.set_content(json_string("error", "cannot make a FLAC: " + err), "application/json");
++                return;
++            }
++            fprintf(stderr, "[Library] FLAC %d-bit for %s: %.1f MB (%.0f%% of the WAV), %.0f ms\n", bits, name.c_str(),
++                    flac.size() / 1e6, 100.0 * flac.size() / std::max<size_t>(wav.size(), 1),
++                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
++            res.set_header("Content-Disposition", "attachment; filename=\"" + name + ".flac\"");
++            res.set_content(std::move(flac), "audio/flac");
++        });
+         svr.Get("/library/request", [](const httplib::Request & req, httplib::Response & res) {
+             std::string name = req.get_param_value("name");
+             if (!library_name_ok(name)) {

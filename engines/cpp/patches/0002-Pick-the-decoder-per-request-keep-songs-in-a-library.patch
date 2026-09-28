@@ -1,0 +1,1375 @@
+From c18128199e077180dc1d20334629a107705700fb Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Thu, 24 Sep 2026 13:52:16 -0700
+Subject: [PATCH 02/36] Pick the decoder per request, keep songs in a library,
+ change engine settings live
+
+Requests may name a decoder, a set of sliders with strengths, ask for the
+score alone, and carry a title and the take they re-render. Sliders act
+only while the music tokens are written; the acoustic stage re-reads the
+song without them. The server takes several named decoders and backbones,
+a slider catalog, a song library folder and a settings file. Every track is
+saved with its replay request, and the library can be listed, streamed,
+renamed, starred and deleted, with cached waveform peaks. Engine settings
+(backbone, precision, keeping modules loaded, context rows, decoder tiles)
+apply between jobs and persist; unload and hardware endpoints report and
+free memory. Job status reports queued jobs, resolved seeds, the score of a
+plan and the reason of a failure. The listening address prints as a link.
+---
+ src/model-store.cpp  |  28 ++
+ src/model-store.h    |   6 +
+ src/pipeline.h       |  93 ++++-
+ src/request.cpp      |  52 +++
+ src/request.h        |  15 +
+ tools/yue-server.cpp | 874 ++++++++++++++++++++++++++++++++++++++++++-
+ 6 files changed, 1056 insertions(+), 12 deletions(-)
+
+diff --git a/src/model-store.cpp b/src/model-store.cpp
+index 34309f3..063e44b 100644
+--- a/src/model-store.cpp
++++ b/src/model-store.cpp
+@@ -327,6 +327,34 @@ BPETokenizer * store_bpe(ModelStore * s, const char * lm_path) {
+     return bpe;
+ }
+ 
++void store_set_policy(ModelStore * s, EvictPolicy policy) {
++    if (s->policy == policy) {
++        return;
++    }
++    s->policy = policy;
++    fprintf(stderr, "[Store] Policy now %s\n", policy == EVICT_STRICT ? "STRICT" : "NEVER");
++    if (policy == EVICT_STRICT) {
++        store_unload_idle(s);
++    }
++}
++
++size_t store_unload_idle(ModelStore * s) {
++    size_t freed = 0;
++    for (auto it = s->gpu.begin(); it != s->gpu.end();) {
++        GpuEntry & e = it->second;
++        if (e.refcount > 0) {
++            ++it;
++            continue;
++        }
++        fprintf(stderr, "[Store] Unload %s (%.1f MB)\n", e.label, (float) e.bytes / (1024.0f * 1024.0f));
++        freed += e.bytes;
++        s->handle_to_key.erase(e.ptr);
++        e.deleter(e.ptr);
++        it = s->gpu.erase(it);
++    }
++    return freed;
++}
++
+ size_t store_vram_bytes(const ModelStore * s) {
+     if (!s) {
+         return 0;
+diff --git a/src/model-store.h b/src/model-store.h
+index f5b412b..eca0070 100644
+--- a/src/model-store.h
++++ b/src/model-store.h
+@@ -106,6 +106,12 @@ void store_release(ModelStore * s, void * handle);
+ // MB). Returns NULL on load failure.
+ BPETokenizer * store_bpe(ModelStore * s, const char * lm_path);
+ 
++// Local additions for the console's engine settings: switch the policy at
++// run time (between jobs), and unload every idle module now. Both run on the
++// worker thread, so no module is held while they act.
++void   store_set_policy(ModelStore * s, EvictPolicy policy);
++size_t store_unload_idle(ModelStore * s);
++
+ // Observability: sum of currently resident GPU module weight buffers, and
+ // the count of loaded GPU modules.
+ size_t store_vram_bytes(const ModelStore * s);
+diff --git a/src/pipeline.h b/src/pipeline.h
+index 76b0f3f..484dc98 100644
+--- a/src/pipeline.h
++++ b/src/pipeline.h
+@@ -19,6 +19,7 @@
+ #include "model-store.h"
+ #include "nar.h"
+ #include "request.h"
++#include "sliders.h"
+ #include "timer.h"
+ #include "torch-cpu-rng.h"
+ #include "vae.h"
+@@ -54,6 +55,11 @@ struct Yue2Pipeline {
+     std::string        vae_path;
+     std::string        transcriber_path;  // the SheetSage2 GGUF, empty without one
+     Yue2PipelineParams params;
++
++    // Local additions: named decoders (the first is the default; vae_path is
++    // its path) and the slider catalog, id -> GGUF path
++    std::vector<std::pair<std::string, std::string>> vaes;
++    std::vector<std::pair<std::string, std::string>> slider_files;
+     DebugDumper        dumper;
+ 
+     // The cache, bound at configure to its config with the context override
+@@ -172,11 +178,36 @@ static Yue2NAR * require_nar(Yue2Pipeline * p) {
+     return m;
+ }
+ 
+-static VAEGGML * require_vae(Yue2Pipeline * p) {
+-    ModelKey k = { MODEL_VAE, p->vae_path };
++static VAEGGML * require_vae(Yue2Pipeline * p, const std::string & path) {
++    ModelKey k = { MODEL_VAE, path.empty() ? p->vae_path : path };
+     return store_require_vae(p->store, k);
+ }
+ 
++// Local addition: the decoder path of a request, "" meaning the default
++static bool pipeline_vae_path(const Yue2Pipeline * p, const std::string & name, std::string * path) {
++    if (name.empty()) {
++        *path = p->vae_path;
++        return true;
++    }
++    for (const auto & v : p->vaes) {
++        if (v.first == name) {
++            *path = v.second;
++            return true;
++        }
++    }
++    return false;
++}
++
++// Local addition: the GGUF path of a slider id, "" when unknown
++static std::string pipeline_slider_path(const Yue2Pipeline * p, const std::string & id) {
++    for (const auto & s : p->slider_files) {
++        if (s.first == id) {
++            return s.second;
++        }
++    }
++    return "";
++}
++
+ static SheetSage2 * require_ss2(Yue2Pipeline * p) {
+     ModelKey     k = { MODEL_SS2, p->transcriber_path };
+     SheetSage2 * m = store_require_ss2(p->store, k);
+@@ -239,6 +270,15 @@ static bool pipeline_generate(Yue2Pipeline *          p,
+     if (!yue2_sampling_valid(r.abc_sampling, "abc") || !yue2_sampling_valid(r.semantic_sampling, "semantic")) {
+         return false;
+     }
++    std::string vae_path;
++    if (!pipeline_vae_path(p, r.vae, &vae_path)) {
++        fprintf(stderr, "[Pipeline] FATAL: unknown decoder '%s'\n", r.vae.c_str());
++        return false;
++    }
++    if (r.plan_only && (cot == YUE2_COT_OFF || !r.abc.empty())) {
++        fprintf(stderr, "[Pipeline] FATAL: plan_only needs full or melody mode and no supplied score\n");
++        return false;
++    }
+ 
+     KvScope kv_scope = { p };
+ 
+@@ -290,6 +330,20 @@ static bool pipeline_generate(Yue2Pipeline *          p,
+         }
+     }
+ 
++    // Local addition: the score alone, no music and no audio
++    if (r.plan_only) {
++        songs->assign((size_t) B, {});
++        for (int i = 0; i < B; i++) {
++            (*songs)[(size_t) i].score     = scores[i];
++            (*songs)[(size_t) i].truncated = truncated[i];
++            (*songs)[(size_t) i].T_audio   = 0;
++            (*songs)[(size_t) i].T_lat     = 0;
++        }
++        fprintf(stderr, "[Pipeline] Done: score only, %d song%s in %.1f s\n", B, B > 1 ? "s" : "",
++                total_timer.ms() / 1000.0);
++        return true;
++    }
++
+     std::vector<std::vector<int>> prefixes(B);
+     for (int i = 0; i < B; i++) {
+         prefixes[i] = yue2_build_prompt_ids(encode, cot, r.style, r.lyrics, has_score ? &abc_ids[i] : nullptr);
+@@ -306,6 +360,8 @@ static bool pipeline_generate(Yue2Pipeline *          p,
+     }
+ 
+     std::vector<Yue2Generation> codes(B);
++    SliderSet                   sliders;
++    bool                        sliders_used = false;
+     if (replay) {
+         std::vector<int> values;
+         if (!pipeline_parse_tokens(r.semantic_tokens, &values)) {
+@@ -329,10 +385,31 @@ static bool pipeline_generate(Yue2Pipeline *          p,
+                 semantic.min_tokens = semantic.max_tokens;
+             }
+         }
+-        if (!yue2_generate(lm, &p->kv, prefixes, negatives, guidance, semantic, r.lm_seed, YUE2_PHASE_SEMANTIC, &codes,
+-                           cancelled, cancel_data)) {
++        // Local addition: the sliders steer the music tokens only, then leave
++        std::vector<std::pair<std::string, float>> chosen;
++        for (const Yue2SliderChoice & c : r.sliders) {
++            std::string path = pipeline_slider_path(p, c.id);
++            if (path.empty()) {
++                fprintf(stderr, "[Sliders] FATAL: unknown slider '%s'\n", c.id.c_str());
++                return false;
++            }
++            chosen.push_back({ path, c.strength });
++        }
++        if (!sliders_load(&sliders, lm->backend, chosen, lm->cfg.n_layers)) {
+             return false;
+         }
++        sliders_used = sliders_active(&sliders);
++        qw3lm_set_sliders(lm, &sliders);
++        bool semantic_ok = yue2_generate(lm, &p->kv, prefixes, negatives, guidance, semantic, r.lm_seed,
++                                         YUE2_PHASE_SEMANTIC, &codes, cancelled, cancel_data);
++        qw3lm_set_sliders(lm, nullptr);
++        sliders_free(&sliders);
++        if (!semantic_ok) {
++            return false;
++        }
++        if (sliders_used) {
++            fprintf(stderr, "[Sliders] Detached; the acoustic stage re-reads the song without them\n");
++        }
+     }
+ 
+     // Acoustic chunks: the context holds the prefix, the codes of the chunk
+@@ -375,7 +452,7 @@ static bool pipeline_generate(Yue2Pipeline *          p,
+     // A generated song spanning several chunks has its first one sealed while
+     // the AR half still holds the GPU: the set carries the whole stream, the
+     // end token takes the row that closes the chunk
+-    if (!replay) {
++    if (!replay && !sliders_used) {
+         for (int i = 0; i < B; i++) {
+             if ((int) codes[i].tokens.size() > chunk_sizes[i]) {
+                 int end = YUE2_MUSIC_END;
+@@ -418,7 +495,9 @@ static bool pipeline_generate(Yue2Pipeline *          p,
+             std::vector<int> sequence = prefixes[i];
+             sequence.insert(sequence.end(), codes[i].tokens.begin() + start, codes[i].tokens.begin() + start + frames);
+             sequence.push_back(YUE2_MUSIC_END);
+-            const int kept = start > 0 ? prefix_len : (replay ? 0 : ar_len);
++            // With sliders the cache the AR decode left carries their steer, so
++            // the first chunk re-prefills the whole sequence without them
++            const int kept = start > 0 ? prefix_len : ((replay || sliders_used) ? 0 : ar_len);
+             if (kept < ar_len) {
+                 nar_hold.reset();
+                 nar                = nullptr;
+@@ -467,7 +546,7 @@ static bool pipeline_generate(Yue2Pipeline *          p,
+     }
+ 
+     nar_hold.reset();
+-    VAEGGML * vae = require_vae(p);
++    VAEGGML * vae = require_vae(p, vae_path);
+     if (!vae) {
+         return false;
+     }
+diff --git a/src/request.cpp b/src/request.cpp
+index 3f97ab0..60c2f87 100644
+--- a/src/request.cpp
++++ b/src/request.cpp
+@@ -36,6 +36,12 @@ void request_init(Yue2Request * r) {
+ 
+     r->output_format = OUTPUT_FORMAT_MP3;
+     r->mp3_bitrate   = 128;
++
++    r->title     = "";
++    r->vae       = "";
++    r->sliders   = {};
++    r->plan_only = false;
++    r->parent    = "";
+ }
+ 
+ static inline std::string yy_str(yyjson_val * v) {
+@@ -162,6 +168,30 @@ static void request_parse_obj(yyjson_val * obj, Yue2Request * r) {
+     if ((v = yyjson_obj_get(obj, "mp3_bitrate")) && yyjson_is_int(v)) {
+         r->mp3_bitrate = yyjson_get_int(v);
+     }
++    if ((v = yyjson_obj_get(obj, "title")) && yyjson_is_str(v)) {
++        r->title = yy_str(v);
++    }
++    if ((v = yyjson_obj_get(obj, "vae")) && yyjson_is_str(v)) {
++        r->vae = yy_str(v);
++    }
++    if ((v = yyjson_obj_get(obj, "parent")) && yyjson_is_str(v)) {
++        r->parent = yy_str(v);
++    }
++    if ((v = yyjson_obj_get(obj, "plan_only")) && yyjson_is_bool(v)) {
++        r->plan_only = yyjson_get_bool(v);
++    }
++    if ((v = yyjson_obj_get(obj, "sliders")) && yyjson_is_arr(v)) {
++        size_t       idx, max;
++        yyjson_val * item;
++        yyjson_arr_foreach(v, idx, max, item) {
++            yyjson_val * id       = yyjson_obj_get(item, "id");
++            yyjson_val * strength = yyjson_obj_get(item, "strength");
++            if (id && yyjson_is_str(id)) {
++                r->sliders.push_back({ yy_str(id), strength && yyjson_is_num(strength) ?
++                                                       (float) yyjson_get_num(strength) : 1.0f });
++            }
++        }
++    }
+ }
+ 
+ bool request_parse_json(Yue2Request * r, const char * json) {
+@@ -256,6 +286,28 @@ std::string request_to_json(const Yue2Request * r, bool sparse) {
+     if (!sparse || r->mp3_bitrate != d.mp3_bitrate) {
+         yyjson_mut_obj_add_int(doc, root, "mp3_bitrate", r->mp3_bitrate);
+     }
++    if (!sparse || r->title != d.title) {
++        yyjson_mut_obj_add_strncpy(doc, root, "title", r->title.c_str(), r->title.size());
++    }
++    if (!sparse || r->vae != d.vae) {
++        yyjson_mut_obj_add_strncpy(doc, root, "vae", r->vae.c_str(), r->vae.size());
++    }
++    if (!sparse || !r->sliders.empty()) {
++        yyjson_mut_val * list = yyjson_mut_arr(doc);
++        for (const Yue2SliderChoice & c : r->sliders) {
++            yyjson_mut_val * item = yyjson_mut_obj(doc);
++            yyjson_mut_obj_add_strncpy(doc, item, "id", c.id.c_str(), c.id.size());
++            yyjson_mut_obj_add_real(doc, item, "strength", c.strength);
++            yyjson_mut_arr_append(list, item);
++        }
++        yyjson_mut_obj_add_val(doc, root, "sliders", list);
++    }
++    if (!sparse || r->plan_only != d.plan_only) {
++        yyjson_mut_obj_add_bool(doc, root, "plan_only", r->plan_only);
++    }
++    if (!sparse || r->parent != d.parent) {
++        yyjson_mut_obj_add_strncpy(doc, root, "parent", r->parent.c_str(), r->parent.size());
++    }
+ 
+     char *      json = yyjson_mut_write(doc, WRITE_FLAGS, NULL);
+     std::string out  = json ? json : "{}";
+diff --git a/src/request.h b/src/request.h
+index 213e5b9..fda8f46 100644
+--- a/src/request.h
++++ b/src/request.h
+@@ -9,6 +9,13 @@
+ 
+ #include <cstdint>
+ #include <string>
++#include <vector>
++
++// Local addition: one voice/genre slider and its strength (0..1)
++struct Yue2SliderChoice {
++    std::string id;
++    float       strength;
++};
+ 
+ struct Yue2Request {
+     // text content
+@@ -69,6 +76,14 @@ struct Yue2Request {
+     // MP3 encoder bitrate in kbps, used when output_format is "mp3".
+     // WAV outputs ignore this field.
+     int mp3_bitrate;  // 128
++
++    // Local additions (console): the pipeline reads vae, sliders and
++    // plan_only; title and parent only travel with the take.
++    std::string                   title;      // ""
++    std::string                   vae;        // "" = the server's default decoder
++    std::vector<Yue2SliderChoice> sliders;    // applied while the music tokens are written
++    bool                          plan_only;  // false; stop after the score
++    std::string                   parent;     // "" or the library take this re-renders
+ };
+ 
+ // fills every field with its default
+diff --git a/tools/yue-server.cpp b/tools/yue-server.cpp
+index f62babb..8a0470b 100644
+--- a/tools/yue-server.cpp
++++ b/tools/yue-server.cpp
+@@ -16,8 +16,14 @@
+ #include "version.h"
+ #include "yyjson.h"
+ 
++#include <algorithm>
+ #include <atomic>
++#include <cctype>
+ #include <chrono>
++#include <ctime>
++#include <filesystem>
++#include <fstream>
++#include <sstream>
+ #include <condition_variable>
+ #include <csignal>
+ #include <cstdio>
+@@ -25,6 +31,7 @@
+ #include <cstring>
+ #include <deque>
+ #include <functional>
++#include <future>
+ #include <memory>
+ #include <mutex>
+ #include <random>
+@@ -166,6 +173,16 @@ struct Job {
+     std::string            result_mime;
+     std::atomic<bool>      cancel{ false };
+ 
++    // Local additions, written before status like the result fields: the
++    // library names of the saved tracks, the score of a plan_only job, and a
++    // short reason when the job failed
++    std::vector<std::string> takes;
++    std::string              abc;
++    std::string              error;
++    std::atomic<bool>        started{ false };  // false while it waits in the queue
++    int64_t                  lm_seed = -1;      // resolved seeds of a synth job
++    int64_t                  seed    = -1;
++
+     // memory ordering contract: result_body and result_mime are written
+     // before status is stored (seq_cst). the client loads status (seq_cst)
+     // and only reads result fields after seeing done/failed. this guarantees
+@@ -419,6 +436,555 @@ static std::string  g_model_path;
+ static std::string  g_vae_path;
+ static std::string  g_transcriber_path;
+ 
++// Local additions: named decoders, the slider catalog and the song library
++struct SliderInfo {
++    std::string id, label, description, path;
++};
++
++static std::vector<std::pair<std::string, std::string>> g_vaes;    // name, path; the first is the default
++static std::vector<std::pair<std::string, std::string>> g_models;  // backbone name, path; see --model
++static std::string                                       g_settings_path;
++
++// Engine settings the console can change between jobs, persisted to --settings
++struct EngineSettings {
++    std::string model;        // a name from g_models
++    bool        keep_loaded;  // every module stays in VRAM between songs
++    int         max_seq;      // KV cache rows, 0 = the whole context
++    int         vae_core;     // VAE tile core frames
++    std::string precision;    // "bf16" (weights as stored) or "f32" (weights widened at load)
++};
++
++static EngineSettings      g_settings;
++static std::mutex          mtx_settings;
++static std::atomic<size_t> g_loaded_bytes{ 0 };
++static std::atomic<int>    g_loaded_modules{ 0 };
++static std::vector<SliderInfo>                           g_sliders;
++static std::string                                       g_outputs_dir;
++static std::mutex                                        mtx_library;
++
++static const char * vae_label(const std::string & name) {
++    if (name == "standard") {
++        return "Standard";
++    }
++    if (name == "legacy") {
++        return "Legacy";
++    }
++    if (name == "blend") {
++        return "Blend";
++    }
++    return name.c_str();
++}
++
++static const char * vae_repo(const std::string & name) {
++    if (name == "standard") {
++        return "m-a-p/YuE2-Vae";
++    }
++    if (name == "legacy") {
++        return "m-a-p/YuE2-Vae-legacy";
++    }
++    if (name == "blend") {
++        return "Mothersuperior/YuE2-Vae-merge-0.666";
++    }
++    return "";
++}
++
++static std::string read_file(const std::string & path) {
++    std::ifstream f(path, std::ios::binary);
++    std::stringstream ss;
++    ss << f.rdbuf();
++    return ss.str();
++}
++
++static bool write_file(const std::string & path, const std::string & data) {
++    std::string   tmp = path + ".part";
++    std::ofstream f(tmp, std::ios::binary);
++    if (!f) {
++        return false;
++    }
++    f.write(data.data(), (std::streamsize) data.size());
++    f.close();
++    if (!f) {
++        return false;
++    }
++    std::error_code ec;
++    std::filesystem::rename(tmp, path, ec);
++    return !ec;
++}
++
++// catalog.json written by convert-extras.py: {"sliders": [{id, label, description, file}]}
++static bool load_slider_catalog(const std::string & dir) {
++    std::string  text = read_file(dir + "/catalog.json");
++    yyjson_doc * doc  = yyjson_read(text.c_str(), text.size(), 0);
++    if (!doc) {
++        fprintf(stderr, "[Server] FATAL: cannot read %s/catalog.json\n", dir.c_str());
++        return false;
++    }
++    yyjson_val * list = yyjson_obj_get(yyjson_doc_get_root(doc), "sliders");
++    size_t       idx, max;
++    yyjson_val * item;
++    yyjson_arr_foreach(list, idx, max, item) {
++        SliderInfo   s;
++        yyjson_val * v;
++        if ((v = yyjson_obj_get(item, "id")) && yyjson_is_str(v)) {
++            s.id = yyjson_get_str(v);
++        }
++        if ((v = yyjson_obj_get(item, "label")) && yyjson_is_str(v)) {
++            s.label = yyjson_get_str(v);
++        }
++        if ((v = yyjson_obj_get(item, "description")) && yyjson_is_str(v)) {
++            s.description = yyjson_get_str(v);
++        }
++        if ((v = yyjson_obj_get(item, "file")) && yyjson_is_str(v)) {
++            s.path = dir + "/" + yyjson_get_str(v);
++        }
++        if (!s.id.empty() && std::filesystem::is_regular_file(s.path)) {
++            g_sliders.push_back(s);
++            g_pipeline.slider_files.push_back({ s.id, s.path });
++        }
++    }
++    yyjson_doc_free(doc);
++    fprintf(stderr, "[Server] Sliders: %zu from %s\n", g_sliders.size(), dir.c_str());
++    return true;
++}
++
++// A library name is one folder directly under the outputs directory
++static bool library_name_ok(const std::string & name) {
++    if (name.empty() || name.size() > 200 || name[0] == '.') {
++        return false;
++    }
++    for (char c : name) {
++        if (!(isalnum((unsigned char) c) || c == '-' || c == '_' || c == '.')) {
++            return false;
++        }
++    }
++    return name.find("..") == std::string::npos && std::filesystem::is_directory(g_outputs_dir + "/" + name);
++}
++
++static std::string slugify(const std::string & title) {
++    std::string out;
++    for (char c : title) {
++        if (isalnum((unsigned char) c)) {
++            out += (char) tolower((unsigned char) c);
++        } else if (!out.empty() && out.back() != '-') {
++            out += '-';
++        }
++        if (out.size() >= 40) {
++            break;
++        }
++    }
++    while (!out.empty() && out.back() == '-') {
++        out.pop_back();
++    }
++    return out.empty() ? "song" : out;
++}
++
++static std::string audio_file_of(const std::string & dir) {
++    if (std::filesystem::is_regular_file(dir + "/audio.mp3")) {
++        return dir + "/audio.mp3";
++    }
++    return dir + "/audio.wav";
++}
++
++// One library entry: meta.json plus the prompt fields of request.json
++static yyjson_mut_val * library_entry(yyjson_mut_doc * out, const std::string & name) {
++    std::string  dir      = g_outputs_dir + "/" + name;
++    std::string  meta_txt = read_file(dir + "/meta.json");
++    std::string  req_txt  = read_file(dir + "/request.json");
++    yyjson_doc * meta     = yyjson_read(meta_txt.c_str(), meta_txt.size(), 0);
++    if (!meta) {
++        return nullptr;
++    }
++    yyjson_mut_val * e = yyjson_val_mut_copy(out, yyjson_doc_get_root(meta));
++    yyjson_doc_free(meta);
++    yyjson_mut_obj_remove_key(e, "name");
++    yyjson_mut_obj_add_strcpy(out, e, "name", name.c_str());
++    Yue2Request r;
++    if (request_parse_json(&r, req_txt.c_str())) {
++        yyjson_mut_obj_add_strncpy(out, e, "style", r.style.c_str(), r.style.size());
++        yyjson_mut_obj_add_strncpy(out, e, "lyrics", r.lyrics.c_str(), r.lyrics.size());
++        yyjson_mut_obj_add_strncpy(out, e, "cot", r.cot.c_str(), r.cot.size());
++        yyjson_mut_obj_add_sint(out, e, "lm_seed", r.lm_seed);
++        yyjson_mut_obj_add_sint(out, e, "seed", r.seed);
++        std::string vae = r.vae.empty() && !g_vaes.empty() ? g_vaes[0].first : r.vae;
++        yyjson_mut_obj_add_strcpy(out, e, "vae", vae.c_str());
++        yyjson_mut_val * sl = yyjson_mut_arr(out);
++        for (const Yue2SliderChoice & c : r.sliders) {
++            yyjson_mut_val * item = yyjson_mut_obj(out);
++            yyjson_mut_obj_add_strcpy(out, item, "id", c.id.c_str());
++            yyjson_mut_obj_add_real(out, item, "strength", c.strength);
++            yyjson_mut_arr_append(sl, item);
++        }
++        yyjson_mut_obj_add_val(out, e, "sliders", sl);
++        yyjson_mut_obj_add_int(out, e, "steps", r.steps);
++        yyjson_mut_obj_add_real(out, e, "cfg_scale", r.cfg_scale);
++        yyjson_mut_obj_add_real(out, e, "duration", r.duration);
++        yyjson_mut_obj_add_strcpy(out, e, "parent", r.parent.c_str());
++        yyjson_mut_obj_add_bool(out, e, "has_score", !r.abc.empty());
++    }
++    return e;
++}
++
++static std::string library_list_json() {
++    std::vector<std::string> names;
++    std::error_code          ec;
++    for (const auto & d : std::filesystem::directory_iterator(g_outputs_dir, ec)) {
++        if (d.is_directory() && std::filesystem::is_regular_file(d.path() / "meta.json")) {
++            names.push_back(d.path().filename().string());
++        }
++    }
++    std::sort(names.begin(), names.end(), std::greater<std::string>());
++    yyjson_mut_doc * doc  = yyjson_mut_doc_new(NULL);
++    yyjson_mut_val * root = yyjson_mut_obj(doc);
++    yyjson_mut_doc_set_root(doc, root);
++    yyjson_mut_val * list = yyjson_mut_arr(doc);
++    for (const auto & n : names) {
++        yyjson_mut_val * e = library_entry(doc, n);
++        if (e) {
++            yyjson_mut_arr_append(list, e);
++        }
++    }
++    yyjson_mut_obj_add_val(doc, root, "takes", list);
++    char *      json = yyjson_mut_write(doc, 0, NULL);
++    std::string out  = json ? json : "{\"takes\":[]}";
++    if (json) {
++        free(json);
++    }
++    yyjson_mut_doc_free(doc);
++    return out;
++}
++
++static std::string library_entry_json(const std::string & name) {
++    yyjson_mut_doc * doc = yyjson_mut_doc_new(NULL);
++    yyjson_mut_val * e   = library_entry(doc, name);
++    std::string      out = "{}";
++    if (e) {
++        yyjson_mut_doc_set_root(doc, e);
++        char * json = yyjson_mut_write(doc, 0, NULL);
++        if (json) {
++            out = json;
++            free(json);
++        }
++    }
++    yyjson_mut_doc_free(doc);
++    return out;
++}
++
++// Save one rendered track into the library: audio, replay request, meta
++static std::string library_save(const Yue2Request & replay,
++                                const std::string & audio,
++                                bool                is_mp3,
++                                const Yue2Song &    song,
++                                int                 track,
++                                int                 tracks,
++                                int                 song_index,
++                                int                 variation,
++                                bool                provided_score,
++                                double              render_seconds) {
++    std::lock_guard<std::mutex> lock(mtx_library);
++    char                        stamp[32];
++    time_t                      now = time(nullptr);
++    struct tm                   tmv;
++#ifdef _WIN32
++    localtime_s(&tmv, &now);
++#else
++    localtime_r(&now, &tmv);
++#endif
++    strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &tmv);
++    std::string base = std::string(stamp) + "-" + slugify(replay.title);
++    if (tracks > 1) {
++        base += "-" + std::to_string(track + 1);
++    }
++    std::string name = base;
++    for (int n = 2; std::filesystem::exists(g_outputs_dir + "/" + name); n++) {
++        name = base + "-v" + std::to_string(n);
++    }
++    std::string     dir = g_outputs_dir + "/" + name;
++    std::error_code ec;
++    std::filesystem::create_directories(dir, ec);
++    if (ec) {
++        fprintf(stderr, "[Library] cannot create %s: %s\n", dir.c_str(), ec.message().c_str());
++        return "";
++    }
++    bool ok = write_file(dir + (is_mp3 ? "/audio.mp3" : "/audio.wav"), audio) &&
++              write_file(dir + "/request.json", request_to_json(&replay, false));
++
++    yyjson_mut_doc * doc  = yyjson_mut_doc_new(NULL);
++    yyjson_mut_val * root = yyjson_mut_obj(doc);
++    yyjson_mut_doc_set_root(doc, root);
++    yyjson_mut_obj_add_strncpy(doc, root, "title", replay.title.c_str(), replay.title.size());
++    yyjson_mut_obj_add_int(doc, root, "created", (int64_t) now);
++    yyjson_mut_obj_add_real(doc, root, "seconds", (double) song.T_audio / YUE2_SAMPLE_RATE);
++    yyjson_mut_obj_add_strncpy(doc, root, "format", replay.output_format.c_str(), replay.output_format.size());
++    yyjson_mut_obj_add_bool(doc, root, "favorite", false);
++    yyjson_mut_obj_add_bool(doc, root, "truncated", song.truncated);
++    yyjson_mut_obj_add_real(doc, root, "render_seconds", render_seconds);
++    yyjson_mut_obj_add_int(doc, root, "song", song_index);
++    yyjson_mut_obj_add_int(doc, root, "variation", variation);
++    yyjson_mut_obj_add_bool(doc, root, "provided_score", provided_score);
++    yyjson_mut_obj_add_str(doc, root, "precision", g_gf_weights_f32 ? "f32" : "bf16");
++    {
++        std::lock_guard<std::mutex> settings_lock(mtx_settings);
++        yyjson_mut_obj_add_strcpy(doc, root, "model", g_settings.model.c_str());
++    }
++    char * json = yyjson_mut_write(doc, YYJSON_WRITE_PRETTY, NULL);
++    ok          = ok && json && write_file(dir + "/meta.json", json);
++    if (json) {
++        free(json);
++    }
++    yyjson_mut_doc_free(doc);
++    if (!ok) {
++        fprintf(stderr, "[Library] cannot write %s\n", dir.c_str());
++        return "";
++    }
++    fprintf(stderr, "[Library] Saved %s\n", name.c_str());
++    return name;
++}
++
++// Update title and/or favorite in meta.json
++static bool library_update(const std::string & name, const std::string & body) {
++    std::lock_guard<std::mutex> lock(mtx_library);
++    std::string                 path = g_outputs_dir + "/" + name + "/meta.json";
++    std::string                 text = read_file(path);
++    yyjson_doc *                meta = yyjson_read(text.c_str(), text.size(), 0);
++    yyjson_doc *                req  = yyjson_read(body.c_str(), body.size(), 0);
++    if (!meta || !req) {
++        if (meta) {
++            yyjson_doc_free(meta);
++        }
++        if (req) {
++            yyjson_doc_free(req);
++        }
++        return false;
++    }
++    yyjson_mut_doc * doc  = yyjson_doc_mut_copy(meta, NULL);
++    yyjson_mut_val * root = yyjson_mut_doc_get_root(doc);
++    yyjson_val *     v;
++    if ((v = yyjson_obj_get(yyjson_doc_get_root(req), "title")) && yyjson_is_str(v)) {
++        yyjson_mut_obj_remove_key(root, "title");
++        yyjson_mut_obj_add_strcpy(doc, root, "title", yyjson_get_str(v));
++    }
++    if ((v = yyjson_obj_get(yyjson_doc_get_root(req), "favorite")) && yyjson_is_bool(v)) {
++        yyjson_mut_obj_remove_key(root, "favorite");
++        yyjson_mut_obj_add_bool(doc, root, "favorite", yyjson_get_bool(v));
++    }
++    char * json = yyjson_mut_write(doc, YYJSON_WRITE_PRETTY, NULL);
++    bool   ok   = json && write_file(path, json);
++    if (json) {
++        free(json);
++    }
++    yyjson_mut_doc_free(doc);
++    yyjson_doc_free(meta);
++    yyjson_doc_free(req);
++    return ok;
++}
++
++static std::string model_name_of(const std::string & path) {
++    std::string base = std::filesystem::path(path).stem().string();  // YuE2-3B-BF16
++    size_t      dash = base.rfind('-');
++    return dash == std::string::npos ? base : base.substr(dash + 1);
++}
++
++static std::string settings_json(const EngineSettings & st) {
++    yyjson_mut_doc * doc  = yyjson_mut_doc_new(NULL);
++    yyjson_mut_val * root = yyjson_mut_obj(doc);
++    yyjson_mut_doc_set_root(doc, root);
++    yyjson_mut_obj_add_strcpy(doc, root, "model", st.model.c_str());
++    yyjson_mut_val * models = yyjson_mut_arr(doc);
++    for (const auto & m : g_models) {
++        yyjson_mut_arr_add_strcpy(doc, models, m.first.c_str());
++    }
++    yyjson_mut_obj_add_val(doc, root, "models", models);
++    yyjson_mut_obj_add_bool(doc, root, "keep_loaded", st.keep_loaded);
++    yyjson_mut_obj_add_int(doc, root, "max_seq", st.max_seq);
++    yyjson_mut_obj_add_int(doc, root, "max_seq_full", YUE2_CONTEXT);
++    yyjson_mut_obj_add_int(doc, root, "vae_core", st.vae_core);
++    yyjson_mut_obj_add_strcpy(doc, root, "precision", st.precision.c_str());
++    char *      json = yyjson_mut_write(doc, YYJSON_WRITE_PRETTY, NULL);
++    std::string out  = json ? json : "{}";
++    if (json) {
++        free(json);
++    }
++    yyjson_mut_doc_free(doc);
++    return out;
++}
++
++// Read settings JSON over a base; false with a reason when a value is out of range
++static bool settings_parse(const std::string & body, EngineSettings * st, std::string * why) {
++    yyjson_doc * doc = yyjson_read(body.c_str(), body.size(), 0);
++    if (!doc || !yyjson_is_obj(yyjson_doc_get_root(doc))) {
++        if (doc) {
++            yyjson_doc_free(doc);
++        }
++        *why = "invalid JSON";
++        return false;
++    }
++    yyjson_val * root = yyjson_doc_get_root(doc);
++    yyjson_val * v;
++    bool         ok = true;
++    if ((v = yyjson_obj_get(root, "model")) && yyjson_is_str(v)) {
++        std::string name  = yyjson_get_str(v);
++        bool        known = false;
++        for (const auto & m : g_models) {
++            known = known || m.first == name;
++        }
++        if (known) {
++            st->model = name;
++        } else {
++            *why = "unknown model";
++            ok   = false;
++        }
++    }
++    if ((v = yyjson_obj_get(root, "keep_loaded")) && yyjson_is_bool(v)) {
++        st->keep_loaded = yyjson_get_bool(v);
++    }
++    if ((v = yyjson_obj_get(root, "max_seq")) && yyjson_is_int(v)) {
++        int n = (int) yyjson_get_int(v);
++        if (n == 0 || (n >= 4096 && n <= YUE2_CONTEXT)) {
++            st->max_seq = n;
++        } else {
++            *why = "context must be 0 (whole) or between 4096 and 24576";
++            ok   = false;
++        }
++    }
++    if ((v = yyjson_obj_get(root, "vae_core")) && yyjson_is_int(v)) {
++        int n = (int) yyjson_get_int(v);
++        if (n >= 64 && n <= 4096) {
++            st->vae_core = n;
++        } else {
++            *why = "VAE tile frames must be between 64 and 4096";
++            ok   = false;
++        }
++    }
++    if ((v = yyjson_obj_get(root, "precision")) && yyjson_is_str(v)) {
++        std::string pr = yyjson_get_str(v);
++        if (pr == "bf16" || pr == "f32") {
++            st->precision = pr;
++        } else {
++            *why = "precision must be bf16 or f32";
++            ok   = false;
++        }
++    }
++    yyjson_doc_free(doc);
++    return ok;
++}
++
++static void refresh_loaded() {
++    g_loaded_bytes.store(store_vram_bytes(g_pipeline.store));
++    g_loaded_modules.store(store_gpu_module_count(g_pipeline.store));
++}
++
++// Runs on the worker thread, between jobs: nothing is held while it acts
++static void settings_apply(const EngineSettings & next) {
++    for (const auto & m : g_models) {
++        if (m.first == next.model && g_pipeline.model_path != m.second) {
++            fprintf(stderr, "[Server] Backbone now %s (%s)\n", m.first.c_str(), m.second.c_str());
++            g_pipeline.model_path = m.second;
++            g_model_path          = m.second;
++            store_unload_idle(g_pipeline.store);
++        }
++    }
++    store_set_policy(g_pipeline.store, next.keep_loaded ? EVICT_NEVER : EVICT_STRICT);
++    if ((next.precision == "f32") != g_gf_weights_f32) {
++        g_gf_weights_f32 = next.precision == "f32";
++        store_unload_idle(g_pipeline.store);  // the next song loads the weights in the new form
++        fprintf(stderr, "[Server] Precision now %s\n", g_gf_weights_f32 ? "F32 (weights widened at load)" : "BF16");
++    }
++    g_pipeline.params.vae_core = next.vae_core;
++    if (next.max_seq != g_pipeline.params.max_seq) {
++        qw3lm_kv_free(&g_pipeline.kv);
++        g_pipeline.params.max_seq       = next.max_seq;
++        g_pipeline.kv.cfg.max_seq_len = next.max_seq > 0 ? next.max_seq : YUE2_CONTEXT;
++        fprintf(stderr, "[Server] Context now %d rows\n", g_pipeline.kv.cfg.max_seq_len);
++    }
++    refresh_loaded();
++    {
++        std::lock_guard<std::mutex> lock(mtx_settings);
++        g_settings = next;
++    }
++    if (!g_settings_path.empty()) {
++        write_file(g_settings_path, settings_json(next));
++    }
++}
++
++static std::string hardware_json() {
++    yyjson_mut_doc * doc  = yyjson_mut_doc_new(NULL);
++    yyjson_mut_val * root = yyjson_mut_obj(doc);
++    yyjson_mut_doc_set_root(doc, root);
++    yyjson_mut_val * list = yyjson_mut_arr(doc);
++    for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
++        ggml_backend_dev_t dev = ggml_backend_dev_get(i);
++        if (ggml_backend_dev_type(dev) != GGML_BACKEND_DEVICE_TYPE_GPU) {
++            continue;
++        }
++        size_t free_b = 0, total_b = 0;
++        ggml_backend_dev_memory(dev, &free_b, &total_b);
++        yyjson_mut_val * d = yyjson_mut_obj(doc);
++        yyjson_mut_obj_add_strcpy(doc, d, "name", ggml_backend_dev_name(dev));
++        yyjson_mut_obj_add_strcpy(doc, d, "description", ggml_backend_dev_description(dev));
++        yyjson_mut_obj_add_uint(doc, d, "total_bytes", total_b);
++        yyjson_mut_obj_add_uint(doc, d, "free_bytes", free_b);
++        yyjson_mut_arr_append(list, d);
++    }
++    yyjson_mut_obj_add_val(doc, root, "gpus", list);
++    yyjson_mut_obj_add_uint(doc, root, "loaded_bytes", g_loaded_bytes.load());
++    yyjson_mut_obj_add_int(doc, root, "loaded_modules", g_loaded_modules.load());
++    {
++        std::lock_guard<std::mutex> lock(mtx_active);
++        yyjson_mut_obj_add_bool(doc, root, "busy", g_active_job != nullptr);
++    }
++    char *      json = yyjson_mut_write(doc, 0, NULL);
++    std::string out  = json ? json : "{}";
++    if (json) {
++        free(json);
++    }
++    yyjson_mut_doc_free(doc);
++    return out;
++}
++
++// Queue a task behind any running job and wait briefly for it; true when it ran
++static bool work_run_soon(std::function<void()> fn, int wait_ms) {
++    auto done = std::make_shared<std::promise<void>>();
++    auto fut  = done->get_future();
++    work_push([fn, done] {
++        fn();
++        done->set_value();
++    });
++    return fut.wait_for(std::chrono::milliseconds(wait_ms)) == std::future_status::ready;
++}
++
++static std::string job_status_json(const Job & job) {
++    JobStatus        status = job.status.load();
++    yyjson_mut_doc * doc    = yyjson_mut_doc_new(NULL);
++    yyjson_mut_val * root   = yyjson_mut_obj(doc);
++    yyjson_mut_doc_set_root(doc, root);
++    yyjson_mut_obj_add_str(doc, root, "status",
++                           status == JobStatus::RUNNING && !job.started.load() ? "queued" : job_status_str(status));
++    if (job.lm_seed >= 0) {
++        yyjson_mut_obj_add_sint(doc, root, "lm_seed", job.lm_seed);
++        yyjson_mut_obj_add_sint(doc, root, "seed", job.seed);
++    }
++    if (status == JobStatus::DONE) {
++        yyjson_mut_val * list = yyjson_mut_arr(doc);
++        for (const auto & t : job.takes) {
++            yyjson_mut_arr_add_strcpy(doc, list, t.c_str());
++        }
++        yyjson_mut_obj_add_val(doc, root, "takes", list);
++        if (!job.abc.empty()) {
++            yyjson_mut_obj_add_strncpy(doc, root, "abc", job.abc.c_str(), job.abc.size());
++        }
++    }
++    if (status == JobStatus::FAILED && !job.error.empty()) {
++        yyjson_mut_obj_add_strncpy(doc, root, "error", job.error.c_str(), job.error.size());
++    }
++    char *      json = yyjson_mut_write(doc, 0, NULL);
++    std::string out  = json ? json : "{}";
++    if (json) {
++        free(json);
++    }
++    yyjson_mut_doc_free(doc);
++    return out;
++}
++
+ static void on_signal(int) {
+     active_job_cancel();
+     if (g_svr) {
+@@ -454,6 +1020,30 @@ static void handle_props(const httplib::Request &, httplib::Response & res) {
+     yyjson_mut_obj_add_int(doc, root, "frame_rate", YUE2_FRAME_RATE);
+     yyjson_mut_obj_add_int(doc, root, "context", YUE2_CONTEXT);
+ 
++    // Local additions: decoders, sliders, batch limit, optional features
++    yyjson_mut_val * vaes = yyjson_mut_arr(doc);
++    for (const auto & v : g_vaes) {
++        yyjson_mut_val * item = yyjson_mut_obj(doc);
++        yyjson_mut_obj_add_strcpy(doc, item, "name", v.first.c_str());
++        yyjson_mut_obj_add_strcpy(doc, item, "label", vae_label(v.first));
++        yyjson_mut_obj_add_strcpy(doc, item, "repo", vae_repo(v.first));
++        yyjson_mut_arr_append(vaes, item);
++    }
++    yyjson_mut_obj_add_val(doc, root, "vaes", vaes);
++    yyjson_mut_obj_add_strcpy(doc, root, "default_vae", g_vaes.empty() ? "" : g_vaes[0].first.c_str());
++    yyjson_mut_val * sliders = yyjson_mut_arr(doc);
++    for (const auto & s : g_sliders) {
++        yyjson_mut_val * item = yyjson_mut_obj(doc);
++        yyjson_mut_obj_add_strcpy(doc, item, "id", s.id.c_str());
++        yyjson_mut_obj_add_strcpy(doc, item, "label", s.label.c_str());
++        yyjson_mut_obj_add_strcpy(doc, item, "description", s.description.c_str());
++        yyjson_mut_arr_append(sliders, item);
++    }
++    yyjson_mut_obj_add_val(doc, root, "sliders", sliders);
++    yyjson_mut_obj_add_int(doc, root, "max_batch", g_pipeline.params.max_batch);
++    yyjson_mut_obj_add_bool(doc, root, "transcriber", !g_transcriber_path.empty());
++    yyjson_mut_obj_add_bool(doc, root, "outputs", !g_outputs_dir.empty());
++
+     // The defaults are the request schema itself, serialized by the request
+     // writer and grafted here: one source of truth, one float formatting
+     std::string  def_json = request_to_json(&d, false);
+@@ -512,6 +1102,38 @@ static bool validate(const httplib::Request & req, httplib::Response & res, Yue2
+         res.set_content(json_string("error", "sampling preset outside the protocol bounds"), "application/json");
+         return false;
+     }
++    // Local additions: decoder, sliders, plan_only
++    auto fail = [&](const char * msg) {
++        res.status = 400;
++        res.set_content(json_string("error", msg), "application/json");
++        return false;
++    };
++    if (!r->vae.empty()) {
++        bool known = false;
++        for (const auto & v : g_vaes) {
++            known = known || v.first == r->vae;
++        }
++        if (!known) {
++            return fail("unknown decoder (see /props vaes)");
++        }
++    }
++    for (size_t i = 0; i < r->sliders.size(); i++) {
++        const Yue2SliderChoice & c = r->sliders[i];
++        if (pipeline_slider_path(&g_pipeline, c.id).empty()) {
++            return fail("unknown slider (see /props sliders)");
++        }
++        if (!(c.strength >= 0.0f && c.strength <= 1.0f)) {
++            return fail("slider strength must be between 0 and 1");
++        }
++        for (size_t j = 0; j < i; j++) {
++            if (r->sliders[j].id == c.id) {
++                return fail("a slider is listed twice");
++            }
++        }
++    }
++    if (r->plan_only && (cot == YUE2_COT_OFF || !r->abc.empty() || !r->semantic_tokens.empty())) {
++        return fail("plan_only needs full or melody mode, no supplied score and no semantic stream");
++    }
+     request_resolve_seed(r);
+     return true;
+ }
+@@ -519,6 +1141,7 @@ static bool validate(const httplib::Request & req, httplib::Response & res, Yue2
+ // Transcribe worker: the uploaded recording becomes an ABC score, the chord
+ // symbols dropped when only the melody is wanted.
+ static void run_transcribe(std::shared_ptr<Job> job, std::vector<float> audio, bool melody_only) {
++    job->started.store(true);
+     active_job_set(job);
+     fprintf(stderr, "[Server] Transcribe job %s: %.1f s of audio, %s\n", job->id.c_str(),
+             (double) audio.size() / SS2_SAMPLE_RATE, melody_only ? "melody only" : "full score");
+@@ -535,19 +1158,39 @@ static void run_transcribe(std::shared_ptr<Job> job, std::vector<float> audio, b
+     job->status.store(JobStatus::DONE);
+ }
+ 
++static void refresh_loaded();
++
+ static void run_job(std::shared_ptr<Job> job, Yue2Request request) {
++    struct Refresh {
++        ~Refresh() { refresh_loaded(); }
++    } refresh_after;
++    job->started.store(true);
+     active_job_set(job);
+     fprintf(stderr, "[Server] Job %s: %s\n", job->id.c_str(), request_to_json(&request).c_str());
+ 
+     std::vector<Yue2Song> songs;
++    auto                  started = std::chrono::steady_clock::now();
+     bool ok = pipeline_generate(&g_pipeline, request, &songs, server_cancel_job, (void *) &job->cancel);
++    double render_seconds =
++        std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+ 
+     if (!ok) {
+         active_job_set(nullptr);
++        job->error = "generation failed; the server log has the reason";
+         job->status.store(job->cancel.load() ? JobStatus::CANCELLED : JobStatus::FAILED);
+         return;
+     }
+ 
++    // Local addition: a plan_only job returns the score alone
++    if (request.plan_only) {
++        active_job_set(nullptr);
++        job->abc         = songs.empty() ? "" : songs[0].score;
++        job->result_body = json_string("abc", job->abc);
++        job->result_mime = "application/json";
++        job->status.store(JobStatus::DONE);
++        return;
++    }
++
+     bool      is_mp3  = false;
+     WavFormat wav_fmt = WAV_S16;
+     audio_parse_format(request.output_format.c_str(), is_mp3, wav_fmt);
+@@ -575,6 +1218,14 @@ static void run_job(std::shared_ptr<Job> job, Yue2Request request) {
+         Yue2Request replay = request_replay(request, song.score.empty() ? request.abc : song.score,
+                                             pipeline_format_tokens(song.tokens), (int) t / M, (int) t % M);
+         request_parts.push_back(request_to_json(&replay));
++        // Local addition: every track lands in the library as it is encoded
++        if (!g_outputs_dir.empty()) {
++            std::string name = library_save(replay, audio_parts.back(), is_mp3, song, (int) t, (int) songs.size(),
++                                            (int) t / M, (int) t % M, !request.abc.empty(), render_seconds);
++            if (!name.empty()) {
++                job->takes.push_back(name);
++            }
++        }
+     }
+ 
+     active_job_set(nullptr);
+@@ -594,6 +1245,10 @@ static void print_usage(const char * prog) {
+             "\n"
+             "Optional:\n"
+             "  --transcriber <gguf>   SheetSage2 GGUF, enables /transcribe\n"
++            "  --vae <name>=<gguf>    Another named decoder, selectable per request (repeatable)\n"
++            "  --sliders <dir>        Slider GGUFs + catalog.json (voice and genre sliders)\n"
++            "  --outputs <dir>        Save every track into this song library\n"
++            "  --settings <json>      Engine settings the console can change (model, keep loaded, context, VAE tiles)\n"
+             "  --host <addr>          Listen address (default: 0.0.0.0)\n"
+             "  --port <N>             Listen port (default: 8087)\n"
+             "  --max-batch <N>        Song batch limit, one KV set each (default: 1)\n"
+@@ -621,9 +1276,47 @@ int main(int argc, char ** argv) {
+     for (int i = 1; i < argc; i++) {
+         bool last = i + 1 >= argc;
+         if (!strcmp(argv[i], "--model") && !last) {
+-            g_model_path = argv[++i];
++            // Local addition: NAME=PATH repeatable, a bare path is named after its quant
++            std::string arg = argv[++i];
++            size_t      eq  = arg.find('=');
++            std::string name, path;
++            if (eq != std::string::npos && arg.find('/') > eq) {
++                name = arg.substr(0, eq);
++                path = arg.substr(eq + 1);
++            } else {
++                path = arg;
++                name = model_name_of(path);
++            }
++            g_models.push_back({ name, path });
++            if (g_model_path.empty()) {
++                g_model_path = path;
++            }
++        } else if (!strcmp(argv[i], "--settings") && !last) {
++            g_settings_path = argv[++i];
+         } else if (!strcmp(argv[i], "--vae") && !last) {
+-            g_vae_path = argv[++i];
++            std::string arg = argv[++i];
++            size_t      eq  = arg.find('=');
++            std::string name, path;
++            if (eq != std::string::npos && arg.find('/') > eq) {
++                name = arg.substr(0, eq);
++                path = arg.substr(eq + 1);
++            } else {
++                name = "standard";
++                path = arg;
++            }
++            g_vaes.push_back({ name, path });
++            if (g_vae_path.empty()) {
++                g_vae_path = path;
++            }
++        } else if (!strcmp(argv[i], "--sliders") && !last) {
++            g_pipeline.slider_files.clear();
++            g_sliders.clear();
++            std::string dir = argv[++i];
++            if (!load_slider_catalog(dir)) {
++                return 1;
++            }
++        } else if (!strcmp(argv[i], "--outputs") && !last) {
++            g_outputs_dir = argv[++i];
+         } else if (!strcmp(argv[i], "--transcriber") && !last) {
+             g_transcriber_path = argv[++i];
+         } else if (!strcmp(argv[i], "--host") && !last) {
+@@ -660,11 +1353,41 @@ int main(int argc, char ** argv) {
+ 
+     LogCapture log_capture;
+ 
++    // Local addition: engine settings, from --settings over the boot flags
++    g_settings = { g_models.empty() ? "" : g_models[0].first, g_keep_loaded, params.max_seq, params.vae_core, "bf16" };
++    if (!g_settings_path.empty() && std::filesystem::is_regular_file(g_settings_path)) {
++        std::string why;
++        if (!settings_parse(read_file(g_settings_path), &g_settings, &why)) {
++            fprintf(stderr, "[Server] Settings %s: %s, keeping the valid values\n", g_settings_path.c_str(), why.c_str());
++        }
++        for (const auto & m : g_models) {
++            if (m.first == g_settings.model) {
++                g_model_path = m.second;
++            }
++        }
++        g_keep_loaded    = g_settings.keep_loaded;
++        params.max_seq   = g_settings.max_seq;
++        params.vae_core  = g_settings.vae_core;
++        g_gf_weights_f32 = g_settings.precision == "f32";
++        fprintf(stderr, "[Server] Settings: model %s, precision %s, keep loaded %s, context %d, VAE tiles %d\n",
++                g_settings.model.c_str(), g_settings.precision.c_str(), g_keep_loaded ? "yes" : "no", params.max_seq,
++                params.vae_core);
++    }
++
+     // Model loads go through the store: STRICT by default (one half of the
+     // backbone resident at a time, the cache staying between them), NEVER
+     // with --keep-loaded (everything accumulates)
+     g_pipeline.store            = store_create(g_keep_loaded ? EVICT_NEVER : EVICT_STRICT);
+     g_pipeline.transcriber_path = g_transcriber_path;
++    g_pipeline.vaes             = g_vaes;
++    for (const auto & v : g_vaes) {
++        fprintf(stderr, "[Server] Decoder %s: %s\n", v.first.c_str(), v.second.c_str());
++    }
++    if (!g_outputs_dir.empty()) {
++        std::error_code ec;
++        std::filesystem::create_directories(g_outputs_dir, ec);
++        fprintf(stderr, "[Server] Library: %s\n", g_outputs_dir.c_str());
++    }
+     if (!pipeline_configure(&g_pipeline, g_model_path.c_str(), g_vae_path.c_str(), params)) {
+         store_free(g_pipeline.store);
+         return 1;
+@@ -704,7 +1427,9 @@ int main(int argc, char ** argv) {
+         if (!validate(req, res, &request)) {
+             return;
+         }
+-        auto job = job_create();
++        auto job     = job_create();
++        job->lm_seed = request.lm_seed;
++        job->seed    = request.seed;
+         work_push([job, request] { run_job(job, request); });
+         res.set_content(json_string("id", job->id), "application/json");
+     });
+@@ -744,7 +1469,7 @@ int main(int argc, char ** argv) {
+         }
+         JobStatus status = job->status.load();
+         if (!req.has_param("result")) {
+-            res.set_content(json_string("status", job_status_str(status)), "application/json");
++            res.set_content(job_status_json(*job), "application/json");
+             return;
+         }
+         if (status != JobStatus::DONE) {
+@@ -769,6 +1494,144 @@ int main(int argc, char ** argv) {
+         res.set_content(json_string("status", job_status_str(job->status.load())), "application/json");
+     });
+ 
++    // Local additions: engine settings, unload, hardware
++    svr.Get("/settings", [](const httplib::Request &, httplib::Response & res) {
++        std::lock_guard<std::mutex> lock(mtx_settings);
++        res.set_content(settings_json(g_settings), "application/json");
++    });
++    svr.Post("/settings", [](const httplib::Request & req, httplib::Response & res) {
++        EngineSettings next;
++        {
++            std::lock_guard<std::mutex> lock(mtx_settings);
++            next = g_settings;
++        }
++        std::string why;
++        if (!settings_parse(req.body, &next, &why)) {
++            res.status = 400;
++            res.set_content(json_string("error", why), "application/json");
++            return;
++        }
++        bool applied = work_run_soon([next] { settings_apply(next); }, 3000);
++        std::string body = settings_json(next);
++        body.insert(body.size() - 1, std::string(",\n  \"applied\": ") + (applied ? "true" : "false"));
++        res.set_content(body, "application/json");
++    });
++    svr.Post("/unload", [](const httplib::Request &, httplib::Response & res) {
++        auto freed   = std::make_shared<size_t>(0);
++        bool applied = work_run_soon(
++            [freed] {
++                *freed = store_unload_idle(g_pipeline.store);
++                if (store_policy(g_pipeline.store) == EVICT_NEVER) {
++                    qw3lm_kv_free(&g_pipeline.kv);
++                }
++                refresh_loaded();
++            },
++            3000);
++        char buf[96];
++        snprintf(buf, sizeof(buf), "{\"applied\":%s,\"freed_mb\":%.0f}", applied ? "true" : "false",
++                 applied ? (double) *freed / (1024.0 * 1024.0) : 0.0);
++        res.set_content(buf, "application/json");
++    });
++    svr.Get("/hardware", [](const httplib::Request &, httplib::Response & res) {
++        res.set_content(hardware_json(), "application/json");
++    });
++
++    // Local addition: the song library on disk (--outputs)
++    if (!g_outputs_dir.empty()) {
++        svr.Get("/library", [](const httplib::Request &, httplib::Response & res) {
++            std::lock_guard<std::mutex> lock(mtx_library);
++            res.set_content(library_list_json(), "application/json");
++        });
++        svr.Get("/library/audio", [](const httplib::Request & req, httplib::Response & res) {
++            std::string name = req.get_param_value("name");
++            if (!library_name_ok(name)) {
++                res.status = 404;
++                res.set_content(json_string("error", "no such take"), "application/json");
++                return;
++            }
++            std::string path = audio_file_of(g_outputs_dir + "/" + name);
++            res.set_file_content(path, path.size() > 4 && path.substr(path.size() - 4) == ".mp3" ? "audio/mpeg" :
++                                                                                                    "audio/wav");
++        });
++        // Waveform peaks for the player, read from the audio once and cached
++        svr.Get("/library/peaks", [](const httplib::Request & req, httplib::Response & res) {
++            std::string name = req.get_param_value("name");
++            if (!library_name_ok(name)) {
++                res.status = 404;
++                res.set_content(json_string("error", "no such take"), "application/json");
++                return;
++            }
++            std::string dir   = g_outputs_dir + "/" + name;
++            std::string cache = dir + "/peaks.json";
++            if (!std::filesystem::is_regular_file(cache)) {
++                std::string audio = read_file(audio_file_of(dir));
++                int         T = 0, sr = 0;
++                float *     planar = audio_read_buf((const uint8_t *) audio.data(), audio.size(), &T, &sr);
++                if (!planar || T <= 0) {
++                    free(planar);
++                    res.status = 500;
++                    res.set_content(json_string("error", "cannot decode the audio"), "application/json");
++                    return;
++                }
++                const int   buckets = 900;
++                int         size    = T / buckets > 0 ? T / buckets : 1;
++                std::string out     = "{\"peaks\":[";
++                for (int b = 0; b < buckets && b * size < T; b++) {
++                    float peak = 0.0f;
++                    for (int i = b * size; i < (b + 1) * size && i < T; i++) {
++                        peak = std::max(peak, std::max(fabsf(planar[i]), fabsf(planar[(size_t) T + i])));
++                    }
++                    char num[16];
++                    snprintf(num, sizeof(num), "%s%.3f", b ? "," : "", (double) peak);
++                    out += num;
++                }
++                char tail[64];
++                snprintf(tail, sizeof(tail), "],\"seconds\":%.3f}", (double) T / (sr > 0 ? sr : YUE2_SAMPLE_RATE));
++                out += tail;
++                free(planar);
++                write_file(cache, out);
++            }
++            res.set_content(read_file(cache), "application/json");
++        });
++        svr.Get("/library/request", [](const httplib::Request & req, httplib::Response & res) {
++            std::string name = req.get_param_value("name");
++            if (!library_name_ok(name)) {
++                res.status = 404;
++                res.set_content(json_string("error", "no such take"), "application/json");
++                return;
++            }
++            res.set_content(read_file(g_outputs_dir + "/" + name + "/request.json"), "application/json");
++        });
++        svr.Post("/library/update", [](const httplib::Request & req, httplib::Response & res) {
++            std::string name = req.get_param_value("name");
++            if (!library_name_ok(name) || !library_update(name, req.body)) {
++                res.status = 400;
++                res.set_content(json_string("error", "cannot update that take"), "application/json");
++                return;
++            }
++            std::lock_guard<std::mutex> lock(mtx_library);
++            res.set_content(library_entry_json(name), "application/json");
++        });
++        svr.Post("/library/delete", [](const httplib::Request & req, httplib::Response & res) {
++            std::string name = req.get_param_value("name");
++            if (!library_name_ok(name)) {
++                res.status = 404;
++                res.set_content(json_string("error", "no such take"), "application/json");
++                return;
++            }
++            std::lock_guard<std::mutex> lock(mtx_library);
++            std::error_code             ec;
++            std::filesystem::remove_all(g_outputs_dir + "/" + name, ec);
++            if (ec) {
++                res.status = 500;
++                res.set_content(json_string("error", ec.message()), "application/json");
++                return;
++            }
++            fprintf(stderr, "[Library] Deleted %s\n", name.c_str());
++            res.set_content(json_string("deleted", name), "application/json");
++        });
++    }
++
+     svr.Get("/", [](const httplib::Request & req, httplib::Response & res) {
+         if (req.get_header_value("Accept-Encoding").find("gzip") == std::string::npos) {
+             res.status = 406;
+@@ -780,7 +1643,8 @@ int main(int argc, char ** argv) {
+     });
+ 
+     fprintf(stderr, "[Server] yue-server %s\n", YUE2_VERSION);
+-    fprintf(stderr, "[Server] Listening on %s:%d\n", host, port);
++    // Local patch: print a full URL so terminals turn it into a clickable link.
++    fprintf(stderr, "[Server] Listening on http://%s:%d\n", host, port);
+     // A failed bind must reach the caller: a supervisor that reads only the
+     // exit code would otherwise believe the daemon is up.
+     int exit_code = 0;

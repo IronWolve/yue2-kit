@@ -1,0 +1,50 @@
+From 412fe52dfc096d4cec76f8a586244b04aef2479c Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sun, 27 Sep 2026 16:27:16 -0700
+Subject: [PATCH 35/36] Link the logo: YuE2 opens the model's repo, the CPP
+ badge the engine's
+
+Both open in a new tab and look as before until hovered.
+---
+ tools/console/app.css    | 4 ++++
+ tools/console/index.html | 4 ++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index 6e92db0..f4e373f 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -414,6 +414,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
+ .brand-mark { color: var(--amber); display: flex; }
+ .brand h1 { margin: 0; font: 400 21px/1 var(--display); letter-spacing: .01em; }
+ .brand h1 .two { color: var(--amber); }
++.brand-link { color: inherit; text-decoration: none; }   /* the model's repo */
++.brand-link:hover, .brand-link:focus-visible { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+ .engine-tag {
+   font: 500 9.5px/1 var(--mono);
+   letter-spacing: .08em;
+@@ -422,7 +424,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
+   border: 1px solid var(--patina-dim);
+   border-radius: 20px;
+   padding: 3px 7px;
++  text-decoration: none;   /* a link to the engine's repo */
+ }
++.engine-tag:hover, .engine-tag:focus-visible { color: var(--ink); border-color: var(--line-strong); }
+ 
+ .engine-chip { display: flex; gap: 9px; align-items: center; flex: none; }
+ .engine-chip strong { display: block; font-size: 12.5px; font-weight: 600; line-height: 1.25; }
+diff --git a/tools/console/index.html b/tools/console/index.html
+index a7689a9..88ccf3a 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -24,8 +24,8 @@
+         <path d="M28 13 L36 13 M28 18 L36 18 M28 23 L36 23" stroke="currentColor" stroke-width="1.1" opacity="0.55"/>
+       </svg>
+     </div>
+-    <h1>YuE<span class="two">2</span></h1>
+-    <span class="engine-tag" title="This page runs on the C++ server (yue-server)">cpp</span>
++    <h1><a class="brand-link" href="https://github.com/multimodal-art-projection/YuE" target="_blank" rel="noopener noreferrer" data-tip="YuE, the music model this app runs: its repo on GitHub (opens in a new tab)">YuE<span class="two">2</span></a></h1>
++    <a class="engine-tag" href="https://github.com/ServeurpersoCom/yue2.cpp" target="_blank" rel="noopener noreferrer" data-tip="The C++ engine this page runs on: its repo on GitHub (opens in a new tab)">cpp</a>
+   </div>
+ 
+   <div class="engine-chip" id="engineChip">

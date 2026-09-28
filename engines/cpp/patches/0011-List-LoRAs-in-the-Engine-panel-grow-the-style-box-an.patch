@@ -1,0 +1,240 @@
+From a981672ea4ae28b44e199815a16002d76e513bec Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 20:52:24 -0700
+Subject: [PATCH 11/36] List LoRAs in the Engine panel; grow the style box and
+ count the prompt
+
+The Engine panel lists every LoRA in loras/ under the VAEs: what it steers,
+rank, size and trigger, the ones on in the form marked in use, a file that
+cannot load in red with the reason.
+
+The style box grows with its text (also when the page fills it), and a
+counter under it shows characters and estimated tokens, with style and
+lyrics counted against the room they share in the context (about 11,400
+tokens beside a full score and a six-minute song): amber near it, red past
+it. The style help states the limit.
+---
+ tools/console/app.css    | 10 ++++++
+ tools/console/app.js     |  1 +
+ tools/console/help.js    | 73 ++++++++++++++++++++++++++++++++++++----
+ tools/console/index.html |  4 +++
+ tools/console/loras.js   | 33 ++++++++++++++++--
+ 5 files changed, 112 insertions(+), 9 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index ba60e01..9fdc135 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1540,3 +1540,13 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+ /* copy icon in the Prompt card's corner */
+ .panel-head .copy-icon { align-self: center; color: var(--dim); }
+ .panel-head .copy-icon:hover, .panel-head .copy-icon:focus-visible { color: var(--amber); }
++
++/* a second heading inside an Engine card (LoRAs under the VAEs) */
++.card h3.card-sub { margin-top: 18px; }
++
++/* the style box grows with its text; the meter under it counts the prompt against the context */
++#style { field-sizing: content; min-height: 76px; max-height: 50vh; }
++.size-meter { display: block; margin: 4px 0 0; }
++.size-meter.is-warn { color: var(--amber); }
++.size-meter.is-over { color: var(--bad); }
++
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 9c99842..7e571fe 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -678,6 +678,7 @@
+     }
+   });
+   all('input[name="cot"]').forEach(function (radio) { radio.addEventListener("change", function () { YueLoras.repaint(); }); });
++  YueLoras.listInto($("loraCard"), $("loraCardNote"));   // the Engine panel's list, under the VAEs
+ 
+   /* ------------------------------------------------------- reused codes */
+   // A take's music codes in the form: Generate renders exactly that music
+diff --git a/tools/console/help.js b/tools/console/help.js
+index 256fbc7..165ec16 100644
+--- a/tools/console/help.js
++++ b/tools/console/help.js
+@@ -4,7 +4,9 @@
+ 
+    window.YueHelp:
+      decorate()   add the (i) marks (safe to call again, e.g. after the sampler knobs are rebuilt)
+-     missing()    ids of form and engine controls that have no help, for the page tests */
++     missing()    ids of form and engine controls that have no help, for the page tests
++   It also makes the style box grow with its text and counts the prompt against the model's
++   context under it (#styleMeter). */
+ (function (root) {
+   "use strict";
+ 
+@@ -24,10 +26,13 @@
+     soundSeed: "Fixes only the acoustic noise of the sound stage: the same music (melody, words, timing) played through a different grain. " +
+       "Blank rolls a random one. Change it, or use Re-render sound on a take, to get another rendering in seconds.",
+     style: "What the song should sound like, as short comma-separated phrases: language, genre, singer (e.g. female alto, raspy male), " +
+-      "instruments, mood, tempo (e.g. 92 BPM). Both the score planner and the music read it.",
++      "instruments, mood, tempo (e.g. 92 BPM). Both the score planner and the music read it; it goes in as the prompt's tag list.\n" +
++      "Size: no fixed limit. Style and lyrics share the model's 24,576-token window with the score (up to 4,096) and the song " +
++      "(up to 9,000, six minutes), so together they can take about 11,400 tokens, roughly 40,000 characters of English, " +
++      "before a full-length song no longer fits; the counter under the box keeps count. The box grows with the text.",
+     lyrics: "The words, with section tags such as [Verse], [Pre-Chorus], [Chorus], [Bridge], [Outro] on their own lines. " +
+       "The sections set the song's form, and together with the words its length: more sections, a longer song. " +
+-      "Leave a blank line between sections.",
++      "Leave a blank line between sections. Lyrics count against the same budget as the style (see the counter under the style box).",
+     modes: "Full plan: the model first writes a score (melody and chords) and the song follows it. Best for new songs; the score can be edited.\n" +
+       "Melody only: the score has the melody but no chords, so the accompaniment is free. Recommended for covers.\n" +
+       "Direct: no score; the music is written straight from style and lyrics. Some add-ons (the sliders, some LoRAs) were trained this way.\n" +
+@@ -226,14 +231,70 @@
+     }).map(function (el) { return el.id; });
+   }
+ 
++  // ------------------------------------------------------------ prompt size
++  // What fits: 24,576 context tokens minus the longest score (4,096) and song (9,000) and the
++  // instruction and markers; the rest is shared by style and lyrics.
++  var PROMPT_BUDGET = 24576 - 4096 - 9000 - 80;
++
++  // An estimate without the tokenizer: English runs about 3.6 characters a token, other scripts ~1
++  function estimateTokens(text) {
++    var ascii = 0, other = 0;
++    for (var i = 0; i < text.length; i++) {
++      if (text.charCodeAt(i) < 128) ascii++; else other++;
++    }
++    return Math.ceil(ascii / 3.6 + other);
++  }
++
++  function paintMeter() {
++    var style = document.getElementById("style"), lyrics = document.getElementById("lyrics"), out = document.getElementById("styleMeter");
++    if (!style || !out) return;
++    var s = estimateTokens(style.value), both = s + (lyrics ? estimateTokens(lyrics.value) : 0);
++    out.textContent = style.value.length.toLocaleString() + " characters, about " + s.toLocaleString() + " tokens. " +
++      "Style and lyrics together: about " + both.toLocaleString() + " of " + PROMPT_BUDGET.toLocaleString() + " tokens" +
++      (both > PROMPT_BUDGET ? " \u2014 too long for a full-length song and score." : ".");
++    out.classList.toggle("is-warn", both > PROMPT_BUDGET * 0.75 && both <= PROMPT_BUDGET);
++    out.classList.toggle("is-over", both > PROMPT_BUDGET);
++  }
++
++  function growBox(box) {
++    box.style.height = "auto";
++    box.style.height = Math.min(Math.round(window.innerHeight * 0.5), Math.max(76, box.scrollHeight + 4)) + "px";
++  }
++
++  var watching = false;
++  function watchPrompt() {
++    var style = document.getElementById("style"), lyrics = document.getElementById("lyrics");
++    if (watching || !style) return;
++    watching = true;
++    var sized = window.CSS && CSS.supports && CSS.supports("field-sizing", "content");
++    var last = null;
++    function tick() {
++      var now = style.value.length + ":" + (lyrics ? lyrics.value.length : 0);
++      if (now === last) return;
++      last = now;
++      if (!sized) growBox(style);
++      paintMeter();
++    }
++    style.addEventListener("input", tick);
++    if (lyrics) lyrics.addEventListener("input", tick);
++    setInterval(tick, 700);     // values set by the page itself (examples, reuse, the writer) fire no input event
++    tick();
++  }
++
+   // Pressing an (i) inside a label or a drawer heading must not tick, focus or fold anything.
+   document.addEventListener("click", function (event) {
+     var info = event.target.closest && event.target.closest(".info");
+     if (info && info.closest("label, summary")) event.preventDefault();
+   }, true);
+ 
+-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", decorate);
+-  else decorate();
++  function start() {
++    decorate();
++    watchPrompt();
++  }
++
++  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
++  else start();
+ 
+-  root.YueHelp = { decorate: decorate, missing: missing, text: HELP, knobs: KNOBS };
++  root.YueHelp = { decorate: decorate, missing: missing, text: HELP, knobs: KNOBS, estimateTokens: estimateTokens,
++    promptBudget: PROMPT_BUDGET };
+ })(window);
+diff --git a/tools/console/index.html b/tools/console/index.html
+index e83f96d..dd56790 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -110,6 +110,9 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+       <h3>VAEs</h3>
+       <dl class="kv wrap" id="vaeCard"></dl>
+       <p class="hint">The form picks one per song; a finished song can get another from its page.</p>
++      <h3 class="card-sub">LoRAs <span class="info" tabindex="0" role="img" aria-label="About LoRAs" data-tip-ref="tip-loras">i</span></h3>
++      <dl class="kv wrap" id="loraCard"></dl>
++      <p class="hint" id="loraCardNote"></p>
+     </div>
+ 
+     <div class="card">
+@@ -226,6 +229,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+       <label class="field">
+         <span class="label">Style prompt <em>language, genre, voice, instruments, tempo</em></span>
+         <textarea id="style" rows="3" placeholder="Language, genre, voice, instruments, tempo"></textarea>
++        <span class="row-hint size-meter" id="styleMeter"></span>
+       </label>
+ 
+       <fieldset class="field sound">
+diff --git a/tools/console/loras.js b/tools/console/loras.js
+index 5bb2bc0..15f6809 100644
+--- a/tools/console/loras.js
++++ b/tools/console/loras.js
+@@ -8,11 +8,12 @@
+      setCatalog(list)      [{id, name, halves:["ar","nar"], rank, layout, trigger, hint, mode, size_mb, error}]
+      set(list)             [{id, ar, nar}] from a take, to render it again
+      value()               [{id, ar, nar}] for the request (installed files only)
+-     describe(list)        "sv-billie (music 0.8 · sound 1.0), ..." for a song's info */
++     describe(list)        "sv-billie (music 0.8 · sound 1.0), ..." for a song's info
++     listInto(dl, note)    also keep an Engine-panel list (a <dl class="kv">) of every installed LoRA */
+ (function (root) {
+   "use strict";
+ 
+-  var S = { catalog: [], choice: [], host: null, opts: {} };
++  var S = { catalog: [], choice: [], host: null, opts: {}, list: null, note: null };
+ 
+   function escape(text) {
+     return String(text === undefined || text === null ? "" : text).replace(/[&<>"']/g, function (c) {
+@@ -83,7 +84,32 @@
+     return notes;
+   }
+ 
++  // The Engine panel's list: every file in loras/, what it steers, and which are on in the form
++  function paintList() {
++    if (!S.list) return;
++    var on = {};
++    S.choice.forEach(function (c) { on[c.id] = c; });
++    S.list.innerHTML = S.catalog.length ? S.catalog.map(function (e) {
++      var detail = e.error ? "cannot load: " + e.error
++        : halvesText(e) + " · rank " + e.rank + " · " + e.size_mb + " MB" + (e.trigger ? " · trigger " + e.trigger : "");
++      return '<div data-tip="' + escape(chipTip(e)) + '"><dt>' + escape(e.name) + (on[e.id] ? " · in use" : "") + '</dt><dd class="' +
++        (e.error ? "no" : on[e.id] ? "amber" : "") + '">' + escape(detail) + "</dd></div>";
++    }).join("") : "<div><dt>None</dt><dd>no .safetensors in loras/</dd></div>";
++    if (S.note) {
++      var active = S.choice.filter(function (c) { return entry(c.id); }).length;
++      S.note.textContent = S.catalog.length + " installed in the app's loras/ folder" +
++        (active ? "; " + active + " on in the form (in use)." : ". Pick them per song in the form.");
++    }
++  }
++
++  function listInto(dl, note) {
++    S.list = dl;
++    S.note = note || null;
++    paintList();
++  }
++
+   function paint() {
++    paintList();
+     if (!S.host) return;
+     var on = {};
+     S.choice.forEach(function (c) { on[c.id] = true; });
+@@ -175,5 +201,6 @@
+     }).join(", ");
+   }
+ 
+-  root.YueLoras = { mount: mount, setCatalog: setCatalog, set: set, value: value, describe: describe, repaint: paint };
++  root.YueLoras = { mount: mount, setCatalog: setCatalog, set: set, value: value, describe: describe, repaint: paint,
++    listInto: listInto };
+ })(window);

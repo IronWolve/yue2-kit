@@ -1,0 +1,152 @@
+From fb04ec69877a82b94415cd27d780e0ecfbf72692 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 21:04:31 -0700
+Subject: [PATCH 14/36] Add a New song button; the seed dice now toggles
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+＋ New song at the top of the Compose column (and Clear in the top bar)
+puts every field, the seeds, the score, the mode, sampling, sliders,
+LoRAs, Instrumental and the version count back to their defaults; the
+VAE, output and theme choices stay.
+
+A seed dice on an empty box puts in a random seed to keep or edit, and
+pressed again it clears the box (random each run); its tip says which.
+
+Clear also redraws the sliders it drops (they stayed on screen before).
+---
+ tools/console/app.css    |  3 +++
+ tools/console/app.js     | 48 +++++++++++++++++++++++++++++++++-------
+ tools/console/help.js    |  6 +++--
+ tools/console/index.html |  6 +++--
+ 4 files changed, 51 insertions(+), 12 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index abddff3..875d82f 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1553,3 +1553,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+ /* the take the player is playing says PLAYING in the list */
+ .tag.playing-tag { display: none; color: var(--amber); border-color: var(--amber-dim); }
+ .take.is-playing .tag.playing-tag { display: inline-block; }
++
++/* a seed box with a seed in it: its dice clears it */
++.dice.is-set { color: var(--amber); }
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 7fe4887..d8e6522 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -734,23 +734,55 @@
+   }
+   $("lyrics").addEventListener("input", growLyrics);
+ 
+-  $("rollLmSeed").addEventListener("click", function () {
+-    $("lmSeed").value = Math.floor(Math.random() * 2147483647);
+-  });
+-  $("rollSoundSeed").addEventListener("click", function () {
+-    $("soundSeed").value = Math.floor(Math.random() * 2147483647);
++  // Each dice toggles: an empty box (random each run) gets a seed to keep or edit; a seed is cleared
++  var DICE = [["lmSeed", "rollLmSeed", "music seed"], ["soundSeed", "rollSoundSeed", "sound seed"]];
++  function paintDice() {
++    DICE.forEach(function (d) {
++      var set = !!$(d[0]).value.trim(), dice = $(d[1]);
++      var tip = set ? "Clear the " + d[2] + ": every run picks a random one again"
++                    : "Put in a random " + d[2] + ", to keep or edit (press again to clear it)";
++      dice.classList.toggle("is-set", set);
++      dice.dataset.tip = tip;
++      dice.setAttribute("aria-label", tip);
++    });
++  }
++  DICE.forEach(function (d) {
++    $(d[1]).addEventListener("click", function () {
++      $(d[0]).value = $(d[0]).value.trim() ? "" : Math.floor(Math.random() * 2147483647);
++      paintDice();
++    });
++    $(d[0]).addEventListener("input", paintDice);
++    $(d[1]).addEventListener("mouseover", paintDice);   // seeds the page fills in (Retake, a plan) fire no input
+   });
++  paintDice();
+ 
+-  $("clearForm").addEventListener("click", function () {
++  // A new song: everything about the song back to its default; the VAE, output and theme choices stay
++  function newSong() {
+     ["title", "style", "lyrics", "abc", "lmSeed", "soundSeed", "cfg"].forEach(function (id) { $(id).value = ""; });
++    setCot("full");
++    $("instrumental").checked = false;
++    all("input[data-group]").forEach(function (input) {
++      input.value = round(samplingDefault(input.dataset.group, input.dataset.key), 6);
++    });
+     $("cfg").dataset.touched = "";
+     fillCfg();
++    syncShape();
++    $("versions").value = 1;
++    $("variations").value = 1;
+     STATE.sliderChoice = [];
++    paintSliders();
+     YueLoras.set([]);
+     setCodes(null);
++    $("scoreDrawer").open = false;
+     growLyrics();
+-    toast("Form cleared");
+-  });
++    paintDice();
++    show("compose");
++    $("view-compose").scrollTop = 0;
++    $("title").focus();
++    toast("New song: the form is back to its defaults (your VAE, output and theme choices stay)");
++  }
++  $("newSong").addEventListener("click", newSong);
++  $("clearForm").addEventListener("click", newSong);
+ 
+   $("loadExample").addEventListener("click", function () {
+     var examples = window.YUE2_EXAMPLES || [];
+diff --git a/tools/console/help.js b/tools/console/help.js
+index 165ec16..838c55c 100644
+--- a/tools/console/help.js
++++ b/tools/console/help.js
+@@ -22,9 +22,11 @@
+     title: "Names the take in the library and every file it downloads as (date-time-title). " +
+       "It is not sent to the model and does not change the song.",
+     seed: "One number that fixes the random draws of the score and the music: the same seed, prompt and settings give the same song. " +
+-      "Blank rolls a random one. Every take keeps its seed, so a good one can be reused with a small change to the prompt.",
++      "Blank means random: every run picks a new one. The dice puts a random seed in the box to keep or edit; press it again to clear the box. " +
++      "Every take keeps its seed, so a good one can be reused with a small change to the prompt (Retake).",
+     soundSeed: "Fixes only the acoustic noise of the sound stage: the same music (melody, words, timing) played through a different grain. " +
+-      "Blank rolls a random one. Change it, or use Re-render sound on a take, to get another rendering in seconds.",
++      "Blank means random each run; the dice puts one in, and pressing it again clears it. Change it, or use Re-render sound on a take, " +
++      "to get another rendering in seconds.",
+     style: "What the song should sound like, as short comma-separated phrases: language, genre, singer (e.g. female alto, raspy male), " +
+       "instruments, mood, tempo (e.g. 92 BPM). Both the score planner and the music read it; it goes in as the prompt's tag list.\n" +
+       "Size: no fixed limit. Style and lyrics share the model's 24,576-token window with the score (up to 4,096) and the song " +
+diff --git a/tools/console/index.html b/tools/console/index.html
+index f5f25d8..3ac752e 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -161,6 +161,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+     <div class="col-head">
+       <h2>Compose</h2>
+       <span class="col-note">symbols in, sound out</span>
++      <div class="spacer"></div>
++      <button type="button" class="btn ghost small" id="newSong" data-tip="Start a new song: every field, both seeds, the score, loaded music codes, the mode, sampling, sliders, LoRAs and Instrumental back to their defaults. Your VAE, output and theme choices stay.">＋ New song</button>
+     </div>
+ 
+     <details class="drawer" id="museDrawer">
+@@ -210,7 +212,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+           <span class="label">Music seed <span class="info" tabindex="0" role="img" aria-label="About the two seeds" data-tip-ref="tip-seeds">i</span></span>
+           <div class="seed-wrap">
+             <input type="text" id="lmSeed" placeholder="random" inputmode="numeric" autocomplete="off" spellcheck="false" />
+-            <button type="button" class="dice" id="rollLmSeed" title="Roll a new music seed" aria-label="Roll a new music seed">
++            <button type="button" class="dice" id="rollLmSeed" aria-label="Put in a random music seed">
+               <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><rect x="2.5" y="2.5" width="15" height="15" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/><circle cx="13" cy="13" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/></svg>
+             </button>
+           </div>
+@@ -219,7 +221,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+           <span class="label">Sound seed</span>
+           <div class="seed-wrap">
+             <input type="text" id="soundSeed" placeholder="random" inputmode="numeric" autocomplete="off" spellcheck="false" />
+-            <button type="button" class="dice" id="rollSoundSeed" title="Roll a new sound seed" aria-label="Roll a new sound seed">
++            <button type="button" class="dice" id="rollSoundSeed" aria-label="Put in a random sound seed">
+               <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><rect x="2.5" y="2.5" width="15" height="15" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/><circle cx="13" cy="13" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/></svg>
+             </button>
+           </div>

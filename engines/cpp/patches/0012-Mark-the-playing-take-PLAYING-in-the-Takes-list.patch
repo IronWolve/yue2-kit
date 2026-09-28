@@ -1,0 +1,62 @@
+From 70517bb8b6a87a9a47296c6720bcdc1e130f0e21 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 20:56:40 -0700
+Subject: [PATCH 12/36] Mark the playing take PLAYING in the Takes list
+
+The card of the song the player is playing shows a PLAYING tag beside its
+mode; it follows the player (play, pause, end, switching songs) and survives
+the list being redrawn.
+---
+ tools/console/app.css |  3 +++
+ tools/console/app.js  | 19 +++++++++++++++----
+ 2 files changed, 18 insertions(+), 4 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index 9fdc135..abddff3 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1550,3 +1550,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+ .size-meter.is-warn { color: var(--amber); }
+ .size-meter.is-over { color: var(--bad); }
+ 
++/* the take the player is playing says PLAYING in the list */
++.tag.playing-tag { display: none; color: var(--amber); border-color: var(--amber-dim); }
++.take.is-playing .tag.playing-tag { display: inline-block; }
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 7e571fe..9b1b0c9 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -3166,9 +3166,18 @@
+   });
+ 
+   paintVolume();
+-  audio.addEventListener("play", function () { $("playGlyph").textContent = "❚❚"; });
+-  audio.addEventListener("pause", function () { $("playGlyph").textContent = "▶"; });
+-  audio.addEventListener("ended", function () { $("playGlyph").textContent = "▶"; });
++  audio.addEventListener("play", function () { $("playGlyph").textContent = "❚❚"; markPlaying(); });
++  audio.addEventListener("pause", function () { $("playGlyph").textContent = "▶"; markPlaying(); });
++  audio.addEventListener("ended", function () { $("playGlyph").textContent = "▶"; markPlaying(); });
++  audio.addEventListener("emptied", markPlaying);
++
++  // The card of the song that is playing says so (the list redraws often, so this runs after it too)
++  function markPlaying() {
++    var name = isPlaying() && STATE.playerTake ? STATE.playerTake.name : "";
++    all("#libList .take[data-name]").forEach(function (card) {
++      card.classList.toggle("is-playing", !!name && card.dataset.name === name);
++    });
++  }
+   audio.addEventListener("timeupdate", function () {
+     $("timeNow").textContent = clock(audio.currentTime);
+     drawWave();
+@@ -3344,8 +3353,10 @@
+         '.mp3" title="Download MP3 (' + mp3Rate() + ' kbps)" aria-label="Download MP3">mp3</a>') +
+         '<div class="take-title">' + escape(title) + "</div>" +
+         '<div class="take-style">' + escape(take.style || "") + "</div>" +
+-        '<div class="take-foot">' + tags + "<span>" + clock(take.seconds) + "</span><span>" + ago(take.created) + "</span></div></article>";
++        '<div class="take-foot"><span class="tag playing-tag">playing</span>' + tags + "<span>" + clock(take.seconds) + "</span><span>" +
++        ago(take.created) + "</span></div></article>";
+     }).join("");
++    markPlaying();
+   }
+ 
+   $("libList").addEventListener("click", function (event) {

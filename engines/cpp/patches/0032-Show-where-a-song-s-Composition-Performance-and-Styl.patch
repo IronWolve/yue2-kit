@@ -1,0 +1,72 @@
+From 4e31073e4b80962665178353c62f52bbfdf95380 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sun, 27 Sep 2026 15:18:34 -0700
+Subject: [PATCH 32/36] Show where a song's Composition, Performance and Style
+ influence sliders sat
+
+The song info names each slider's position (lowest to highest), or says custom with the values, from the saved request; Style influence replaces the plain Guidance row and still shows the guidance value.
+---
+ tools/console/app.js | 32 +++++++++++++++++++++++++++++---
+ 1 file changed, 29 insertions(+), 3 deletions(-)
+
+diff --git a/tools/console/app.js b/tools/console/app.js
+index e481df2..9a9392c 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -54,6 +54,7 @@
+     session: [],        // takes kept in this tab when the server has no library
+     take: null,         // the take being inspected
+     requests: {},       // replay requests by take name
++    noRequest: {},      // takes whose saved request could not be read
+     peakCache: {},      // waveform peaks by audio url
+     peakLoading: {},
+     peaks: null,
+@@ -2688,12 +2689,35 @@
+     paintPlayHere();
+   }
+ 
++  // Where a song's sampling sat on the three shape sliders: the position's name, or "custom" with the
++  // values. Keys a saved request leaves out are the defaults.
++  function shapeOf(id, sampling) {
++    var spec = SHAPES[id], pos = -1;
++    var value = function (key) {
++      return sampling && sampling[key] !== undefined ? round(Number(sampling[key]), 6) : round(samplingDefault(spec.group, key), 6);
++    };
++    spec.steps.forEach(function (v, i) { if (spec.keys.every(function (k, j) { return value(k) === v[j]; })) pos = i; });
++    return pos >= 0 ? SHAPE_LABELS[pos]
++      : "custom: temperature " + value("temperature") + " · top-p " + value("top_p") + " · top-k " + value("top_k");
++  }
++
++  function styleInfluence(take) {
++    var auto = !(typeof take.cfg_scale === "number" && take.cfg_scale >= 0), fallback = take.cot === "off" ? 1.01 : 1.0;
++    var value = auto ? fallback : round(take.cfg_scale, 3);
++    var pos = value === fallback ? 2 : SHAPES.shapeStyle.cfg.indexOf(value);
++    return (pos >= 0 ? SHAPE_LABELS[pos] : "custom") + " · guidance " + (auto ? "default " + (take.cot === "off" ? "1.01" : "1.0") : value);
++  }
++
+   function paintTakeMeta() {
+     var take = STATE.take;
+     if (!take) return;
+     var labels = sliderLabels();
+-    var cfg = typeof take.cfg_scale === "number" && take.cfg_scale >= 0 ? String(round(take.cfg_scale, 3))
+-      : "default " + (take.cot === "off" ? "1.01" : "1.0");
++    // Composition and Performance come from the saved request: fetched once, then painted again
++    var req = STATE.requests[take.name], shapes = req ? true : (STATE.noRequest[take.name] ? false : null);
++    if (shapes === null) {
++      getRequest(take).then(function () { if (STATE.take === take) paintTakeMeta(); })
++        .catch(function () { STATE.noRequest[take.name] = true; if (STATE.take === take) paintTakeMeta(); });
++    }
+     var cells = [
+       ["Length", clock(take.seconds)],
+       ["Mode", MODES[take.cot] || take.cot || "—"],
+@@ -2705,7 +2729,9 @@
+         return (labels[c.id] || c.id) + " " + round(c.strength, 2); }).join(", ") : "none"],
+       ["LoRAs", (take.loras || []).length ? YueLoras.describe(take.loras) : "none"],
+       ["Steps", take.steps || "—"],
+-      ["Guidance", cfg],
++      ["Composition", shapes ? shapeOf("shapeComposition", req.abc_sampling) : (shapes === null ? "…" : "—")],
++      ["Performance", shapes ? shapeOf("shapePerformance", req.semantic_sampling) : (shapes === null ? "…" : "—")],
++      ["Style influence", styleInfluence(take)],
+       ["Format", FORMAT_LABELS[take.format] || take.format || "—"],
+       ["Render time", take.render_seconds ? clock(take.render_seconds) : "—"]
+     ];

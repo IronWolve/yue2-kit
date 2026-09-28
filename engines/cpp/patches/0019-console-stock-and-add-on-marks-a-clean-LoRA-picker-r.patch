@@ -1,0 +1,498 @@
+From 13ba5f4da0f82003d9e06da7bbd16e0d6e116239 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 08:48:18 -0700
+Subject: [PATCH 19/36] console: stock and add-on marks, a clean LoRA picker,
+ read-only engine tiles
+
+The form's LoRA buttons become one even grid: each shows a short name, the
+half it steers and a few words on what it does (from sources.json, else the
+file's own name and style note). Stock and add-on are marked the same way
+everywhere: the Sliders and LoRAs headings and the Blend VAE carry an ADD-ON
+badge in the form; the Engine VAE tiles say STOCK or ADD-ON, and the Engine
+gets a Sliders card (an add-on: its source link, an (i) recap, one tile per
+slider). Engine tiles lose their On/Off buttons and only mark what the song
+form has picked; the form is where things are chosen.
+---
+ tools/console/app.css    | 34 +++++++++++++++------
+ tools/console/app.js     | 55 ++++++++++++++++++++++------------
+ tools/console/index.html | 27 ++++++++++-------
+ tools/console/loras.js   | 58 ++++++++++++++++++++----------------
+ tools/console/vaes.js    | 64 +++++++++++++++++++++++-----------------
+ 5 files changed, 147 insertions(+), 91 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index b4c10fb..7c73797 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1551,13 +1551,22 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+ .lora-item.is-bad { border-left-color: var(--bad); }
+ .lora-item-head { display: flex; align-items: flex-start; gap: 8px; }
+ .lora-item-name { flex: 1; min-width: 0; font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+-.lora-item-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; flex: none; max-width: 55%; }
+ .lora-item-meta { margin-top: 4px; font: 11px/1.45 var(--mono); color: var(--dim); overflow-wrap: anywhere; }
+ .lora-item.is-bad .lora-item-meta { color: var(--bad); }
+-.lora-switch { flex: none; min-width: 42px; padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent;
+-  color: var(--dim); font: 600 10.5px/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+-.lora-switch:hover { color: var(--ink); border-color: var(--amber-dim); }
+-.lora-switch[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--on-amber); }
++
++/* the form's LoRA buttons: one even grid; each shows its name, the half it steers and a few words */
++.lora-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
++.lora-pick { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 1px 8px; min-width: 0;
++  padding: 6px 10px 7px; text-align: left; background: var(--sunk); border: 1px solid var(--line-soft); border-radius: var(--r-sm);
++  color: var(--ink); cursor: pointer; }
++.lora-pick:hover, .lora-pick:focus-visible { border-color: var(--amber-dim); background: var(--hover); outline: none; }
++.lora-pick.is-on { border-color: var(--amber); box-shadow: inset 3px 0 0 var(--amber); }
++.lora-pick:disabled { cursor: not-allowed; opacity: .55; border-style: dashed; }
++.lora-pick-name { min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++.lora-pick-half { font: 600 9.5px/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
++.lora-pick.is-on .lora-pick-half { color: var(--amber); }
++.lora-pick-tag { grid-column: 1 / -1; min-width: 0; font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++.lora-pick:disabled .lora-pick-tag { color: var(--bad); }
+ 
+ /* Engine tiles: the source link and the (i) recap under each name; official or third-party VAEs */
+ .tile-src { display: flex; align-items: center; gap: 2px; margin-top: 3px; min-width: 0; }
+@@ -1567,10 +1576,17 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+ .tile-link:hover, .tile-link:focus-visible { color: var(--amber); outline: none; }
+ .tile-link:hover span, .tile-link:focus-visible span { text-decoration: underline; }
+ .tile-src .info { flex: none; }
+-.tile-kind { display: inline-block; margin-left: 8px; padding: 0 6px; vertical-align: 1px; border: 1px solid var(--line-strong); border-radius: 999px;
+-  color: var(--muted); font: 600 9.5px/1.5 var(--sans); letter-spacing: .06em; text-transform: uppercase; cursor: help; }
+-.tile-kind.is-third { border-style: dashed; border-color: var(--amber-dim); color: var(--amber); }
+-.vae-item.is-third { border-style: dashed; border-left-style: solid; }
++/* STOCK (shipped with the model by its publisher) or ADD-ON (made by someone else): the same small mark everywhere */
++.kind-badge { display: inline-block; margin-left: 8px; padding: 0 6px; vertical-align: 2px; border: 1px solid var(--line-strong); border-radius: 999px;
++  color: var(--muted); font: 600 9.5px/1.5 var(--sans); font-style: normal; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; cursor: help; }
++.kind-badge.is-addon { border-style: dashed; border-color: var(--amber-dim); color: var(--amber); }
++.label .kind-badge { margin-left: 4px; }
++.toggle .kind-badge { margin-left: 6px; vertical-align: 1px; }
++.vae-item.is-addon { border-style: dashed; border-left-style: solid; }
++.card-src { margin: -4px 0 10px; }
++.tile-state { flex: none; margin-top: 2px; font: 600 9.5px/1.5 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--amber); white-space: nowrap; }
++.slider-list { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
++.slider-item .lora-item-meta { font: 12px/1.45 var(--sans); color: var(--muted); }
+ 
+ /* the style box grows with its text; the meter under it counts the prompt against the context */
+ #style { field-sizing: content; min-height: 76px; max-height: 50vh; }
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 401f469..0079293 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -87,9 +87,9 @@
+ 
+   var VAE_NOTES = { standard: "best sound", legacy: "benchmark", blend: "\u2154 standard, \u2153 legacy" };
+   var VAE_NOTES_LONG = {
+-    standard: "current official, best sound",
+-    legacy: "older official, used for the published scores",
+-    blend: "community mix, \u2154 Standard + \u2153 Legacy"
++    standard: "stock: current official, best sound",
++    legacy: "stock: older official, used for the published scores",
++    blend: "add-on: a community mix, \u2154 Standard + \u2153 Legacy"
+   };
+   var FORMAT_LABELS = { wav24: "WAV 24-bit", wav16: "WAV 16-bit", wav32: "WAV 32-bit float", mp3: "MP3" };
+   var MODES = { full: "Full plan", melody: "Melody only", off: "Direct" };
+@@ -569,7 +569,7 @@
+     var current = selectedVae(true);
+     $("decoders").innerHTML = STATE.vaes.map(function (v) {
+       return '<label class="toggle" data-tip="' + escape(v.repo || v.name) + '"><input type="radio" name="vae" value="' +
+-        escape(v.name) + '" /><span>' + escape(v.label || v.name) + "</span>" +
++        escape(v.name) + '" /><span>' + escape(v.label || v.name) + (YueVaes.kindOf(v) === "add-on" ? YueVaes.badge("add-on") : "") + "</span>" +
+         (VAE_NOTES[v.name] ? "<small>" + VAE_NOTES[v.name] + "</small>" : "") + "</label>";
+     }).join("");
+     var want = current || recall("yue2.vae");
+@@ -593,11 +593,8 @@
+ 
+   $("decoders").addEventListener("change", function () { store("yue2.vae", selectedVae()); YueVaes.repaint(); });
+ 
+-  // The Engine panel's VAE tiles (vaes.js): a tile's switch picks the form's VAE
+-  YueVaes.listInto($("vaeCard"), $("vaeCardNote"), {
+-    current: function () { return selectedVae(true) || ""; },
+-    choose: function (name) { checkVae(name); store("yue2.vae", selectedVae()); }
+-  });
++  // The Engine panel's VAE tiles (vaes.js) mark the one the form has picked
++  YueVaes.listInto($("vaeCard"), $("vaeCardNote"), { current: function () { return selectedVae(true) || ""; } });
+ 
+   /* ------------------------------------------------------------- sliders */
+   // Voice and genre sliders from the server's catalogue: tap to add, stack any
+@@ -609,13 +606,38 @@
+     return labels;
+   }
+ 
++  var NO_SLIDERS = "None on this server. Start it with --sliders to add voice and genre sliders.";
++
++  // The Engine panel's Sliders card: where they come from (an add-on) and one tile per slider, the ones
++  // in the song form marked. For reading: the form's chips add and remove them.
++  function paintSliderCard() {
++    var list = STATE.sliderCatalog || [], chosen = {}, src = (STATE.sources || {}).sliders || {};
++    STATE.sliderChoice.forEach(function (c) { chosen[c.id] = c; });
++    $("sliderSource").innerHTML = (src.url
++      ? '<a class="tile-link" href="' + escape(src.url) + '" target="_blank" rel="noopener noreferrer" data-tip="' +
++        escape("Open its model card (new tab): " + src.url) + '"><span>' + escape(src.repo || src.url) + "</span>\u2197</a>" : "") +
++      (src.about ? '<span class="info" tabindex="0" role="img" aria-label="About the sliders" data-tip="' + escape(src.about) + '">i</span>' : "");
++    $("sliderCard").innerHTML = list.map(function (e) {
++      var on = chosen[e.id], ok = e.installed !== false;
++      var meta = [e.description || "", ok ? "" : "not downloaded"].filter(Boolean).join(" · ");
++      return '<li class="lora-item slider-item' + (on ? " is-on" : "") + (ok ? "" : " is-bad") + '" data-slider-tile="' + escape(e.id) + '">' +
++        '<div class="lora-item-head"><span class="lora-item-name">' + escape(e.label || e.id) + "</span>" +
++        (on ? '<span class="tile-state">in the song form \u00b7 ' + Number(on.strength).toFixed(2) + "</span>" : "") + "</div>" +
++        '<div class="lora-item-meta">' + escape(meta) + "</div></li>";
++    }).join("");
++    $("sliderCardNote").textContent = list.length
++      ? list.length + " voice and genre sliders" + (STATE.sliderChoice.length ? " · " + STATE.sliderChoice.length + " in the song form" : " · none in the song form")
++      : NO_SLIDERS;
++  }
++
+   function paintSliders() {
++    paintSliderCard();
+     var catalog = STATE.sliderCatalog || [], labels = sliderLabels(), on = {};
+     STATE.sliderChoice.forEach(function (choice) { on[choice.id] = choice; });
+     $("sliderChips").innerHTML = catalog.length ? catalog.map(function (entry) {
+       return '<button type="button" class="chip' + (on[entry.id] ? " is-on" : "") + '" data-slider="' + escape(entry.id) + '"' +
+         ' aria-pressed="' + (on[entry.id] ? "true" : "false") + '" data-tip="' +
+-        escape((entry.description ? entry.description + "\n" : "") + "ntc-ai/yue2-particle-sliders \u00b7 " + entry.id) + '">' +
++        escape((entry.description ? entry.description + "\n" : "") + "Add-on slider (see Engine \u203a Sliders) \u00b7 " + entry.id) + '">' +
+         escape(entry.label || entry.id) + "</button>";
+     }).join("") : '<span class="row-hint">No sliders on this server (start it with --sliders).</span>';
+     $("sliderActive").innerHTML = STATE.sliderChoice.map(function (choice) {
+@@ -2226,13 +2248,7 @@
+       return "<div><dt>" + row[0] + '</dt><dd class="' + row[2] + '" title="' + escape(row[1]) + '">' + escape(row[1]) + "</dd></div>";
+     }).join("");
+     YueVaes.set(STATE.vaes, STATE.defaultVae);
+-    var sliders = STATE.sliderCatalog || [];
+-    $("sliderCardNote").textContent = sliders.length
+-      ? sliders.length + " installed (LoRA plugin ntc-ai/yue2-particle-sliders); pick them per song in the form."
+-      : "None on this server. Start it with --sliders to add voice and genre sliders.";
+-    $("sliderCard").innerHTML = sliders.map(function (entry) {
+-      return '<span class="chip static" data-tip="' + escape(entry.description || entry.id) + '">' + escape(entry.label || entry.id) + "</span>";
+-    }).join("");
++    paintSliderCard();
+     paintStrip();
+     // Transcription needs the server's transcriber.
+     $("coverFromAudio").disabled = !STATE.transcriber;
+@@ -2255,8 +2271,9 @@
+     STATE.defaultVae = props.default_vae || STATE.vaes[0].name;
+     STATE.sliderCatalog = Array.isArray(props.sliders) ? props.sliders : [];
+     YueLoras.setCatalog(Array.isArray(props.loras) ? props.loras : []);
+-    YueLoras.setSources((props.sources || {}).loras);
+-    YueVaes.setSources((props.sources || {}).vaes);
++    STATE.sources = props.sources || {};
++    YueLoras.setSources(STATE.sources.loras);
++    YueVaes.setSources(STATE.sources.vaes);
+     STATE.maxBatch = Math.max(1, parseInt(props.max_batch, 10) || 1);
+     STATE.transcriber = !!props.transcriber;
+     STATE.library = props.outputs !== false;
+diff --git a/tools/console/index.html b/tools/console/index.html
+index 1a30e7b..e9e33d0 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -115,15 +115,16 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+     </div>
+ 
+     <div class="card wide lora-card">
+-      <div class="lora-card-head"><h3>LoRAs <span class="info" tabindex="0" role="img" aria-label="About LoRAs" data-tip-ref="tip-loras">i</span></h3>
++      <div class="lora-card-head"><h3>LoRAs <span class="kind-badge is-addon" data-tip="Add-on: made by a third party, not the model&#39;s publisher">add-on</span> <span class="info" tabindex="0" role="img" aria-label="About LoRAs" data-tip-ref="tip-loras">i</span></h3>
+         <span class="lora-card-note" id="loraCardNote"></span></div>
+       <ul class="lora-list" id="loraCard"></ul>
+     </div>
+ 
+-    <div class="card">
+-      <h3>Sliders</h3>
+-      <p class="hint" id="sliderCardNote"></p>
+-      <div class="chiprow" id="sliderCard"></div>
++    <div class="card wide lora-card">
++      <div class="lora-card-head"><h3>Sliders <span class="kind-badge is-addon" data-tip="Add-on: made by a third party, not the model&#39;s publisher">add-on</span></h3>
++        <span class="lora-card-note" id="sliderCardNote"></span></div>
++      <div class="tile-src card-src" id="sliderSource"></div>
++      <ul class="lora-list slider-list" id="sliderCard"></ul>
+     </div>
+ 
+     <div class="card writer-card">
+@@ -245,14 +246,14 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+       </fieldset>
+ 
+       <fieldset class="field sound">
+-        <span class="label">Sliders <span class="info" tabindex="0" role="img" aria-label="About the sliders" data-tip-ref="tip-sliders">i</span><em>voice and genre while the music is written; 0 is off, 1 is full</em></span>
++        <span class="label">Sliders <span class="kind-badge is-addon" data-tip="Add-on: made by a third party, not the model&#39;s publisher">add-on</span> <span class="info" tabindex="0" role="img" aria-label="About the sliders" data-tip-ref="tip-sliders">i</span><em>voice and genre while the music is written; 0 is off, 1 is full</em></span>
+         <div class="slider-active" id="sliderActive"></div>
+         <div class="slider-chips" id="sliderChips"></div>
+         <p class="row-hint" id="sliderHint"></p>
+       </fieldset>
+ 
+       <fieldset class="field sound">
+-        <span class="label">LoRAs <span class="info" tabindex="0" role="img" aria-label="About LoRAs" data-tip-ref="tip-loras">i</span><em>trained add-ons: a strength for the music half and for the sound half</em></span>
++        <span class="label">LoRAs <span class="kind-badge is-addon" data-tip="Add-on: made by a third party, not the model&#39;s publisher">add-on</span> <span class="info" tabindex="0" role="img" aria-label="About LoRAs" data-tip-ref="tip-loras">i</span><em>a strength for the music half and for the sound half</em></span>
+         <div id="loraPicker"></div>
+       </fieldset>
+ 
+@@ -591,7 +592,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+   Your style and lyrics fields stay as you wrote them.
+ </template>
+ <template id="tip-loras">
+-  <span class="tip-kind">LoRA &middot; a trained add-on</span>
++  <span class="tip-kind">LoRA &middot; add-on, not stock</span>
+   <p>A LoRA is a small file of weight changes someone trained on a style, a genre or an artist.
+     It is added into the model for this song, then taken out again.</p>
+   <dl>
+@@ -616,9 +617,13 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+   <p>A finished song can get another VAE version from its page, in seconds.</p>
+ </template>
+ <template id="tip-sliders">
+-  <span class="tip-kind">LoRA plugin &middot; <code>ntc-ai/yue2-particle-sliders</code></span>
+-  <p>Small add-ons that nudge the song model toward a voice or a genre while it writes the music,
+-    so they change what is played, not just how it sounds.</p>
++  <span class="tip-kind">Sliders &middot; add-on, not stock</span>
++  <p>None of these ship with the model: all of them are one outside maker's add-on (its link and
++    details are in Engine &rsaquo; Sliders). Each nudges the song model toward a voice or a genre while
++    it writes the music, so they change what is played, not just how it sounds.</p>
++  <p>A cousin of a LoRA, not a LoRA: a small trained network that adapts its push to the music as it
++    goes, so it runs live beside the model instead of being merged in. Each one active slows the
++    music stage a little.</p>
+   <p>Tap to add; 0 is off, 1 is full; stack as many as you like. Trained in Direct mode; applied only
+     while the music tokens are written, never to the score or the sound. Experimental.</p>
+ </template>
+diff --git a/tools/console/loras.js b/tools/console/loras.js
+index f2af89d..6553ee4 100644
+--- a/tools/console/loras.js
++++ b/tools/console/loras.js
+@@ -35,11 +35,20 @@
+       ? parts.slice(0, -1).join(" / ") : stem;
+   }
+ 
++  // A short name: sources.json's title, else the file's own name
+   function nameOf(id) {
+-    var e = entry(id);
+-    return e ? e.name : fallbackName(id);
++    var e = entry(id), src = source(id);
++    return src && src.title ? src.title : e ? e.name : fallbackName(id);
+   }
+ 
++  // A few words on what it does, for inside its button: sources.json's tag, else the file's style note
++  function tagOf(e) {
++    var src = source(e.id), hint = String(e.hint || "").split(/[,.;]/)[0].trim();
++    return src && src.tag ? src.tag : hint.length <= 32 ? hint : hint.slice(0, 31) + "\u2026";
++  }
++
++  function halfShort(e) { return has(e, "ar") && has(e, "nar") ? "both" : has(e, "ar") ? "music" : "sound"; }
++
+   // The sources.json entry for a file: its exact id, else the longest folder prefix of it
+   function source(id) {
+     var best = "";
+@@ -61,8 +70,8 @@
+   }
+ 
+   function chipTip(e) {
+-    if (e.error) return e.name + "\nCannot load: " + e.error;
+-    var lines = [e.name + " · " + halvesText(e) + (has(e, "ar") && has(e, "nar") ? " halves" : " half"),
++    if (e.error) return nameOf(e.id) + "\nCannot load: " + e.error;
++    var lines = [nameOf(e.id) + " · " + halvesText(e) + (has(e, "ar") && has(e, "nar") ? " halves" : " half"),
+       "rank " + e.rank + ", " + e.layout + " layout, " + e.size_mb + " MB"];
+     if (triggerOf(e)) lines.push("Trigger word: " + triggerOf(e));
+     if (e.mode) lines.push("Trained in " + (e.mode === "direct" ? "Direct" : e.mode) + " mode");
+@@ -98,26 +107,24 @@
+     S.choice.forEach(function (c) {
+       var e = entry(c.id);
+       if (!e) { notes.push(fallbackName(c.id) + " is no longer in loras/ and will be left out."); return; }
+-      if (triggerOf(e)) notes.push(e.name + ": put its trigger word “" + triggerOf(e) + "” in the style.");
+-      if (e.mode === "direct" && cot && cot !== "off") notes.push(e.name + " was trained in Direct mode.");
+-      if (e.mode && e.mode !== "direct" && cot === "off") notes.push(e.name + " was trained with a score (" + e.mode + " mode).");
+-      if (c.ar > 1) notes.push(e.name + ": above 1.0 on the music half, vocals often fall apart.");
++      var name = nameOf(c.id);
++      if (triggerOf(e)) notes.push(name + ": put its trigger word “" + triggerOf(e) + "” in the style.");
++      if (e.mode === "direct" && cot && cot !== "off") notes.push(name + " was trained in Direct mode.");
++      if (e.mode && e.mode !== "direct" && cot === "off") notes.push(name + " was trained with a score (" + e.mode + " mode).");
++      if (c.ar > 1) notes.push(name + ": above 1.0 on the music half, vocals often fall apart.");
+     });
+     if (S.choice.length > 1) notes.push(S.choice.length + " stacked: their changes add up.");
+     return notes;
+   }
+ 
+-  // The Engine panel's list: one tile per file in loras/ (name, halves, in use), details under it
++  // The Engine panel's list: one tile per file in loras/ (name, source, details), the ones in the song form
++  // marked. It is for reading: the form's LoRA picker adds and removes them
+   function paintList() {
+     if (!S.list) return;
+     var on = {};
+     S.choice.forEach(function (c) { on[c.id] = c; });
+     S.list.innerHTML = S.catalog.length ? S.catalog.map(function (e) {
+-      var parts = String(e.name).split(" / "), main = parts.pop(), folder = parts.join(" / ");
+-      var tags = e.error ? "" : '<button type="button" class="lora-switch" data-lora-switch="' + escape(e.id) + '" aria-pressed="' + !!on[e.id] +
+-        '" data-tip="' + escape(on[e.id] ? "On: in the next song. Press to turn it off (it leaves the song form)"
+-                                         : "Off. Press to turn it on: it joins the song form at strength 1.0 on each half it has") +
+-        '">' + (on[e.id] ? "On" : "Off") + "</button>";
++      var parts = String(e.name).split(" / "), main = parts.pop(), folder = parts.join(" / "), title = (source(e.id) || {}).title || main;
+       var meta = e.error ? "cannot load: " + e.error
+         : [halvesText(e), folder, "rank " + e.rank, e.size_mb + " MB", triggerOf(e) ? "trigger " + triggerOf(e) : "", e.mode ? e.mode + " mode" : ""]
+           .filter(Boolean).join(" · ");
+@@ -127,15 +134,16 @@
+           escape("Open its model card (new tab): " + src.url) + '"><span>' + escape(src.repo || src.url) + "</span>\u2197</a>"
+         : '<span class="tile-repo" data-tip="' + escape("No source for this file in loras/sources.json; the (i) has its details") + '">' +
+           escape(src.repo || "no source link") + "</span>";
+-      return '<li class="lora-item' + (on[e.id] ? " is-on" : "") + (e.error ? " is-bad" : "") + '">' +
+-        '<div class="lora-item-head"><span class="lora-item-name">' + escape(main) + '</span><span class="lora-item-tags">' + tags + "</span></div>" +
+-        '<div class="tile-src">' + where + '<span class="info" tabindex="0" role="img" aria-label="About ' + escape(e.name) +
++      return '<li class="lora-item' + (on[e.id] ? " is-on" : "") + (e.error ? " is-bad" : "") + '" data-lora="' + escape(e.id) + '">' +
++        '<div class="lora-item-head"><span class="lora-item-name">' + escape(title) + "</span>" +
++        (on[e.id] ? '<span class="tile-state">in the song form</span>' : "") + "</div>" +
++        '<div class="tile-src">' + where + '<span class="info" tabindex="0" role="img" aria-label="About ' + escape(nameOf(e.id)) +
+         '" data-tip="' + escape(aboutTip(e)) + '">i</span></div>' +
+         '<div class="lora-item-meta">' + escape(meta) + "</div></li>";
+     }).join("") : '<li class="lora-item"><div class="lora-item-meta">No .safetensors files in the app\'s loras/ folder.</div></li>';
+     if (S.note) {
+       var active = S.choice.filter(function (c) { return entry(c.id); }).length;
+-      S.note.textContent = S.catalog.length + " in loras/" + (active ? " · " + active + " on for the next song" : " · all off");
++      S.note.textContent = S.catalog.length + " in loras/" + (active ? " · " + active + " in the song form" : " · none in the song form");
+     }
+   }
+ 
+@@ -155,10 +163,6 @@
+   function listInto(list, note) {
+     S.list = list;
+     S.note = note || null;
+-    list.addEventListener("click", function (event) {
+-      var button = event.target.closest("[data-lora-switch]");
+-      if (button) toggle(button.dataset.loraSwitch);
+-    });
+     paintList();
+   }
+ 
+@@ -176,10 +180,14 @@
+           '" data-tip="Add the trigger word to the style prompt">+ ' + escape(triggerOf(e)) + "</button>" : "<span></span>") +
+         '<button type="button" class="icon-btn" data-remove-lora="' + escape(c.id) + '" aria-label="Remove ' + escape(nameOf(c.id)) + '">✕</button></div>';
+     }).join("");
++    // one even grid of buttons: the name, which half it steers, and a few words on what it does
+     chips.innerHTML = S.catalog.map(function (e) {
+-      return '<button type="button" class="chip' + (on[e.id] ? " is-on" : "") + '" data-lora-chip="' + escape(e.id) + '"' +
++      var tag = e.error ? "cannot load" : tagOf(e) || halvesText(e) + (has(e, "ar") && has(e, "nar") ? " halves" : " half");
++      return '<button type="button" class="lora-pick' + (on[e.id] ? " is-on" : "") + '" data-lora-chip="' + escape(e.id) + '"' +
+         (e.error ? " disabled" : "") + ' aria-pressed="' + (on[e.id] ? "true" : "false") + '" data-tip="' + escape(aboutTip(e)) + '">' +
+-        escape(e.name) + (e.error ? "" : '<span class="chip-sub">' + escape(halvesText(e)) + "</span>") + "</button>";
++        '<span class="lora-pick-name">' + escape(nameOf(e.id)) + "</span>" +
++        (e.error ? "" : '<span class="lora-pick-half">' + halfShort(e) + "</span>") +
++        '<span class="lora-pick-tag">' + escape(tag) + "</span></button>";
+     }).join("");
+     S.host.querySelector(".lora-hint").textContent = hints().join(" ");
+   }
+@@ -192,7 +200,7 @@
+   function mount(host, opts) {
+     S.host = host;
+     S.opts = opts || {};
+-    host.innerHTML = '<div class="lora-active"></div><div class="slider-chips lora-chips"></div><p class="row-hint lora-hint"></p>';
++    host.innerHTML = '<div class="lora-active"></div><div class="lora-chips"></div><p class="row-hint lora-hint"></p>';
+     host.addEventListener("click", function (event) {
+       var chip = event.target.closest("[data-lora-chip]"), remove = event.target.closest("[data-remove-lora]");
+       var trigger = event.target.closest("[data-trigger]");
+diff --git a/tools/console/vaes.js b/tools/console/vaes.js
+index 4e95772..3a84c6d 100644
+--- a/tools/console/vaes.js
++++ b/tools/console/vaes.js
+@@ -1,18 +1,26 @@
+ /* The Engine panel's VAE tiles: one per decoder, with where it came from
+-   (official or third-party, and a link to it), a recap under its (i), and an
+-   On/Off switch that picks it for the next song. A song has exactly one VAE,
+-   so turning one on turns the others off; the form's VAE follows. The same
+-   file ships in both consoles; each page hands it its decoders.
++   (stock, from the model's own publisher, or an add-on made by someone else,
++   and a link to it) and a recap under its (i).
++   They are for reading: the song form picks the VAE, and the tile of the one
++   it has picked is marked. The same file ships in both consoles; each page
++   hands it its decoders.
+ 
+    window.YueVaes:
+-     listInto(list, note, opts)  opts: { current() -> name, choose(name) }
++     listInto(list, note, opts)  opts: { current() -> the form's VAE }
+      set(vaes, def)              [{name, label, repo, installed}] and the Engine default
+      setSources(map)             {name: {official, url, about}} from loras/sources.json
+-     repaint()                   after the form's VAE changes */
++     repaint()                   after the form's VAE changes
++     kindOf(v)                   "stock" | "add-on" for {name, repo}: sources.json's word, else by publisher
++     badge(kind)                 the small STOCK / ADD-ON mark, for the form too */
+ (function (root) {
+   "use strict";
+ 
+   var NOTES = { standard: "best sound", legacy: "benchmark", blend: "⅔ standard, ⅓ legacy" };
++  var PUBLISHER = "m-a-p/";   // the model's own releases; anything else is an add-on
++  var KIND_TIPS = {
++    "stock": "Stock: released with the model by its own publisher",
++    "add-on": "Add-on: made by a third party, not the model's publisher"
++  };
+   var S = { vaes: [], def: "", sources: {}, list: null, note: null, opts: {} };
+ 
+   function escape(text) {
+@@ -23,35 +31,42 @@
+ 
+   function labelOf(v) { return v.label || v.name; }
+ 
++  function kindOf(v) {
++    var src = S.sources[v.name] || {};
++    if (src.official === true) return "stock";
++    if (src.official === false) return "add-on";
++    return v.repo ? (v.repo.indexOf(PUBLISHER) === 0 ? "stock" : "add-on") : "";
++  }
++
++  function badge(kind) {
++    return kind ? '<span class="kind-badge' + (kind === "add-on" ? " is-addon" : "") + '" data-tip="' + escape(KIND_TIPS[kind]) + '">' +
++      kind + "</span>" : "";
++  }
++
+   function paint() {
+     if (!S.list) return;
+-    var current = S.opts.current ? S.opts.current() : "", onLabel = "";
++    var current = S.opts.current ? S.opts.current() : "", pickedLabel = "";
+     S.list.innerHTML = S.vaes.map(function (v) {
+-      var src = S.sources[v.name] || {}, ok = v.installed !== false, on = ok && v.name === current;
+-      var kind = src.official === true ? "official" : src.official === false ? "third-party" : "";
+-      if (on) onLabel = labelOf(v);
+-      var badge = kind ? '<span class="tile-kind' + (src.official ? "" : " is-third") + '" data-tip="' +
+-          escape(src.official ? "Official: released by the model's own publisher"
+-                              : "Third-party: made by someone else from the official releases, not by the model's publisher") +
+-          '">' + kind + "</span>" : "";
+-      var tags = (ok ? '<button type="button" class="lora-switch" data-vae-switch="' + escape(v.name) + '" aria-pressed="' + on + '" data-tip="' +
+-          escape(on ? "On: the next song uses this VAE. A song needs one, so turn another on to switch"
+-                    : "Off. Press to use this VAE for the next song (the form's VAE follows)") + '">' + (on ? "On" : "Off") + "</button>" : "");
++      var src = S.sources[v.name] || {}, ok = v.installed !== false, picked = ok && v.name === current;
++      var kind = kindOf(v);
++      if (picked) pickedLabel = labelOf(v);
+       var recap = [labelOf(v) + (kind ? " · " + kind : ""), src.about || "", v.repo ? "Weights: " + v.repo : ""].filter(Boolean).join("\n");
+       var where = src.url
+         ? '<a class="tile-link" href="' + escape(src.url) + '" target="_blank" rel="noopener noreferrer" data-tip="' +
+           escape("Open its model card (new tab): " + src.url) + '"><span>' + escape(v.repo || src.url) + "</span>\u2197</a>"
+         : '<span class="tile-repo" data-tip="' + escape(v.repo || v.name) + '">' + escape(v.repo || v.name) + "</span>";
+       var meta = [NOTES[v.name] || "", v.name === S.def ? "engine default" : "", ok ? "" : "not downloaded"].filter(Boolean).join(" · ");
+-      return '<li class="lora-item vae-item' + (on ? " is-on" : "") + (src.official === false ? " is-third" : "") + (ok ? "" : " is-bad") + '">' +
+-        '<div class="lora-item-head"><span class="lora-item-name">' + escape(labelOf(v)) + badge + '</span><span class="lora-item-tags">' + tags + "</span></div>" +
++      return '<li class="lora-item vae-item' + (picked ? " is-on" : "") + (kind === "add-on" ? " is-addon" : "") + (ok ? "" : " is-bad") +
++        '" data-vae="' + escape(v.name) + '">' +
++        '<div class="lora-item-head"><span class="lora-item-name">' + escape(labelOf(v)) + badge(kind) + "</span>" +
++        (picked ? '<span class="tile-state">in the song form</span>' : "") + "</div>" +
+         '<div class="tile-src">' + where + '<span class="info" tabindex="0" role="img" aria-label="About the ' + escape(labelOf(v)) +
+         ' VAE" data-tip="' + escape(recap) + '">i</span></div>' +
+         (meta ? '<div class="lora-item-meta">' + escape(meta) + "</div>" : "") + "</li>";
+     }).join("");
+     if (S.note) {
+       S.note.textContent = S.vaes.length + " decoder" + (S.vaes.length === 1 ? "" : "s") +
+-        (onLabel ? " · " + onLabel + " on for the next song" : "") + " · a finished song can add another from its page";
++        (pickedLabel ? " · " + pickedLabel + " picked in the form" : "") + " · a finished song can add another from its page";
+     }
+   }
+ 
+@@ -59,12 +74,6 @@
+     S.list = list;
+     S.note = note || null;
+     S.opts = opts || {};
+-    list.addEventListener("click", function (event) {
+-      var button = event.target.closest("[data-vae-switch]");
+-      if (!button || button.getAttribute("aria-pressed") === "true") return;
+-      if (S.opts.choose) S.opts.choose(button.dataset.vaeSwitch);
+-      paint();
+-    });
+     paint();
+   }
+ 
+@@ -79,5 +88,6 @@
+     paint();
+   }
+ 
+-  root.YueVaes = { listInto: listInto, set: set, setSources: setSources, repaint: paint };
++  root.YueVaes = { listInto: listInto, set: set, setSources: setSources, repaint: paint,
++    kindOf: kindOf, badge: badge };
+ })(window);

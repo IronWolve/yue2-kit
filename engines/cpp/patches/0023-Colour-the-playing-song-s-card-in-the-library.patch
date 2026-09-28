@@ -1,0 +1,32 @@
+From f7c586d75c00f4b326c51149cd40c6bf5718eef5 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 12:11:38 -0700
+Subject: [PATCH 23/36] Colour the playing song's card in the library
+
+Tinted card, a thicker accent bar, an accent title and a solid PLAYING badge, all from the theme's own accent colour, so the playing song stands out from the selected one.
+---
+ tools/console/app.css | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index 2fcb1e7..cee73d3 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1615,9 +1615,14 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+ .size-meter.is-warn { color: var(--amber); }
+ .size-meter.is-over { color: var(--bad); }
+ 
+-/* the take the player is playing says PLAYING in the list */
+-.tag.playing-tag { display: none; color: var(--amber); border-color: var(--amber-dim); }
+-.take.is-playing .tag.playing-tag { display: inline-block; }
++/* the take the player is playing stands out in the list: a card tinted in the theme's accent, a thicker
++   accent bar than the selected card's, an accent title and a solid ▶ PLAYING badge */
++.tag.playing-tag { display: none; }
++.take.is-playing { background: color-mix(in srgb, var(--amber) 14%, transparent); border-color: var(--amber-dim); box-shadow: inset 4px 0 0 var(--amber); }
++.take.is-playing:hover { background: color-mix(in srgb, var(--amber) 22%, transparent); }
++.take.is-playing .take-title { color: var(--amber); font-weight: 600; }
++.take.is-playing .tag.playing-tag { display: inline-block; background: var(--amber); border-color: var(--amber); color: var(--on-amber); font-weight: 700; }
++.take.is-playing .tag.playing-tag::before { content: "▶ "; }
+ 
+ /* a seed box with a seed in it: its dice clears it */
+ .dice.is-set { color: var(--amber); }

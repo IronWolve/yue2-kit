@@ -1,0 +1,178 @@
+From 88b27d29e589d27a5cb9d9b1a82790bae46cf215 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Thu, 24 Sep 2026 19:02:24 -0700
+Subject: [PATCH 04/36] Keep a playing song going when a run finishes, name
+ downloads after the take
+
+A finished song no longer replaces the one that is playing; it waits first
+in the library with a note. Every library card has a download button, the
+song page an Audio link, and the player's download, the song page and the
+server all name the file after the take (date, time and title). A
+background refresh no longer overwrites engine fields while they are being
+edited.
+---
+ tools/console/app.css    |  7 +++++--
+ tools/console/app.js     | 39 +++++++++++++++++++++++++++++++--------
+ tools/console/index.html |  1 +
+ tools/yue-server.cpp     |  6 ++++--
+ 4 files changed, 41 insertions(+), 12 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index 7cccdb8..8dccf0d 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1074,7 +1074,7 @@ pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-br
+ .tag.vae { color: var(--amber); border-color: var(--amber-dim); }
+ .tag.re { color: var(--dim); border-style: dashed; }
+ 
+-.take-del, .take-fav {
++.take-del, .take-fav, .take-dl {
+   position: absolute;
+   top: 8px;
+   padding: 3px 6px;
+@@ -1090,7 +1090,10 @@ pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-br
+ }
+ .take-del { right: 8px; }
+ .take-fav { right: 38px; }
+-.take:hover .take-del, .take:hover .take-fav, .take:focus-within .take-del, .take:focus-within .take-fav { opacity: 1; }
++.take-dl { right: 68px; text-decoration: none; }
++.take:hover .take-del, .take:hover .take-fav, .take:focus-within .take-del, .take:focus-within .take-fav,
++.take:hover .take-dl, .take:focus-within .take-dl { opacity: 1; }
++.take-dl:hover { color: var(--amber); border-color: var(--amber-dim); }
+ .take-del:hover { color: var(--bad); border-color: var(--bad-line); }
+ .take-fav:hover { color: var(--amber); border-color: var(--amber-dim); }
+ .take.is-fav .take-fav { opacity: 1; color: var(--amber); border-color: var(--amber-dim); }
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 4dc9d9d..641f73d 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -1363,9 +1363,12 @@
+       if (job.kind === "replay") return replayLanded(job);
+       var count = job.takes.length;
+       if (job.restored) return;
+-      toastOnce(job.id, "Song complete — " + job.title + (count > 1 ? " (" + count + " takes)" : ""), "good");
+-      // Only jump to the new song if the run is what you were looking at.
+-      if (STATE.job === job && !STATE.take && count) openTake(job.takes[0]);
++      var watching = STATE.job === job && !STATE.take && count, playing = isPlaying();
++      toastOnce(job.id, "Song complete — " + job.title + (count > 1 ? " (" + count + " takes)" : "") +
++                (watching && playing ? ". It is first in Takes; what you are playing keeps playing." : ""), "good");
++      // Only jump to the new song if the run is what you were looking at,
++      // and never by cutting off a song that is playing.
++      if (watching && !playing) openTake(job.takes[0]);
+     }).catch(function (error) {
+       job.error = error.message;
+       settle(job, "failed");
+@@ -2178,8 +2181,15 @@
+     return found;
+   }
+ 
+-  function paintSettings(settings) {
++  function paintSettings(settings, force) {
+     STATE.settings = settings;
++    // A background refresh must not wipe fields you are still editing; Save repaints them.
++    if (STATE.settingsDirty && !force) {
++      paintStrip();
++      paintSubmitNote();
++      return;
++    }
++    STATE.settingsDirty = false;
+     var models = settings.models || [];
+     $("setModel").innerHTML = models.length ? models.map(function (m) {
+       return '<option value="' + escape(m) + '">' + escape(m) + (m === "BF16" ? " (release weights)" : " (quantized)") + "</option>";
+@@ -2237,13 +2247,14 @@
+   }
+ 
+   ["setMaxSeq", "setVaeCore", "setKeepLoaded", "setModel", "setPrecision"].forEach(function (id) {
+-    $(id).addEventListener("input", function () { paintComputeHint(); $("memPreset").value = ""; });
+-    $(id).addEventListener("change", function () { paintComputeHint(); });
++    $(id).addEventListener("input", function () { STATE.settingsDirty = true; paintComputeHint(); $("memPreset").value = ""; });
++    $(id).addEventListener("change", function () { STATE.settingsDirty = true; paintComputeHint(); });
+   });
+ 
+   $("memPreset").addEventListener("change", function () {
+     var size = this.value;
+     if (!size) return;
++    STATE.settingsDirty = true;
+     if (size === "auto") {
+       var gpu = STATE.hardware && (STATE.hardware.gpus || [])[0], gib = gpu ? gpu.total_bytes / GIB : 0, pick = "";
+       Object.keys(MEM_PRESETS).forEach(function (c) { if (gib + 0.6 >= +c) pick = c; });
+@@ -2273,7 +2284,7 @@
+     var button = this;
+     button.disabled = true;
+     post("/settings", changed).then(function (data) {
+-      paintSettings(data);
++      paintSettings(data, true);
+       var weights = changed.precision ? PRECISION_LABELS[changed.precision] + " weights" : "";
+       var loads = changed.model ? "the " + changed.model + " backbone" + (weights ? " with " + weights : "") : weights;
+       var note = loads ? " — the next song loads " + loads : "";
+@@ -2377,6 +2388,12 @@
+ 
+   function formatExt(format) { return format === "mp3" ? "mp3" : "wav"; }
+ 
++  // Downloads carry the library name (date, time and title), like the other console
++  function audioFileName(take) { return take.name + "." + formatExt(take.format); }
++
++  // True while a song is audibly playing; finished runs must not replace it.
++  function isPlaying() { return !!audio.getAttribute("src") && !audio.paused && !audio.ended; }
++
+   function getRequest(take) {
+     if (STATE.requests[take.name]) return Promise.resolve(STATE.requests[take.name]);
+     if (take.session) return Promise.reject(new Error("This take's request is gone with the page reload"));
+@@ -2415,7 +2432,10 @@
+     $("playbarStyle").textContent = take.style;
+     $("dlAudio").href = url;
+     $("dlAudio").textContent = take.format === "mp3" ? "MP3" : "WAV";
+-    $("dlAudio").setAttribute("download", slug(displayTitle(take)) + "." + formatExt(take.format));
++    $("dlAudio").setAttribute("download", audioFileName(take));
++    $("dlTakeAudio").href = url;
++    $("dlTakeAudio").textContent = "Audio ." + formatExt(take.format);
++    $("dlTakeAudio").setAttribute("download", audioFileName(take));
+     $("timeTotal").textContent = clock(take.seconds);
+ 
+     paintTakeMeta();
+@@ -3087,6 +3107,8 @@
+         '<button type="button" class="take-fav" data-fav="' + escape(take.name) + '" aria-pressed="' + (take.favorite ? "true" : "false") +
+         '" title="' + (take.favorite ? "Remove from favourites" : "Keep as a favourite") + '" aria-label="Favourite">' + (take.favorite ? "★" : "☆") + "</button>" +
+         '<button type="button" class="take-del" data-del="' + escape(take.name) + '" title="Delete take" aria-label="Delete take">✕</button>' +
++        '<a class="take-dl" data-dl="1" href="' + escape(takeAudioUrl(take)) + '" download="' + escape(audioFileName(take)) +
++        '" title="Download ' + formatExt(take.format).toUpperCase() + '" aria-label="Download">⤓</a>' +
+         '<div class="take-title">' + escape(title) + "</div>" +
+         '<div class="take-style">' + escape(take.style || "") + "</div>" +
+         '<div class="take-foot">' + tags + "<span>" + clock(take.seconds) + "</span><span>" + ago(take.created) + "</span></div></article>";
+@@ -3094,6 +3116,7 @@
+   }
+ 
+   $("libList").addEventListener("click", function (event) {
++    if (event.target.closest("[data-dl]")) { event.stopPropagation(); return; }   // download, do not open
+     var fav = event.target.closest("[data-fav]"), del = event.target.closest("[data-del]");
+     if (fav) {
+       event.stopPropagation();
+diff --git a/tools/console/index.html b/tools/console/index.html
+index afa9ec6..b69592c 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -441,6 +441,7 @@
+ 
+     <div class="take-body is-hidden" id="takeBody">
+       <div class="take-tools" id="takeTools">
++        <a class="btn ghost small" id="dlTakeAudio" download title="Download this song">Audio .wav</a>
+         <button type="button" class="btn ghost small" id="reuseTake" title="Load this take's exact request into the form, music codes included">Reuse this take</button>
+         <button type="button" class="btn ghost small" id="rerenderSound" title="Same music, a new sound seed (seconds)">Re-render sound</button>
+         <button type="button" class="btn ghost small" id="dlRequest" title="The replay request: prompt, score, codes and both seeds">Request .json</button>
+diff --git a/tools/yue-server.cpp b/tools/yue-server.cpp
+index 8a0470b..2c975a6 100644
+--- a/tools/yue-server.cpp
++++ b/tools/yue-server.cpp
+@@ -1550,8 +1550,10 @@ int main(int argc, char ** argv) {
+                 return;
+             }
+             std::string path = audio_file_of(g_outputs_dir + "/" + name);
+-            res.set_file_content(path, path.size() > 4 && path.substr(path.size() - 4) == ".mp3" ? "audio/mpeg" :
+-                                                                                                    "audio/wav");
++            bool        mp3  = path.size() > 4 && path.substr(path.size() - 4) == ".mp3";
++            // Saved copies are named after the take (date, time, title), not audio.wav
++            res.set_header("Content-Disposition", "inline; filename=\"" + name + (mp3 ? ".mp3" : ".wav") + "\"");
++            res.set_file_content(path, mp3 ? "audio/mpeg" : "audio/wav");
+         });
+         // Waveform peaks for the player, read from the audio once and cached
+         svr.Get("/library/peaks", [](const httplib::Request & req, httplib::Response & res) {

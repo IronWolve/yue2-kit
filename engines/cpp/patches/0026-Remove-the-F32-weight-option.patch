@@ -1,0 +1,417 @@
+From ba6cf2880f045424947a492adba27a5718cb8c02 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 14:18:21 -0700
+Subject: [PATCH 26/36] Remove the F32 weight option
+
+It widened BF16 weights to F32 at load for a quality gain that was never measured, while doubling the backbone's memory and measuring about 60% slower on the same song. The button, the Engine setting, its tip and the server setting are gone; an older page or settings.json that still sends precision is ignored. Songs made with it keep saying so on their page.
+---
+ src/gguf-weights.h       | 57 +++-------------------------------------
+ tests/test-slider.cpp    |  2 --
+ tools/console/app.css    |  2 --
+ tools/console/app.js     | 46 +++++++-------------------------
+ tools/console/index.html | 15 -----------
+ tools/yue-server.cpp     | 31 +++++-----------------
+ 6 files changed, 20 insertions(+), 133 deletions(-)
+
+diff --git a/src/gguf-weights.h b/src/gguf-weights.h
+index 15c01c3..3a7bdb1 100644
+--- a/src/gguf-weights.h
++++ b/src/gguf-weights.h
+@@ -166,14 +166,6 @@ static bool gf_load(GGUFModel * gf, const char * path) {
+     return true;
+ }
+ 
+-// Local addition: the console's precision setting. When true, every BF16 or
+-// F16 weight loads converted to F32 (exact), so matrix products run F32 x F32
+-// instead of rounding their activation input to 16 bits. One instance for
+-// the whole process (the store loads modules from another translation unit).
+-inline bool g_gf_weights_f32 = false;
+-
+-static struct ggml_tensor * gf_load_tensor_f32(WeightCtx * wctx, const GGUFModel & gf, const std::string & name);
+-
+ // Local addition: the LoRA set merged into weights as they load. The store sets
+ // it around one module's load; a merge that fails leaves its reason in
+ // g_gf_lora_error and the store throws that load away.
+@@ -336,28 +328,6 @@ static const void * gf_lora_stage(WeightCtx * wctx, const GGUFModel & gf, const
+     return merged;
+ }
+ 
+-static bool gf_widen(enum ggml_type t) {
+-    return g_gf_weights_f32 && (t == GGML_TYPE_BF16 || t == GGML_TYPE_F16);
+-}
+-
+-// One part of a fused weight, converted to F32 into a staging buffer
+-static void gf_push_part_f32(WeightCtx * wctx, struct ggml_tensor * fused, const struct ggml_tensor * src,
+-                             const void * raw, size_t offset_bytes, const GGUFModel * gf = nullptr,
+-                             const std::string & name = std::string()) {
+-    size_t lora_bytes = 0;
+-    if (gf) {
+-        if (const void * merged = gf_lora_stage(wctx, *gf, name, src, raw, GGML_TYPE_F32, &lora_bytes, false)) {
+-            wctx->pending.push_back({ fused, merged, lora_bytes, offset_bytes });
+-            return;
+-        }
+-    }
+-    size_t n   = ggml_nelements(src);
+-    auto   buf = std::make_unique<float[]>(n);
+-    ggml_get_type_traits(src->type)->to_float(raw, buf.get(), (int64_t) n);
+-    wctx->pending.push_back({ fused, buf.get(), n * sizeof(float), offset_bytes });
+-    wctx->staging.push_back(std::move(buf));
+-}
+-
+ // Load a tensor from GGUF into the weight context.
+ // Returns ggml_tensor (not yet backed by memory; call wctx_alloc after all loads).
+ // Tensor shapes are already in ggml order (ne[0]=innermost).
+@@ -378,10 +348,6 @@ static struct ggml_tensor * gf_load_tensor(WeightCtx *         wctx,
+         fprintf(stderr, "[GGUF] FATAL: tensor '%s' not in meta context\n", name.c_str());
+         exit(1);
+     }
+-    if (gf_widen(src->type) && !(shape_override && n_dims_override > 0)) {
+-        return gf_load_tensor_f32(wctx, gf, name);
+-    }
+-
+     int     n_dims;
+     int64_t ne[4] = { 1, 1, 1, 1 };
+ 
+@@ -503,9 +469,8 @@ static struct ggml_tensor * gf_load_qkv_fused(WeightCtx *         wctx,
+     int64_t              ne0       = q_src->ne[0];
+     int64_t              fused_ne1 = q_src->ne[1] + k_src->ne[1] + v_src->ne[1];
+     int64_t              ne[2]     = { ne0, fused_ne1 };
+-    bool                 widen     = gf_widen(q_src->type);
+-    enum ggml_type       type      = widen ? GGML_TYPE_F32 : q_src->type;
+-    if (!widen && gf_lora_hits(gf, { q_name, k_name, v_name })) {
++    enum ggml_type       type      = q_src->type;
++    if (gf_lora_hits(gf, { q_name, k_name, v_name })) {
+         type = gf_lora_type(type);   // Local addition: one type for all three parts
+     }
+     struct ggml_tensor * fused     = ggml_new_tensor(wctx->ctx, type, 2, ne);
+@@ -521,13 +486,6 @@ static struct ggml_tensor * gf_load_qkv_fused(WeightCtx *         wctx,
+         return gf.mapping + gf.data_offset + off;
+     };
+ 
+-    if (widen) {
+-        size_t row_f32 = ggml_row_size(GGML_TYPE_F32, ne0);
+-        gf_push_part_f32(wctx, fused, q_src, get_data(q_name), 0, &gf, q_name);
+-        gf_push_part_f32(wctx, fused, k_src, get_data(k_name), q_src->ne[1] * row_f32, &gf, k_name);
+-        gf_push_part_f32(wctx, fused, v_src, get_data(v_name), (q_src->ne[1] + k_src->ne[1]) * row_f32, &gf, v_name);
+-        return fused;
+-    }
+     if (type != q_src->type) {   // re-typed for a LoRA: every part converted, merged or not
+         size_t out_row = ggml_row_size(type, ne0);
+         gf_lora_push_part(wctx, gf, fused, q_name, q_src, get_data(q_name), type, 0);
+@@ -565,9 +523,8 @@ static struct ggml_tensor * gf_load_pair_fused(WeightCtx *         wctx,
+ 
+     int64_t              ne0   = a_src->ne[0];
+     int64_t              ne[2] = { ne0, a_src->ne[1] + b_src->ne[1] };
+-    bool                 widen = gf_widen(a_src->type);
+-    enum ggml_type       type  = widen ? GGML_TYPE_F32 : a_src->type;
+-    if (!widen && gf_lora_hits(gf, { a_name, b_name })) {
++    enum ggml_type       type  = a_src->type;
++    if (gf_lora_hits(gf, { a_name, b_name })) {
+         type = gf_lora_type(type);   // Local addition: one type for both parts
+     }
+     struct ggml_tensor * fused = ggml_new_tensor(wctx->ctx, type, 2, ne);
+@@ -582,12 +539,6 @@ static struct ggml_tensor * gf_load_pair_fused(WeightCtx *         wctx,
+         return gf.mapping + gf.data_offset + off;
+     };
+ 
+-    if (widen) {
+-        gf_push_part_f32(wctx, fused, a_src, get_data(a_name), 0, &gf, a_name);
+-        gf_push_part_f32(wctx, fused, b_src, get_data(b_name), a_src->ne[1] * ggml_row_size(GGML_TYPE_F32, ne0), &gf,
+-                         b_name);
+-        return fused;
+-    }
+     if (type != a_src->type) {   // re-typed for a LoRA: both parts converted, merged or not
+         gf_lora_push_part(wctx, gf, fused, a_name, a_src, get_data(a_name), type, 0);
+         gf_lora_push_part(wctx, gf, fused, b_name, b_src, get_data(b_name), type,
+diff --git a/tests/test-slider.cpp b/tests/test-slider.cpp
+index 4ff5fce..f492bd3 100644
+--- a/tests/test-slider.cpp
++++ b/tests/test-slider.cpp
+@@ -45,8 +45,6 @@ int main(int argc, char ** argv) {
+     }
+     int N = (int) seqs.size();
+ 
+-    // YUE2_WEIGHTS_F32=1 loads the BF16 weights widened to F32 (the console's F32 precision)
+-    g_gf_weights_f32 = getenv("YUE2_WEIGHTS_F32") != nullptr;
+     Qwen3LM lm;
+     if (!qw3lm_load(&lm, argv[1])) {
+         return 1;
+diff --git a/tools/console/app.css b/tools/console/app.css
+index cee73d3..d49e8c5 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1627,5 +1627,3 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+ /* a seed box with a seed in it: its dice clears it */
+ .dice.is-set { color: var(--amber); }
+ 
+-/* F32 beside the model menu: lit when full-precision maths is on */
+-.f32-toggle[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--on-amber); }
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 872d820..d210458 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -2304,16 +2304,14 @@
+   // GPU memory between songs, the context (key/value cache) size and the VAE
+   // tile size. Presets only fill the form; Save applies.
+ 
+-  // 32 GB leaves the precision alone: F32 fits there, and it is a choice, not a size.
+   var MEM_PRESETS = {
+-    "8":  { model: "Q8_0", precision: "bf16", max_seq: 12288, keep_loaded: false, vae_core: 256 },
+-    "12": { model: "BF16", precision: "bf16", max_seq: 16384, keep_loaded: false, vae_core: 512 },
+-    "16": { model: "BF16", precision: "bf16", max_seq: 0, keep_loaded: false, vae_core: 512 },
+-    "24": { model: "BF16", precision: "bf16", max_seq: 0, keep_loaded: false, vae_core: 1024 },
++    "8":  { model: "Q8_0", max_seq: 12288, keep_loaded: false, vae_core: 256 },
++    "12": { model: "BF16", max_seq: 16384, keep_loaded: false, vae_core: 512 },
++    "16": { model: "BF16", max_seq: 0, keep_loaded: false, vae_core: 512 },
++    "24": { model: "BF16", max_seq: 0, keep_loaded: false, vae_core: 1024 },
+     "32": { model: "BF16", max_seq: 0, keep_loaded: true, vae_core: 1024 }
+   };
+-  var SETTING_KEYS = ["model", "precision", "keep_loaded", "max_seq", "vae_core"];
+-  var PRECISION_LABELS = { bf16: "BF16", f32: "F32" };
++  var SETTING_KEYS = ["model", "keep_loaded", "max_seq", "vae_core"];
+   var GIB = 1073741824;
+ 
+   function fullContext() { return (STATE.settings && STATE.settings.max_seq_full) || (STATE.props && STATE.props.context) || 24576; }
+@@ -2328,8 +2326,7 @@
+     Object.keys(MEM_PRESETS).forEach(function (size) {
+       var p = MEM_PRESETS[size];
+       if (p.max_seq === settings.max_seq && p.keep_loaded === !!settings.keep_loaded && p.vae_core === settings.vae_core &&
+-          (!presetFits(p) || p.model === settings.model) &&
+-          (p.precision === undefined || settings.precision === undefined || p.precision === settings.precision)) found = size;
++          (!presetFits(p) || p.model === settings.model)) found = size;
+     });
+     return found;
+   }
+@@ -2357,24 +2354,9 @@
+     });
+   });
+ 
+-  // F32 beside the model menu: one press for full-precision maths, again for BF16 (loads with the next song)
+-  function paintF32(settings) {
+-    var on = !!settings && settings.precision === "f32";
+-    $("f32Toggle").setAttribute("aria-pressed", String(on));
+-  }
+-  $("f32Toggle").addEventListener("click", function () {
+-    var want = this.getAttribute("aria-pressed") === "true" ? "bf16" : "f32";
+-    post("/settings", { precision: want }).then(function (data) {
+-      paintSettings(data, true);
+-      toast(want === "f32" ? "F32 on: the next song loads full-precision weights (about twice the memory, slower)"
+-                           : "BF16: the next song loads the release weights", "good");
+-    }).catch(function (error) { toast(error.message, "bad"); });
+-  });
+-
+   function paintSettings(settings, force) {
+     STATE.settings = settings;
+     paintModelPick(settings);
+-    paintF32(settings);
+     // A background refresh must not wipe fields you are still editing; Save repaints them.
+     if (STATE.settingsDirty && !force) {
+       paintStrip();
+@@ -2392,9 +2374,6 @@
+       $(pair[0]).value = pair[1];
+     });
+     $("setKeepLoaded").checked = !!settings.keep_loaded;
+-    // A server without the precision setting keeps the select still.
+-    $("setPrecision").disabled = settings.precision === undefined;
+-    $("setPrecision").value = settings.precision === "f32" ? "f32" : "bf16";
+     $("memPreset").value = matchPreset(settings);
+     paintComputeHint();
+     paintStrip();
+@@ -2407,7 +2386,6 @@
+     else notes.push("Context " + rows.toLocaleString() + " rows: songs up to about " + clock(Math.max(0, rows - 2500) / FRAME_RATE) +
+                     " with a typical prompt; longer ones will not fit.");
+     notes.push($("setKeepLoaded").checked ? "Models stay in GPU memory between songs." : "Each stage leaves GPU memory when it is done.");
+-    if ($("setPrecision").value === "f32") notes.push("F32 weights take about twice the GPU memory (language half ~8.3 GB, sound half ~5.4 GB) and run slower.");
+     $("computeHint").textContent = notes.join(" ");
+   }
+ 
+@@ -2419,7 +2397,6 @@
+     if (!Number.isInteger(vaeCore) || vaeCore < 64 || vaeCore > 4096) throw new Error("VAE tile frames must be between 64 and 4,096");
+     var out = { keep_loaded: $("setKeepLoaded").checked, max_seq: maxSeq, vae_core: vaeCore };
+     if ($("setModel").value) out.model = $("setModel").value;
+-    if (!$("setPrecision").disabled) out.precision = $("setPrecision").value;
+     return out;
+   }
+ 
+@@ -2438,7 +2415,7 @@
+     });
+   }
+ 
+-  ["setMaxSeq", "setVaeCore", "setKeepLoaded", "setModel", "setPrecision"].forEach(function (id) {
++  ["setMaxSeq", "setVaeCore", "setKeepLoaded", "setModel"].forEach(function (id) {
+     $(id).addEventListener("input", function () { STATE.settingsDirty = true; paintComputeHint(); $("memPreset").value = ""; });
+     $(id).addEventListener("change", function () { STATE.settingsDirty = true; paintComputeHint(); });
+   });
+@@ -2456,13 +2433,11 @@
+     }
+     var p = MEM_PRESETS[size], models = (STATE.settings && STATE.settings.models) || [];
+     if (models.indexOf(p.model) >= 0) $("setModel").value = p.model;
+-    if (p.precision && !$("setPrecision").disabled) $("setPrecision").value = p.precision;
+     $("setMaxSeq").value = p.max_seq;
+     $("setKeepLoaded").checked = p.keep_loaded;
+     $("setVaeCore").value = p.vae_core;
+     paintComputeHint();
+     toast(size + " GB preset: " + (models.indexOf(p.model) >= 0 ? p.model + ", " : "") +
+-          (p.precision ? PRECISION_LABELS[p.precision] + " maths, " : "") +
+           (p.max_seq ? "context " + p.max_seq.toLocaleString() : "whole context") + ", models " +
+           (p.keep_loaded ? "kept loaded" : "unloaded after each song") + ", VAE tiles " + p.vae_core + ". Press Save to apply.");
+   });
+@@ -2477,8 +2452,7 @@
+     button.disabled = true;
+     post("/settings", changed).then(function (data) {
+       paintSettings(data, true);
+-      var weights = changed.precision ? PRECISION_LABELS[changed.precision] + " weights" : "";
+-      var loads = changed.model ? "the " + changed.model + " backbone" + (weights ? " with " + weights : "") : weights;
++      var loads = changed.model ? "the " + changed.model + " backbone" : "";
+       var note = loads ? " — the next song loads " + loads : "";
+       toast(data.applied ? "Saved and applied" + note : "Saved — the server is busy; it applies before the next song", "good");
+       pollProps();
+@@ -2532,7 +2506,6 @@
+       strip.push(["GPU", "none"]);
+     }
+     strip.push(["Backbone", s && s.model ? s.model : (basename(p.model).replace(/\.gguf$/i, "") || "—")]);
+-    if (s && s.precision) strip.push(["Precision", PRECISION_LABELS[s.precision] || s.precision]);
+     strip.push(["Context", s ? (s.max_seq ? s.max_seq.toLocaleString() : "whole") : (p.context ? p.context.toLocaleString() : "—")]);
+     strip.push(["Batch", String(STATE.maxBatch)]);
+     $("hwStats").innerHTML = strip.map(function (row) {
+@@ -2729,7 +2702,6 @@
+       ["Sound seed", seedText(take.seed) || "—"],
+       ["VAE", vaeLabel(take.vae)],
+       ["Model", take.model || "—"],
+-      ["Precision", take.precision === "f32" ? "F32" : "BF16"],
+       ["Sliders", (take.sliders || []).length ? take.sliders.map(function (c) {
+         return (labels[c.id] || c.id) + " " + round(c.strength, 2); }).join(", ") : "none"],
+       ["LoRAs", (take.loras || []).length ? YueLoras.describe(take.loras) : "none"],
+@@ -2740,6 +2712,8 @@
+     ];
+     if (take.truncated) cells.push(["Limit", "hit token cap"]);
+     if (take.provided_score) cells.push(["Score", "supplied"]);
++    // made while the F32 option existed (removed 2026-09-26): kept so those songs can still be compared
++    if (take.precision === "f32") cells.push(["Precision", "F32 (option since removed)"]);
+     if (take.song > 0 || take.variation > 0) {
+       cells.push(["Batch", "song " + ((take.song || 0) + 1) + (take.variation > 0 ? ", sound " + (take.variation + 1) : "")]);
+     }
+diff --git a/tools/console/index.html b/tools/console/index.html
+index 1de68df..013c987 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -47,7 +47,6 @@ Q8_0: near lossless (the C++ author), 3.8 GB.
+ Q6_K 2.9 GB and Q5_K_M 2.6 GB: smaller still; the author advises nothing below Q5.
+ Smaller copies need less VRAM and write music a little faster. A change loads with the next song.
+ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+-    <button type="button" class="btn ghost small f32-toggle" id="f32Toggle" aria-pressed="false" data-tip="F32: full-precision maths. Pressed, the next song loads the weights widened to 32 bits and keeps everything in between at full precision (about twice the GPU memory for the weights, and slower). Released: BF16, the release. With a quantized model (Q8_0, Q6_K, Q5_K_M) those weights stay quantized, so it changes little.">F32</button>
+     <button type="button" class="btn ghost small theme-button" id="themeButton">Theme</button>
+     <button class="btn ghost small" id="openPrompt" title="Open a prompt saved as JSON or YAML">Open</button>
+     <input type="file" id="openFile" accept=".json,.yaml,.yml" hidden />
+@@ -82,8 +81,6 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+       <h3>Compute</h3>
+       <label class="field"><span class="label">Model <span class="info" tabindex="0" role="img" aria-label="About the model files" data-tip-ref="tip-model">i</span><em>the backbone file</em></span>
+         <select id="setModel"></select></label>
+-      <label class="field"><span class="label">Precision <span class="info" tabindex="0" role="img" aria-label="About precision" data-tip-ref="tip-precision">i</span><em>the model's maths; reloads the model</em></span>
+-        <select id="setPrecision"><option value="bf16">BF16 (release, fastest)</option><option value="f32">F32 (full precision, 2&times; memory)</option></select></label>
+       <label class="field"><span class="label">GPU memory preset <em>sets the knobs below; then Save</em></span>
+         <select id="memPreset"><option value="">Custom</option><option value="auto">Auto (detect)</option>
+           <option value="8">8 GB</option><option value="12">12 GB</option><option value="16">16 GB</option>
+@@ -632,18 +629,6 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+   <p>Tap to add; 0 is off, 1 is full; stack as many as you like. Trained in Direct mode; applied only
+     while the music tokens are written, never to the score or the sound. Experimental.</p>
+ </template>
+-<template id="tip-precision">
+-  <span class="tip-kind">Model precision</span>
+-  <dl>
+-    <dt>BF16</dt><dd>the weights as stored in the backbone file (the release: about 3 significant
+-      digits per number); matrix products round their inputs to 16 bits; fastest</dd>
+-    <dt>F32</dt><dd>the same weights, widened exactly as they load, and everything in between kept
+-      at full precision (about 7 digits); about twice the GPU memory for the weights, and slower</dd>
+-  </dl>
+-  <p>The author of this C++ port reports clearer, less misspoken words with full-precision maths.
+-    Measured here: F32 matches the PyTorch FP32 model to about 0.02%. Switching reloads the model
+-    with the next song; compare a few songs each way.</p>
+-</template>
+ <template id="tip-model">
+   <span class="tip-kind">Backbone file</span>
+   <dl>
+diff --git a/tools/yue-server.cpp b/tools/yue-server.cpp
+index 0953218..37e9af4 100644
+--- a/tools/yue-server.cpp
++++ b/tools/yue-server.cpp
+@@ -452,7 +452,6 @@ struct EngineSettings {
+     bool        keep_loaded;  // every module stays in VRAM between songs
+     int         max_seq;      // KV cache rows, 0 = the whole context
+     int         vae_core;     // VAE tile core frames
+-    std::string precision;    // "bf16" (weights as stored) or "f32" (weights widened at load)
+ };
+ 
+ static EngineSettings      g_settings;
+@@ -763,7 +762,6 @@ static std::string library_save(const Yue2Request & replay,
+     yyjson_mut_obj_add_int(doc, root, "song", song_index);
+     yyjson_mut_obj_add_int(doc, root, "variation", variation);
+     yyjson_mut_obj_add_bool(doc, root, "provided_score", provided_score);
+-    yyjson_mut_obj_add_str(doc, root, "precision", g_gf_weights_f32 ? "f32" : "bf16");
+     {
+         std::lock_guard<std::mutex> settings_lock(mtx_settings);
+         yyjson_mut_obj_add_strcpy(doc, root, "model", g_settings.model.c_str());
+@@ -840,7 +838,6 @@ static std::string settings_json(const EngineSettings & st) {
+     yyjson_mut_obj_add_int(doc, root, "max_seq", st.max_seq);
+     yyjson_mut_obj_add_int(doc, root, "max_seq_full", YUE2_CONTEXT);
+     yyjson_mut_obj_add_int(doc, root, "vae_core", st.vae_core);
+-    yyjson_mut_obj_add_strcpy(doc, root, "precision", st.precision.c_str());
+     char *      json = yyjson_mut_write(doc, YYJSON_WRITE_PRETTY, NULL);
+     std::string out  = json ? json : "{}";
+     if (json) {
+@@ -897,15 +894,6 @@ static bool settings_parse(const std::string & body, EngineSettings * st, std::s
+             ok   = false;
+         }
+     }
+-    if ((v = yyjson_obj_get(root, "precision")) && yyjson_is_str(v)) {
+-        std::string pr = yyjson_get_str(v);
+-        if (pr == "bf16" || pr == "f32") {
+-            st->precision = pr;
+-        } else {
+-            *why = "precision must be bf16 or f32";
+-            ok   = false;
+-        }
+-    }
+     yyjson_doc_free(doc);
+     return ok;
+ }
+@@ -926,11 +914,6 @@ static void settings_apply(const EngineSettings & next) {
+         }
+     }
+     store_set_policy(g_pipeline.store, next.keep_loaded ? EVICT_NEVER : EVICT_STRICT);
+-    if ((next.precision == "f32") != g_gf_weights_f32) {
+-        g_gf_weights_f32 = next.precision == "f32";
+-        store_unload_idle(g_pipeline.store);  // the next song loads the weights in the new form
+-        fprintf(stderr, "[Server] Precision now %s\n", g_gf_weights_f32 ? "F32 (weights widened at load)" : "BF16");
+-    }
+     g_pipeline.params.vae_core = next.vae_core;
+     if (next.max_seq != g_pipeline.params.max_seq) {
+         qw3lm_kv_free(&g_pipeline.kv);
+@@ -1490,7 +1473,7 @@ int main(int argc, char ** argv) {
+     LogCapture log_capture;
+ 
+     // Local addition: engine settings, from --settings over the boot flags
+-    g_settings = { g_models.empty() ? "" : g_models[0].first, g_keep_loaded, params.max_seq, params.vae_core, "bf16" };
++    g_settings = { g_models.empty() ? "" : g_models[0].first, g_keep_loaded, params.max_seq, params.vae_core };
+     if (!g_settings_path.empty() && std::filesystem::is_regular_file(g_settings_path)) {
+         std::string why;
+         if (!settings_parse(read_file(g_settings_path), &g_settings, &why)) {
+@@ -1501,13 +1484,11 @@ int main(int argc, char ** argv) {
+                 g_model_path = m.second;
+             }
+         }
+-        g_keep_loaded    = g_settings.keep_loaded;
+-        params.max_seq   = g_settings.max_seq;
+-        params.vae_core  = g_settings.vae_core;
+-        g_gf_weights_f32 = g_settings.precision == "f32";
+-        fprintf(stderr, "[Server] Settings: model %s, precision %s, keep loaded %s, context %d, VAE tiles %d\n",
+-                g_settings.model.c_str(), g_settings.precision.c_str(), g_keep_loaded ? "yes" : "no", params.max_seq,
+-                params.vae_core);
++        g_keep_loaded   = g_settings.keep_loaded;
++        params.max_seq  = g_settings.max_seq;
++        params.vae_core = g_settings.vae_core;
++        fprintf(stderr, "[Server] Settings: model %s, keep loaded %s, context %d, VAE tiles %d\n",
++                g_settings.model.c_str(), g_keep_loaded ? "yes" : "no", params.max_seq, params.vae_core);
+     }
+ 
+     // Model loads go through the store: STRICT by default (one half of the

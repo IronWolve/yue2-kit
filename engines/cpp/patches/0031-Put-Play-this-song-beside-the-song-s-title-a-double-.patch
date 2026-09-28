@@ -1,0 +1,75 @@
+From 30a6a71cdade9216932779fcfd4c68372dda7e58 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 15:07:56 -0700
+Subject: [PATCH 31/36] Put Play this song beside the song's title; a
+ double-click in the list plays
+
+The button moves from the end of the action row to right after the title. A double-click on a song in the list opens and plays it; it is read from the second click, because the first click redraws the list and the browser then sends no dblclick. Renaming stays on the Rename button.
+---
+ tools/console/app.js     | 25 ++++++++++++-------------
+ tools/console/index.html |  1 +
+ 2 files changed, 13 insertions(+), 13 deletions(-)
+
+diff --git a/tools/console/app.js b/tools/console/app.js
+index d210458..e481df2 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -2684,8 +2684,7 @@
+       '<button type="button" class="btn ghost small' + (take.favorite ? " is-on" : "") + '" id="favTake" aria-pressed="' +
+       (take.favorite ? "true" : "false") + '" title="' + (take.favorite ? "Remove from favourites" : "Keep as a favourite") + '">' +
+       (take.favorite ? "★ Favourite" : "☆ Favourite") + "</button>" +
+-      '<button type="button" class="btn ghost small" id="renameTake" title="Rename this take">Rename</button>' +
+-      '<button type="button" class="btn primary small is-hidden" id="playHere" data-tip="Play this song now (the player keeps what it was playing until you do)">▶ Play this song</button>';
++      '<button type="button" class="btn ghost small" id="renameTake" title="Rename this take">Rename</button>';
+     paintPlayHere();
+   }
+ 
+@@ -3181,11 +3180,15 @@
+     if (button) button.classList.toggle("is-hidden", !STATE.take || !!(STATE.playerTake && STATE.playerTake.name === STATE.take.name));
+   }
+ 
+-  $("takeActions").addEventListener("click", function (event) {
+-    if (!event.target.closest("#playHere") || !STATE.take) return;
+-    loadPlayer(STATE.take, false);
++  // Put a song in the player and start it: "Play this song" (right after the title, on the left)
++  // and a double-click in the list
++  function playNow(take) {
++    if (!take) return;
++    loadPlayer(take, false);
+     audio.play().catch(function () { toast("Your browser would not play this file", "bad"); });
+-  });
++    paintPlayHere();
++  }
++  $("playHere").addEventListener("click", function () { playNow(STATE.take); });
+ 
+   function togglePlay() {
+     if (!audio.getAttribute("src") && STATE.take) loadPlayer(STATE.take, false);
+@@ -3435,13 +3438,9 @@
+     if (!card) return;
+     if (card.dataset.run) return openRunRow(card.dataset.run);
+     openTake(card.dataset.name);
+-  });
+-
+-  $("libList").addEventListener("dblclick", function (event) {
+-    var card = event.target.closest(".take");
+-    if (!card || card.dataset.run || !event.target.closest(".take-title")) return;
+-    if (!STATE.take || STATE.take.name !== card.dataset.name) openTake(card.dataset.name);
+-    startRename();
++    // A double-click plays the song (renaming is the song page's Rename button). It is read from the
++    // second click itself: the first click redraws the list, and the browser then sends no dblclick.
++    if (event.detail === 2) playNow(findTake(card.dataset.name));
+   });
+ 
+   $("libList").addEventListener("keydown", function (event) {
+diff --git a/tools/console/index.html b/tools/console/index.html
+index 013c987..ff9a728 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -442,6 +442,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+   <section class="col take-col" id="view-take">
+     <div class="col-head">
+       <h2 id="takeTitle">Nothing playing</h2>
++      <button type="button" class="btn primary small is-hidden" id="playHere" data-tip="Play this song now (the player keeps what it was playing until you do). Double-clicking a song in the list plays it too.">▶ Play this song</button>
+       <span class="col-note" id="takeEyebrow">no run yet</span>
+       <div class="spacer"></div>
+       <button class="btn ghost small run-return is-hidden" id="backToRun">

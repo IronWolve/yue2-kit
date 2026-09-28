@@ -1,0 +1,151 @@
+From 304a2929dcf788cbcf9ba9feb3814325d9f85437 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 14:51:23 -0700
+Subject: [PATCH 30/36] Colour the terminal copy of the server log
+
+Whole lines by meaning (errors red, warnings and cancels yellow, a finished song or save green, loading chatter and counters dim), otherwise the tag by stage with stage summaries in bold. Only when stderr is a terminal and NO_COLOR is unset; the page's log stream stays plain.
+---
+ tools/yue-server.cpp | 92 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 91 insertions(+), 1 deletion(-)
+
+diff --git a/tools/yue-server.cpp b/tools/yue-server.cpp
+index 0d87925..b01302a 100644
+--- a/tools/yue-server.cpp
++++ b/tools/yue-server.cpp
+@@ -77,6 +77,10 @@ static int fd_write(int fd, const void * buf, size_t n) {
+ static void fd_close(int fd) {
+     _close(fd);
+ }
++
++static int fd_isatty(int) {  // Local addition: no log colours on Windows consoles
++    return 0;
++}
+ #else
+ static int fd_pipe(int fd[2]) {
+     return pipe(fd);
+@@ -101,6 +105,10 @@ static int fd_write(int fd, const void * buf, size_t n) {
+ static void fd_close(int fd) {
+     close(fd);
+ }
++
++static int fd_isatty(int fd) {  // Local addition
++    return isatty(fd);
++}
+ #endif
+ 
+ static httplib::Server * g_svr = nullptr;
+@@ -293,6 +301,77 @@ static int         g_real_stderr_fd = -1;
+ static int         g_pipe_read_fd   = -1;
+ static std::thread g_log_reader;
+ 
++// Local addition: colours on the terminal copy of the log; the ring (the page's
++// /logs) stays plain. On when stderr is a terminal and NO_COLOR is unset. Whole
++// lines by meaning: errors red, warnings and cancels yellow, a finished song or
++// save green, loading chatter, graph notes, counters and request dumps dim.
++// Otherwise the [Tag] by stage (writing music magenta, sound stage cyan, VAE
++// blue, sliders and LoRAs pink, transcriber bright cyan, the rest bold), with
++// stage summaries (ms/step, load and decode times, a new job) in bold.
++static bool g_log_color = false;
++
++static bool log_has(const std::string & s, const char * t) {
++    return s.find(t) != std::string::npos;
++}
++
++static bool log_starts(const std::string & s, const char * t) {
++    return s.compare(0, strlen(t), t) == 0;
++}
++
++// "[AR] Semantic 100/9000", "[NAR] Step 3/32, 451 ms": a counter, not news
++static bool log_is_progress(const std::string & s) {
++    if (log_starts(s, "[NAR] Step ")) {
++        return true;
++    }
++    size_t sp = s.rfind(' ');
++    if (!log_starts(s, "[AR] ") || sp == std::string::npos) {
++        return false;
++    }
++    std::string last = s.substr(sp + 1);
++    return last.find('/') != std::string::npos && last[0] != '/' &&
++           last.find_first_not_of("0123456789/") == std::string::npos;
++}
++
++static std::string log_colorize(const std::string & s) {
++    const char * whole = nullptr;
++    if (log_has(s, "FATAL") || log_has(s, "ERROR") || log_has(s, "OOM") || log_has(s, "Cannot ") ||
++        log_has(s, "cannot ") || log_has(s, "Failed") || log_has(s, "failed")) {
++        whole = "\033[31m";
++    } else if (log_has(s, "WARNING") || log_has(s, "warning") || log_has(s, "Cancel")) {
++        whole = "\033[33m";
++    } else if (log_starts(s, "[Pipeline] Done") || log_starts(s, "[Library] Saved") || log_starts(s, "[Server] Listening")) {
++        whole = "\033[1;32m";
++    } else if (s.empty() || s[0] != '[' || log_is_progress(s) || log_starts(s, "[GGUF]") || log_starts(s, "[Load]") ||
++               log_starts(s, "[WeightCtx]") || log_starts(s, "[BPE]") || log_starts(s, "[LM-Config]") ||
++               log_starts(s, "[LM-KV]") || log_starts(s, "[Qwen3]") || log_starts(s, "[Dedup]") ||
++               log_has(s, "] Graph") || log_has(s, "] Attn:") || log_has(s, "] MLP:")) {
++        whole = "\033[2m";
++    }
++    if (whole) {
++        return std::string(whole) + s + "\033[0m";
++    }
++    size_t end = s.find(']');
++    if (end == std::string::npos || end > 24) {
++        return s;
++    }
++    std::string  tag = s.substr(0, end + 1), rest = s.substr(end + 1);
++    const char * tc  = "\033[1m";
++    if (tag == "[AR]" || log_starts(tag, "[LM")) {
++        tc = "\033[35m";
++    } else if (tag == "[NAR]") {
++        tc = "\033[36m";
++    } else if (log_starts(tag, "[VAE")) {
++        tc = "\033[34m";
++    } else if (tag == "[Sliders]" || tag == "[LoRA]") {
++        tc = "\033[95m";
++    } else if (tag == "[SheetSage]") {
++        tc = "\033[96m";
++    }
++    bool summary = log_has(rest, "ms/step") || log_starts(s, "[NAR] Solved") || log_has(rest, "decode done") ||
++                   log_starts(s, "[Store] Load ") || log_starts(s, "[Server] Job ");
++    return std::string(tc) + tag + "\033[0m" + (summary ? "\033[1m" + rest + "\033[0m" : rest);
++}
++
+ // reader thread: drain pipe, forward to real stderr, push lines to ring.
+ // exits when the write end of the pipe is closed (fd_dup2 restores real stderr).
+ static void log_reader_main() {
+@@ -303,10 +382,16 @@ static void log_reader_main() {
+         if (n <= 0) {
+             break;
+         }
+-        fd_write(g_real_stderr_fd, buf, (size_t) n);
++        if (!g_log_color) {
++            fd_write(g_real_stderr_fd, buf, (size_t) n);
++        }
+         partial.append(buf, (size_t) n);
+         size_t pos;
+         while ((pos = partial.find('\n')) != std::string::npos) {
++            if (g_log_color) {  // Local addition: whole lines, coloured
++                std::string out = log_colorize(partial.substr(0, pos)) + "\n";
++                fd_write(g_real_stderr_fd, out.data(), out.size());
++            }
+             std::lock_guard<std::mutex> lock(mtx_log);
+             log_ring[log_seq & LOG_RING_MASK] = partial.substr(0, pos);
+             log_seq++;
+@@ -315,6 +400,10 @@ static void log_reader_main() {
+         }
+     }
+     if (!partial.empty()) {
++        if (g_log_color) {
++            std::string out = log_colorize(partial);
++            fd_write(g_real_stderr_fd, out.data(), out.size());
++        }
+         std::lock_guard<std::mutex> lock(mtx_log);
+         log_ring[log_seq & LOG_RING_MASK] = std::move(partial);
+         log_seq++;
+@@ -342,6 +431,7 @@ static void log_capture_stop() {
+ 
+ static void setup_log_capture() {
+     g_real_stderr_fd = fd_dup(STDERR_FILENO);
++    g_log_color      = g_real_stderr_fd >= 0 && fd_isatty(g_real_stderr_fd) && !getenv("NO_COLOR");  // Local addition
+     int pipefd[2];
+     if (fd_pipe(pipefd) != 0) {
+         fd_close(g_real_stderr_fd);

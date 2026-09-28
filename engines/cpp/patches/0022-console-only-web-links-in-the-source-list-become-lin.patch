@@ -1,0 +1,89 @@
+From 0759750f87f7baeba25183cb9011ddd202f52ef5 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 09:51:55 -0700
+Subject: [PATCH 22/36] console: only web links in the source list become links
+
+A link from the LoRA, VAE or slider source list is shown as a link only
+when it starts with http:// or https://; anything else stays plain text.
+---
+ tools/console/app.js   |  7 ++++---
+ tools/console/loras.js | 11 +++++++----
+ tools/console/vaes.js  | 10 +++++++---
+ 3 files changed, 18 insertions(+), 10 deletions(-)
+
+diff --git a/tools/console/app.js b/tools/console/app.js
+index f1d2b60..4fd8d44 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -613,10 +613,11 @@
+   // in the song form marked. For reading: the form's chips add and remove them.
+   function paintSliderCard() {
+     var list = STATE.sliderCatalog || [], chosen = {}, src = (STATE.sources || {}).sliders || {};
++    var url = /^https?:\/\//i.test(String(src.url || "")) ? String(src.url) : "";   // only web links become links
+     STATE.sliderChoice.forEach(function (c) { chosen[c.id] = c; });
+-    $("sliderSource").innerHTML = (src.url
+-      ? '<a class="tile-link" href="' + escape(src.url) + '" target="_blank" rel="noopener noreferrer" data-tip="' +
+-        escape("Open its model card (new tab): " + src.url) + '"><span>' + escape(src.repo || src.url) + "</span>\u2197</a>" : "") +
++    $("sliderSource").innerHTML = (url
++      ? '<a class="tile-link" href="' + escape(url) + '" target="_blank" rel="noopener noreferrer" data-tip="' +
++        escape("Open its model card (new tab): " + url) + '"><span>' + escape(src.repo || url) + "</span>\u2197</a>" : "") +
+       (src.about ? '<span class="info" tabindex="0" role="img" aria-label="About the sliders" data-tip="' + escape(src.about) + '">i</span>' : "");
+     $("sliderCard").innerHTML = list.map(function (e) {
+       var on = chosen[e.id], ok = e.installed !== false;
+diff --git a/tools/console/loras.js b/tools/console/loras.js
+index 6553ee4..fb8e094 100644
+--- a/tools/console/loras.js
++++ b/tools/console/loras.js
+@@ -58,6 +58,9 @@
+     return best ? S.sources[best] : null;
+   }
+ 
++  // Only web links become links: anything else in sources.json stays plain text
++  function webUrl(u) { return /^https?:\/\//i.test(String(u || "")) ? String(u) : ""; }
++
+   function triggerOf(e) {
+     var src = e ? source(e.id) : null;
+     return e ? (e.trigger || (src && src.trigger) || "") : "";
+@@ -128,10 +131,10 @@
+       var meta = e.error ? "cannot load: " + e.error
+         : [halvesText(e), folder, "rank " + e.rank, e.size_mb + " MB", triggerOf(e) ? "trigger " + triggerOf(e) : "", e.mode ? e.mode + " mode" : ""]
+           .filter(Boolean).join(" · ");
+-      var src = source(e.id) || {};
+-      var where = src.url
+-        ? '<a class="tile-link" href="' + escape(src.url) + '" target="_blank" rel="noopener noreferrer" data-tip="' +
+-          escape("Open its model card (new tab): " + src.url) + '"><span>' + escape(src.repo || src.url) + "</span>\u2197</a>"
++      var src = source(e.id) || {}, url = webUrl(src.url);
++      var where = url
++        ? '<a class="tile-link" href="' + escape(url) + '" target="_blank" rel="noopener noreferrer" data-tip="' +
++          escape("Open its model card (new tab): " + url) + '"><span>' + escape(src.repo || url) + "</span>\u2197</a>"
+         : '<span class="tile-repo" data-tip="' + escape("No source for this file in loras/sources.json; the (i) has its details") + '">' +
+           escape(src.repo || "no source link") + "</span>";
+       return '<li class="lora-item' + (on[e.id] ? " is-on" : "") + (e.error ? " is-bad" : "") + '" data-lora="' + escape(e.id) + '">' +
+diff --git a/tools/console/vaes.js b/tools/console/vaes.js
+index 3a84c6d..a22e2fd 100644
+--- a/tools/console/vaes.js
++++ b/tools/console/vaes.js
+@@ -31,6 +31,9 @@
+ 
+   function labelOf(v) { return v.label || v.name; }
+ 
++  // Only web links become links: anything else in sources.json stays plain text
++  function webUrl(u) { return /^https?:\/\//i.test(String(u || "")) ? String(u) : ""; }
++
+   function kindOf(v) {
+     var src = S.sources[v.name] || {};
+     if (src.official === true) return "stock";
+@@ -51,9 +54,10 @@
+       var kind = kindOf(v);
+       if (picked) pickedLabel = labelOf(v);
+       var recap = [labelOf(v) + (kind ? " · " + kind : ""), src.about || "", v.repo ? "Weights: " + v.repo : ""].filter(Boolean).join("\n");
+-      var where = src.url
+-        ? '<a class="tile-link" href="' + escape(src.url) + '" target="_blank" rel="noopener noreferrer" data-tip="' +
+-          escape("Open its model card (new tab): " + src.url) + '"><span>' + escape(v.repo || src.url) + "</span>\u2197</a>"
++      var url = webUrl(src.url);
++      var where = url
++        ? '<a class="tile-link" href="' + escape(url) + '" target="_blank" rel="noopener noreferrer" data-tip="' +
++          escape("Open its model card (new tab): " + url) + '"><span>' + escape(v.repo || url) + "</span>\u2197</a>"
+         : '<span class="tile-repo" data-tip="' + escape(v.repo || v.name) + '">' + escape(v.repo || v.name) + "</span>";
+       var meta = [NOTES[v.name] || "", v.name === S.def ? "engine default" : "", ok ? "" : "not downloaded"].filter(Boolean).join(" · ");
+       return '<li class="lora-item vae-item' + (picked ? " is-on" : "") + (kind === "add-on" ? " is-addon" : "") + (ok ? "" : " is-bad") +

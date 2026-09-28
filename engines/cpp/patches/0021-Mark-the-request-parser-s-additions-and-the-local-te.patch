@@ -1,0 +1,69 @@
+From 0f7d4b0a6cbe468d3276ead9d8a705f76bcc52de Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 09:51:55 -0700
+Subject: [PATCH 21/36] Mark the request parser's additions and the local test
+ targets
+
+Every change to an upstream file now carries a Local addition comment, so
+an upstream update shows at a glance which lines are ours.
+---
+ src/request.cpp      | 5 ++++-
+ tests/CMakeLists.txt | 4 ++--
+ 2 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/src/request.cpp b/src/request.cpp
+index e6c444d..34c631e 100644
+--- a/src/request.cpp
++++ b/src/request.cpp
+@@ -2,7 +2,7 @@
+ 
+ #include "request.h"
+ 
+-#include <cmath>
++#include <cmath>  // Local addition: rounding LoRA strengths
+ 
+ #include "task-types.h"
+ #include "yyjson.h"
+@@ -39,6 +39,7 @@ void request_init(Yue2Request * r) {
+     r->output_format = OUTPUT_FORMAT_MP3;
+     r->mp3_bitrate   = 128;
+ 
++    // Local additions (console): take title, decoder, sliders, LoRAs, score-only runs, parent take
+     r->title     = "";
+     r->vae       = "";
+     r->sliders   = {};
+@@ -171,6 +172,7 @@ static void request_parse_obj(yyjson_val * obj, Yue2Request * r) {
+     if ((v = yyjson_obj_get(obj, "mp3_bitrate")) && yyjson_is_int(v)) {
+         r->mp3_bitrate = yyjson_get_int(v);
+     }
++    // Local additions (console): the fields request_init() adds, read from the request
+     if ((v = yyjson_obj_get(obj, "title")) && yyjson_is_str(v)) {
+         r->title = yy_str(v);
+     }
+@@ -302,6 +304,7 @@ std::string request_to_json(const Yue2Request * r, bool sparse) {
+     if (!sparse || r->mp3_bitrate != d.mp3_bitrate) {
+         yyjson_mut_obj_add_int(doc, root, "mp3_bitrate", r->mp3_bitrate);
+     }
++    // Local additions (console): the same fields, written back (strengths rounded to 3 decimals)
+     if (!sparse || r->title != d.title) {
+         yyjson_mut_obj_add_strncpy(doc, root, "title", r->title.c_str(), r->title.size());
+     }
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 2a20397..943bd35 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -6,12 +6,12 @@ link_ggml_backends(test-vae)
+ add_executable(test-lm test-lm.cpp)
+ link_ggml_backends(test-lm)
+ 
+-# test-slider: voice/genre slider parity harness (local addition).
++# Local addition: test-slider, the voice/genre slider parity harness.
+ add_executable(test-slider test-slider.cpp)
+ link_ggml_backends(test-slider)
+ add_executable(test-slider-unit test-slider-unit.cpp)
+ link_ggml_backends(test-slider-unit)
+-# test-lora: LoRA catalog and merge harness (local addition), for tools/test_lora_parity.py
++# Local addition: test-lora, the LoRA catalog and merge harness.
+ add_executable(test-lora test-lora.cpp)
+ link_ggml_backends(test-lora)
+ 

@@ -1,0 +1,248 @@
+From b99ae2e86c680bfb9a2b00466db6da331a02c80f Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 18:34:56 -0700
+Subject: [PATCH 05/36] Let songs be browsed without stopping the one that
+ plays
+
+The player keeps its own song. Opening another song shows its page and
+offers a Play this song button; the player only follows the page while it
+is idle, a version chip switches it on purpose, and a new version of the
+playing song waits as a chip instead of taking over. Space controls
+whatever the player holds; deleting the song in the player empties it.
+---
+ tools/console/app.js | 117 +++++++++++++++++++++++++++++++------------
+ 1 file changed, 84 insertions(+), 33 deletions(-)
+
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 641f73d..72ee6c4 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -190,7 +190,7 @@
+       if (!$("view-engine").classList.contains("is-hidden")) scrollLogToEnd();
+     } else if (view === "take") {
+       $("view-engine").classList.add("is-hidden");
+-      if (STATE.take) drawWave();
++      drawWave();
+       if (window.innerWidth <= 1150) $("view-take").scrollIntoView({ behavior: "smooth", block: "start" });
+     }
+   }
+@@ -224,7 +224,7 @@
+   document.addEventListener("keydown", function (event) {
+     if (/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)) return;
+     if (event.key === "Escape") { $("view-engine").classList.add("is-hidden"); closeMenus(); }
+-    if (event.key === " " && STATE.take && !event.target.closest(".menu-pop")) { event.preventDefault(); togglePlay(); }
++    if (event.key === " " && (audio.getAttribute("src") || STATE.take) && !event.target.closest(".menu-pop")) { event.preventDefault(); togglePlay(); }
+   });
+ 
+   /* ------------------------------------------------------------ info tips */
+@@ -1365,10 +1365,10 @@
+       if (job.restored) return;
+       var watching = STATE.job === job && !STATE.take && count, playing = isPlaying();
+       toastOnce(job.id, "Song complete — " + job.title + (count > 1 ? " (" + count + " takes)" : "") +
+-                (watching && playing ? ". It is first in Takes; what you are playing keeps playing." : ""), "good");
+-      // Only jump to the new song if the run is what you were looking at,
+-      // and never by cutting off a song that is playing.
+-      if (watching && !playing) openTake(job.takes[0]);
++                (watching && playing ? ". What you are playing keeps playing; ▶ Play this song when you are ready." : ""), "good");
++      // Only jump to the new song if the run is what you were looking at;
++      // opening it never cuts off a song that is playing.
++      if (watching) openTake(job.takes[0]);
+     }).catch(function (error) {
+       job.error = error.message;
+       settle(job, "failed");
+@@ -1427,8 +1427,8 @@
+     var name = job.takes[0];
+     toastOnce(job.id, (job.what || "New version") + " ready — " + job.title, "good");
+     // Only switch if you are still listening to the take it came from.
+-    if (name && STATE.take && STATE.take.name === job.parent) openTake(name, { keep: true });
+-    else if (STATE.take) { paintDecodeSwitch(); }
++    if (name && STATE.take && STATE.take.name === job.parent && !isPlaying()) openTake(name, { keep: true });
++    else if (STATE.take) { paintDecodeSwitch(); paintSoundSwitch(); }
+   }
+ 
+   // With no library on the server, the finished songs are fetched once and
+@@ -2411,7 +2411,6 @@
+     var take = findTake(name);
+     if (!take) return;
+     opts = opts || {};
+-    var resume = opts.keep && audio.src ? { at: audio.currentTime, playing: !audio.paused } : null;
+     STATE.take = take;
+     STATE.job = null;
+     STATE.stageRows = null;
+@@ -2422,21 +2421,22 @@
+     paintTakeHead();
+ 
+     var url = takeAudioUrl(take);
+-    if (audio.getAttribute("src") !== url) {
+-      audio.src = url;
+-      $("timeNow").textContent = "0:00";
+-      $("playGlyph").textContent = "▶";
++    // Looking at a song never cuts off the one that is playing. The player follows
++    // the page only while it is idle; a version chip (keep) is an explicit switch.
++    var inPlayer = STATE.playerTake && STATE.playerTake.name === take.name;
++    if (opts.keep) {
++      var sameMusic = !!(STATE.playerTake && familyOf(take).some(function (t) { return t.name === STATE.playerTake.name; }));
++      var wasPlaying = isPlaying();
++      loadPlayer(take, sameMusic);
++      if (!sameMusic && wasPlaying) audio.play().catch(function () {});
++    } else if (inPlayer) {
++      STATE.playerTake = take;
++    } else if (!isPlaying()) {
++      loadPlayer(take, false);
+     }
+-    $("playbar").classList.remove("is-empty");
+-    $("playbarTitle").textContent = displayTitle(take);
+-    $("playbarStyle").textContent = take.style;
+-    $("dlAudio").href = url;
+-    $("dlAudio").textContent = take.format === "mp3" ? "MP3" : "WAV";
+-    $("dlAudio").setAttribute("download", audioFileName(take));
+     $("dlTakeAudio").href = url;
+     $("dlTakeAudio").textContent = "Audio ." + formatExt(take.format);
+     $("dlTakeAudio").setAttribute("download", audioFileName(take));
+-    $("timeTotal").textContent = clock(take.seconds);
+ 
+     paintTakeMeta();
+     $("metaStyle").textContent = take.style;
+@@ -2458,15 +2458,8 @@
+       }).catch(function () {});
+     }
+ 
+-    if (resume) {
+-      audio.addEventListener("loadedmetadata", function again() {
+-        audio.removeEventListener("loadedmetadata", again);
+-        try { audio.currentTime = Math.min(resume.at, audio.duration || resume.at); } catch (error) { /* not seekable yet */ }
+-        if (resume.playing) audio.play().catch(function () {});
+-      });
+-    }
+-    loadPeaks(take);
+     paintDecodeSwitch();
++    paintPlayHere();
+     paintSoundSwitch();
+     paintLibrary();
+     paintRunReturn();
+@@ -2482,7 +2475,9 @@
+       '<button type="button" class="btn ghost small' + (take.favorite ? " is-on" : "") + '" id="favTake" aria-pressed="' +
+       (take.favorite ? "true" : "false") + '" title="' + (take.favorite ? "Remove from favourites" : "Keep as a favourite") + '">' +
+       (take.favorite ? "★ Favourite" : "☆ Favourite") + "</button>" +
+-      '<button type="button" class="btn ghost small" id="renameTake" title="Rename this take">Rename</button>';
++      '<button type="button" class="btn ghost small" id="renameTake" title="Rename this take">Rename</button>' +
++      '<button type="button" class="btn primary small is-hidden" id="playHere" data-tip="Play this song now (the player keeps what it was playing until you do)">▶ Play this song</button>';
++    paintPlayHere();
+   }
+ 
+   function paintTakeMeta() {
+@@ -2691,7 +2686,8 @@
+     $("decodeSwitch").innerHTML = '<span class="label">VAE</span>' + STATE.vaes.map(function (v) {
+       var label = escape(v.label || v.name), repo = v.repo || v.name;
+       if (v.name === take.vae) {
+-        return '<button type="button" class="chip is-on" aria-pressed="true" data-tip="' + escape("Playing this version\n" + repo) + '">' + label + "</button>";
++        var held = STATE.playerTake && STATE.playerTake.name === take.name;
++        return '<button type="button" class="chip is-on" aria-pressed="true" data-tip="' + escape((held ? "Playing this version\n" : "This version\n") + repo) + '">' + label + "</button>";
+       }
+       var twin = family.filter(function (t) { return t.vae === v.name && String(t.seed) === String(take.seed); })[0];
+       if (twin) {
+@@ -2772,6 +2768,9 @@
+     if (STATE.take && STATE.take.name === entry.name) {
+       STATE.take = entry;
+       paintTakeHead();
++    }
++    if (STATE.playerTake && STATE.playerTake.name === entry.name) {
++      STATE.playerTake = entry;
+       $("playbarTitle").textContent = displayTitle(entry);
+     }
+     paintLibrary();
+@@ -2835,6 +2834,11 @@
+     $("takeTitle").textContent = "Nothing playing";
+     $("takeEyebrow").textContent = "no run yet";
+     $("takeActions").innerHTML = "";
++    paintRunReturn();
++  }
++
++  function clearPlayer() {
++    STATE.playerTake = null;
+     audio.pause();
+     audio.removeAttribute("src");
+     audio.load();
+@@ -2845,7 +2849,7 @@
+     $("timeNow").textContent = "0:00";
+     $("timeTotal").textContent = "0:00";
+     drawWave();
+-    paintRunReturn();
++    paintPlayHere();
+   }
+ 
+   function removeTake(take) {
+@@ -2854,6 +2858,7 @@
+     delete STATE.requests[take.name];
+     delete STATE.peakCache[takeAudioUrl(take)];
+     if (take.session && take.url) URL.revokeObjectURL(take.url);
++    if (STATE.playerTake && STATE.playerTake.name === take.name) clearPlayer();
+     if (STATE.take && STATE.take.name === take.name) clearTakeView();
+   }
+ 
+@@ -2901,7 +2906,53 @@
+ 
+   var audio = $("audio");
+ 
++  // The player holds its own song, apart from the song page on screen.
++  STATE.playerTake = null;
++
++  function loadPlayer(take, keepTime) {
++    var at = audio.currentTime, wasPlaying = !audio.paused;
++    var url = takeAudioUrl(take);
++    STATE.playerTake = take;
++    if (audio.getAttribute("src") !== url) {
++      audio.src = url;
++      if (keepTime) {
++        // A/B between versions of the same music: same bar, same play state
++        audio.addEventListener("loadedmetadata", function again() {
++          audio.removeEventListener("loadedmetadata", again);
++          try { audio.currentTime = Math.min(at, audio.duration || at); } catch (error) { /* not seekable yet */ }
++          if (wasPlaying) audio.play().catch(function () {});
++        });
++      } else {
++        $("timeNow").textContent = "0:00";
++        $("playGlyph").textContent = "▶";
++      }
++    }
++    $("playbar").classList.remove("is-empty");
++    $("playbarTitle").textContent = displayTitle(take);
++    $("playbarStyle").textContent = take.style;
++    $("dlAudio").href = url;
++    $("dlAudio").textContent = take.format === "mp3" ? "MP3" : "WAV";
++    $("dlAudio").setAttribute("download", audioFileName(take));
++    $("timeTotal").textContent = clock(take.seconds);
++    loadPeaks(take);
++    paintDecodeSwitch();
++    paintPlayHere();
++  }
++
++  // "Play this song" shows when the page and the player hold different songs.
++  function paintPlayHere() {
++    var button = $("playHere");
++    if (button) button.classList.toggle("is-hidden", !STATE.take || !!(STATE.playerTake && STATE.playerTake.name === STATE.take.name));
++  }
++
++  $("takeActions").addEventListener("click", function (event) {
++    if (!event.target.closest("#playHere") || !STATE.take) return;
++    loadPlayer(STATE.take, false);
++    audio.play().catch(function () { toast("Your browser would not play this file", "bad"); });
++  });
++
+   function togglePlay() {
++    if (!audio.getAttribute("src") && STATE.take) loadPlayer(STATE.take, false);
+     if (!audio.getAttribute("src")) return;
+     if (audio.paused) audio.play().catch(function () { toast("Your browser would not play this file", "bad"); });
+     else audio.pause();
+@@ -2977,9 +3028,9 @@
+       STATE.peakCache[url] = peaks;
+       var keys = Object.keys(STATE.peakCache);
+       if (keys.length > 80) delete STATE.peakCache[keys[0]];
+-      if (STATE.take && takeAudioUrl(STATE.take) === url) { STATE.peaks = peaks; drawWave(); }
++      if (STATE.playerTake && takeAudioUrl(STATE.playerTake) === url) { STATE.peaks = peaks; drawWave(); }
+     }).catch(function () {
+-      if (STATE.take && takeAudioUrl(STATE.take) === url) { STATE.peaks = "none"; drawWave(); }
++      if (STATE.playerTake && takeAudioUrl(STATE.playerTake) === url) { STATE.peaks = "none"; drawWave(); }
+     }).then(function () { delete STATE.peakLoading[url]; });
+   }
+ 

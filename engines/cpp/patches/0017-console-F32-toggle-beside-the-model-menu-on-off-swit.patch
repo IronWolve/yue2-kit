@@ -1,0 +1,146 @@
+From 7f37317b32b5f23fe5a4e44741127570959e8920 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 22:02:39 -0700
+Subject: [PATCH 17/36] console: F32 toggle beside the model menu, on/off
+ switches on engine LoRA tiles
+
+The F32 button flips precision between f32 and bf16 without opening the
+Engine tab and stays in step with the Engine form. Each LoRA tile in the
+Engine tab gets an On/Off switch that adds it to the song form at strength
+1.0 on each half it has, or takes it out; broken files get no switch.
+---
+ tools/console/app.css    |  8 +++++++-
+ tools/console/app.js     | 15 +++++++++++++++
+ tools/console/index.html |  1 +
+ tools/console/loras.js   | 34 +++++++++++++++++++++++-----------
+ 4 files changed, 46 insertions(+), 12 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index 13ae76c..32d58c2 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1554,7 +1554,10 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+ .lora-item-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; flex: none; max-width: 55%; }
+ .lora-item-meta { margin-top: 4px; font: 11px/1.45 var(--mono); color: var(--dim); overflow-wrap: anywhere; }
+ .lora-item.is-bad .lora-item-meta { color: var(--bad); }
+-.tag.in-use { color: var(--amber); border-color: var(--amber-dim); }
++.lora-switch { flex: none; min-width: 42px; padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent;
++  color: var(--dim); font: 600 10.5px/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
++.lora-switch:hover { color: var(--ink); border-color: var(--amber-dim); }
++.lora-switch[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--on-amber); }
+ 
+ /* the style box grows with its text; the meter under it counts the prompt against the context */
+ #style { field-sizing: content; min-height: 76px; max-height: 50vh; }
+@@ -1568,3 +1571,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+ 
+ /* a seed box with a seed in it: its dice clears it */
+ .dice.is-set { color: var(--amber); }
++
++/* F32 beside the model menu: lit when full-precision maths is on */
++.f32-toggle[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--on-amber); }
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 24490d0..02f4799 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -2330,9 +2330,24 @@
+     });
+   });
+ 
++  // F32 beside the model menu: one press for full-precision maths, again for BF16 (loads with the next song)
++  function paintF32(settings) {
++    var on = !!settings && settings.precision === "f32";
++    $("f32Toggle").setAttribute("aria-pressed", String(on));
++  }
++  $("f32Toggle").addEventListener("click", function () {
++    var want = this.getAttribute("aria-pressed") === "true" ? "bf16" : "f32";
++    post("/settings", { precision: want }).then(function (data) {
++      paintSettings(data, true);
++      toast(want === "f32" ? "F32 on: the next song loads full-precision weights (about twice the memory, slower)"
++                           : "BF16: the next song loads the release weights", "good");
++    }).catch(function (error) { toast(error.message, "bad"); });
++  });
++
+   function paintSettings(settings, force) {
+     STATE.settings = settings;
+     paintModelPick(settings);
++    paintF32(settings);
+     // A background refresh must not wipe fields you are still editing; Save repaints them.
+     if (STATE.settingsDirty && !force) {
+       paintStrip();
+diff --git a/tools/console/index.html b/tools/console/index.html
+index 9a79409..7cfb6a7 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -47,6 +47,7 @@ Q8_0: near lossless (the C++ author), 3.8 GB.
+ Q6_K 2.9 GB and Q5_K_M 2.6 GB: smaller still; the author advises nothing below Q5.
+ Smaller copies need less VRAM and write music a little faster. A change loads with the next song.
+ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
++    <button type="button" class="btn ghost small f32-toggle" id="f32Toggle" aria-pressed="false" data-tip="F32: full-precision maths. Pressed, the next song loads the weights widened to 32 bits and keeps everything in between at full precision (about twice the GPU memory for the weights, and slower). Released: BF16, the release. With a quantized model (Q8_0, Q6_K, Q5_K_M) those weights stay quantized, so it changes little.">F32</button>
+     <button type="button" class="btn ghost small theme-button" id="themeButton">Theme</button>
+     <button class="btn ghost small" id="openPrompt" title="Open a prompt saved as JSON or YAML">Open</button>
+     <input type="file" id="openFile" accept=".json,.yaml,.yml" hidden />
+diff --git a/tools/console/loras.js b/tools/console/loras.js
+index b548e6c..de9c210 100644
+--- a/tools/console/loras.js
++++ b/tools/console/loras.js
+@@ -91,7 +91,10 @@
+     S.choice.forEach(function (c) { on[c.id] = c; });
+     S.list.innerHTML = S.catalog.length ? S.catalog.map(function (e) {
+       var parts = String(e.name).split(" / "), main = parts.pop(), folder = parts.join(" / ");
+-      var tags = on[e.id] ? '<span class="tag in-use">in use</span>' : "";
++      var tags = e.error ? "" : '<button type="button" class="lora-switch" data-lora-switch="' + escape(e.id) + '" aria-pressed="' + !!on[e.id] +
++        '" data-tip="' + escape(on[e.id] ? "On: in the next song. Press to turn it off (it leaves the song form)"
++                                         : "Off. Press to turn it on: it joins the song form at strength 1.0 on each half it has") +
++        '">' + (on[e.id] ? "On" : "Off") + "</button>";
+       var meta = e.error ? "cannot load: " + e.error
+         : [halvesText(e), folder, "rank " + e.rank, e.size_mb + " MB", e.trigger ? "trigger " + e.trigger : "", e.mode ? e.mode + " mode" : ""]
+           .filter(Boolean).join(" · ");
+@@ -101,13 +104,30 @@
+     }).join("") : '<li class="lora-item"><div class="lora-item-meta">No .safetensors files in the app\'s loras/ folder.</div></li>';
+     if (S.note) {
+       var active = S.choice.filter(function (c) { return entry(c.id); }).length;
+-      S.note.textContent = S.catalog.length + " in loras/" + (active ? " · " + active + " in use in the form" : " · pick them per song in the form");
++      S.note.textContent = S.catalog.length + " in loras/" + (active ? " · " + active + " on for the next song" : " · all off");
+     }
+   }
+ 
++  function toggle(id) {
++    var at = -1;
++    S.choice.forEach(function (c, i) { if (c.id === id) at = i; });
++    if (at >= 0) {
++      S.choice.splice(at, 1);
++    } else {
++      var e = entry(id);
++      if (!e || e.error) return;
++      S.choice.push({ id: id, ar: has(e, "ar") ? 1 : 0, nar: has(e, "nar") ? 1 : 0 });
++    }
++    changed();
++  }
++
+   function listInto(list, note) {
+     S.list = list;
+     S.note = note || null;
++    list.addEventListener("click", function (event) {
++      var button = event.target.closest("[data-lora-switch]");
++      if (button) toggle(button.dataset.loraSwitch);
++    });
+     paintList();
+   }
+ 
+@@ -146,15 +166,7 @@
+       var chip = event.target.closest("[data-lora-chip]"), remove = event.target.closest("[data-remove-lora]");
+       var trigger = event.target.closest("[data-trigger]");
+       if (chip && !chip.disabled) {
+-        var id = chip.dataset.loraChip, at = -1;
+-        S.choice.forEach(function (c, i) { if (c.id === id) at = i; });
+-        if (at >= 0) {
+-          S.choice.splice(at, 1);
+-        } else {
+-          var e = entry(id);
+-          S.choice.push({ id: id, ar: has(e, "ar") ? 1 : 0, nar: has(e, "nar") ? 1 : 0 });
+-        }
+-        changed();
++        toggle(chip.dataset.loraChip);
+       } else if (remove) {
+         S.choice = S.choice.filter(function (c) { return c.id !== remove.dataset.removeLora; });
+         changed();

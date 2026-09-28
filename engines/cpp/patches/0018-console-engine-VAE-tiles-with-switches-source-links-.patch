@@ -1,0 +1,367 @@
+From a66e4be7fe74134f97785bdcced8cc362e99fa46 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 08:28:21 -0700
+Subject: [PATCH 18/36] console: engine VAE tiles with switches, source links
+ and recaps on every tile
+
+The Engine tab's VAE list becomes tiles like the LoRAs: an On/Off switch
+picks the song's VAE (one per song, the form follows), and each tile is
+marked official or third-party. Every VAE and LoRA tile now shows where it
+came from as a link, with an (i) that recaps what it does and how it was
+made. Links, recaps and a fallback trigger word come from an optional
+sources.json in the LoRA folder, which /props passes through.
+---
+ tools/console/app.css    | 13 +++++++
+ tools/console/app.js     | 16 +++++---
+ tools/console/index.html |  9 +++--
+ tools/console/loras.js   | 61 +++++++++++++++++++++++------
+ tools/console/vaes.js    | 83 ++++++++++++++++++++++++++++++++++++++++
+ tools/yue-server.cpp     | 10 +++++
+ 6 files changed, 171 insertions(+), 21 deletions(-)
+ create mode 100644 tools/console/vaes.js
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index 32d58c2..b4c10fb 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1559,6 +1559,19 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+ .lora-switch:hover { color: var(--ink); border-color: var(--amber-dim); }
+ .lora-switch[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--on-amber); }
+ 
++/* Engine tiles: the source link and the (i) recap under each name; official or third-party VAEs */
++.tile-src { display: flex; align-items: center; gap: 2px; margin-top: 3px; min-width: 0; }
++.tile-link, .tile-repo { min-width: 0; font: 11.5px/1.45 var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
++.tile-link { display: inline-flex; gap: 3px; color: var(--patina); text-decoration: none; }
++.tile-link span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
++.tile-link:hover, .tile-link:focus-visible { color: var(--amber); outline: none; }
++.tile-link:hover span, .tile-link:focus-visible span { text-decoration: underline; }
++.tile-src .info { flex: none; }
++.tile-kind { display: inline-block; margin-left: 8px; padding: 0 6px; vertical-align: 1px; border: 1px solid var(--line-strong); border-radius: 999px;
++  color: var(--muted); font: 600 9.5px/1.5 var(--sans); letter-spacing: .06em; text-transform: uppercase; cursor: help; }
++.tile-kind.is-third { border-style: dashed; border-color: var(--amber-dim); color: var(--amber); }
++.vae-item.is-third { border-style: dashed; border-left-style: solid; }
++
+ /* the style box grows with its text; the meter under it counts the prompt against the context */
+ #style { field-sizing: content; min-height: 76px; max-height: 50vh; }
+ .size-meter { display: block; margin: 4px 0 0; }
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 02f4799..401f469 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -583,6 +583,7 @@
+       var first = document.querySelector("#decoders input");
+       if (first) first.checked = true;
+     }
++    YueVaes.repaint();
+   }
+ 
+   function selectedVae(noFallback) {
+@@ -590,7 +591,13 @@
+     return input ? input.value : (noFallback ? null : STATE.defaultVae);
+   }
+ 
+-  $("decoders").addEventListener("change", function () { store("yue2.vae", selectedVae()); });
++  $("decoders").addEventListener("change", function () { store("yue2.vae", selectedVae()); YueVaes.repaint(); });
++
++  // The Engine panel's VAE tiles (vaes.js): a tile's switch picks the form's VAE
++  YueVaes.listInto($("vaeCard"), $("vaeCardNote"), {
++    current: function () { return selectedVae(true) || ""; },
++    choose: function (name) { checkVae(name); store("yue2.vae", selectedVae()); }
++  });
+ 
+   /* ------------------------------------------------------------- sliders */
+   // Voice and genre sliders from the server's catalogue: tap to add, stack any
+@@ -2218,10 +2225,7 @@
+     $("serverCard").innerHTML = rows.map(function (row) {
+       return "<div><dt>" + row[0] + '</dt><dd class="' + row[2] + '" title="' + escape(row[1]) + '">' + escape(row[1]) + "</dd></div>";
+     }).join("");
+-    $("vaeCard").innerHTML = STATE.vaes.length ? STATE.vaes.map(function (v) {
+-      return "<div><dt>" + escape(v.label || v.name) + (v.name === STATE.defaultVae ? " · default" : "") + '</dt><dd title="' +
+-        escape(v.repo || "") + '">' + escape(v.repo || v.name) + "</dd></div>";
+-    }).join("") : "<div><dt>Standard</dt><dd>m-a-p/YuE2-Vae</dd></div>";
++    YueVaes.set(STATE.vaes, STATE.defaultVae);
+     var sliders = STATE.sliderCatalog || [];
+     $("sliderCardNote").textContent = sliders.length
+       ? sliders.length + " installed (LoRA plugin ntc-ai/yue2-particle-sliders); pick them per song in the form."
+@@ -2251,6 +2255,8 @@
+     STATE.defaultVae = props.default_vae || STATE.vaes[0].name;
+     STATE.sliderCatalog = Array.isArray(props.sliders) ? props.sliders : [];
+     YueLoras.setCatalog(Array.isArray(props.loras) ? props.loras : []);
++    YueLoras.setSources((props.sources || {}).loras);
++    YueVaes.setSources((props.sources || {}).vaes);
+     STATE.maxBatch = Math.max(1, parseInt(props.max_batch, 10) || 1);
+     STATE.transcriber = !!props.transcriber;
+     STATE.library = props.outputs !== false;
+diff --git a/tools/console/index.html b/tools/console/index.html
+index 7cfb6a7..1a30e7b 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -108,10 +108,10 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+       </div>
+     </div>
+ 
+-    <div class="card">
+-      <h3>VAEs</h3>
+-      <dl class="kv wrap" id="vaeCard"></dl>
+-      <p class="hint">The form picks one per song; a finished song can get another from its page.</p>
++    <div class="card wide lora-card">
++      <div class="lora-card-head"><h3>VAEs</h3>
++        <span class="lora-card-note" id="vaeCardNote"></span></div>
++      <ul class="lora-list vae-list" id="vaeCard"></ul>
+     </div>
+ 
+     <div class="card wide lora-card">
+@@ -697,6 +697,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+ <script src="instrumental.js"></script>
+ <script src="help.js"></script>
+ <script src="loras.js"></script>
++<script src="vaes.js"></script>
+ <script src="themes.js"></script>
+ <script src="app.js"></script>
+ </body>
+diff --git a/tools/console/loras.js b/tools/console/loras.js
+index de9c210..f2af89d 100644
+--- a/tools/console/loras.js
++++ b/tools/console/loras.js
+@@ -9,11 +9,13 @@
+      set(list)             [{id, ar, nar}] from a take, to render it again
+      value()               [{id, ar, nar}] for the request (installed files only)
+      describe(list)        "sv-billie (music 0.8 · sound 1.0), ..." for a song's info
+-     listInto(list, note)  also keep an Engine-panel list (a <ul>) of every installed LoRA */
++     listInto(list, note)  also keep an Engine-panel list (a <ul>) of every installed LoRA
++     setSources(map)       {id or folder prefix: {repo, url, about, trigger}} from loras/sources.json:
++                           a link and a recap per LoRA, and a trigger word for files that carry none */
+ (function (root) {
+   "use strict";
+ 
+-  var S = { catalog: [], choice: [], host: null, opts: {}, list: null, note: null };
++  var S = { catalog: [], choice: [], host: null, opts: {}, list: null, note: null, sources: {} };
+ 
+   function escape(text) {
+     return String(text === undefined || text === null ? "" : text).replace(/[&<>"']/g, function (c) {
+@@ -38,6 +40,20 @@
+     return e ? e.name : fallbackName(id);
+   }
+ 
++  // The sources.json entry for a file: its exact id, else the longest folder prefix of it
++  function source(id) {
++    var best = "";
++    Object.keys(S.sources).forEach(function (key) {
++      if ((id === key || id.indexOf(key) === 0) && key.length > best.length) best = key;
++    });
++    return best ? S.sources[best] : null;
++  }
++
++  function triggerOf(e) {
++    var src = e ? source(e.id) : null;
++    return e ? (e.trigger || (src && src.trigger) || "") : "";
++  }
++
+   function has(e, half) { return !!e && (e.halves || []).indexOf(half) >= 0; }
+ 
+   function halvesText(e) {
+@@ -46,15 +62,22 @@
+ 
+   function chipTip(e) {
+     if (e.error) return e.name + "\nCannot load: " + e.error;
+-    var lines = [e.name + " · " + halvesText(e) + " half" + (has(e, "ar") && has(e, "nar") ? "s" : ""),
++    var lines = [e.name + " · " + halvesText(e) + (has(e, "ar") && has(e, "nar") ? " halves" : " half"),
+       "rank " + e.rank + ", " + e.layout + " layout, " + e.size_mb + " MB"];
+-    if (e.trigger) lines.push("Trigger word: " + e.trigger);
++    if (triggerOf(e)) lines.push("Trigger word: " + triggerOf(e));
+     if (e.mode) lines.push("Trained in " + (e.mode === "direct" ? "Direct" : e.mode) + " mode");
+     if (e.hint) lines.push(e.hint);
+     lines.push("loras/" + e.id);
+     return lines.join("\n");
+   }
+ 
++  // chipTip with the recap from sources.json under the name
++  function aboutTip(e) {
++    var src = source(e.id), lines = chipTip(e).split("\n");
++    if (src && src.about) lines.splice(1, 0, src.about, "");
++    return lines.join("\n");
++  }
++
+   function halfControl(choice, e, half) {
+     var label = half === "ar" ? "Music" : "Sound", on = has(e, half) || !e;
+     var value = on ? choice[half] : 0;
+@@ -75,7 +98,7 @@
+     S.choice.forEach(function (c) {
+       var e = entry(c.id);
+       if (!e) { notes.push(fallbackName(c.id) + " is no longer in loras/ and will be left out."); return; }
+-      if (e.trigger) notes.push(e.name + ": put its trigger word “" + e.trigger + "” in the style.");
++      if (triggerOf(e)) notes.push(e.name + ": put its trigger word “" + triggerOf(e) + "” in the style.");
+       if (e.mode === "direct" && cot && cot !== "off") notes.push(e.name + " was trained in Direct mode.");
+       if (e.mode && e.mode !== "direct" && cot === "off") notes.push(e.name + " was trained with a score (" + e.mode + " mode).");
+       if (c.ar > 1) notes.push(e.name + ": above 1.0 on the music half, vocals often fall apart.");
+@@ -96,10 +119,18 @@
+                                          : "Off. Press to turn it on: it joins the song form at strength 1.0 on each half it has") +
+         '">' + (on[e.id] ? "On" : "Off") + "</button>";
+       var meta = e.error ? "cannot load: " + e.error
+-        : [halvesText(e), folder, "rank " + e.rank, e.size_mb + " MB", e.trigger ? "trigger " + e.trigger : "", e.mode ? e.mode + " mode" : ""]
++        : [halvesText(e), folder, "rank " + e.rank, e.size_mb + " MB", triggerOf(e) ? "trigger " + triggerOf(e) : "", e.mode ? e.mode + " mode" : ""]
+           .filter(Boolean).join(" · ");
+-      return '<li class="lora-item' + (on[e.id] ? " is-on" : "") + (e.error ? " is-bad" : "") + '" data-tip="' + escape(chipTip(e)) + '">' +
++      var src = source(e.id) || {};
++      var where = src.url
++        ? '<a class="tile-link" href="' + escape(src.url) + '" target="_blank" rel="noopener noreferrer" data-tip="' +
++          escape("Open its model card (new tab): " + src.url) + '"><span>' + escape(src.repo || src.url) + "</span>\u2197</a>"
++        : '<span class="tile-repo" data-tip="' + escape("No source for this file in loras/sources.json; the (i) has its details") + '">' +
++          escape(src.repo || "no source link") + "</span>";
++      return '<li class="lora-item' + (on[e.id] ? " is-on" : "") + (e.error ? " is-bad" : "") + '">' +
+         '<div class="lora-item-head"><span class="lora-item-name">' + escape(main) + '</span><span class="lora-item-tags">' + tags + "</span></div>" +
++        '<div class="tile-src">' + where + '<span class="info" tabindex="0" role="img" aria-label="About ' + escape(e.name) +
++        '" data-tip="' + escape(aboutTip(e)) + '">i</span></div>' +
+         '<div class="lora-item-meta">' + escape(meta) + "</div></li>";
+     }).join("") : '<li class="lora-item"><div class="lora-item-meta">No .safetensors files in the app\'s loras/ folder.</div></li>';
+     if (S.note) {
+@@ -139,15 +170,15 @@
+     var active = S.host.querySelector(".lora-active"), chips = S.host.querySelector(".lora-chips");
+     active.innerHTML = S.choice.map(function (c) {
+       var e = entry(c.id);
+-      return '<div class="lora-row' + (e ? "" : " is-missing") + '"><span class="lora-name" data-tip="' + escape(e ? chipTip(e) : "Not in loras/ any more") + '">' +
++      return '<div class="lora-row' + (e ? "" : " is-missing") + '"><span class="lora-name" data-tip="' + escape(e ? aboutTip(e) : "Not in loras/ any more") + '">' +
+         escape(nameOf(c.id)) + "</span>" + halfControl(c, e, "ar") + halfControl(c, e, "nar") +
+-        (e && e.trigger ? '<button type="button" class="chip lora-trigger" data-trigger="' + escape(e.trigger) +
+-          '" data-tip="Add the trigger word to the style prompt">+ ' + escape(e.trigger) + "</button>" : "<span></span>") +
++        (triggerOf(e) ? '<button type="button" class="chip lora-trigger" data-trigger="' + escape(triggerOf(e)) +
++          '" data-tip="Add the trigger word to the style prompt">+ ' + escape(triggerOf(e)) + "</button>" : "<span></span>") +
+         '<button type="button" class="icon-btn" data-remove-lora="' + escape(c.id) + '" aria-label="Remove ' + escape(nameOf(c.id)) + '">✕</button></div>';
+     }).join("");
+     chips.innerHTML = S.catalog.map(function (e) {
+       return '<button type="button" class="chip' + (on[e.id] ? " is-on" : "") + '" data-lora-chip="' + escape(e.id) + '"' +
+-        (e.error ? " disabled" : "") + ' aria-pressed="' + (on[e.id] ? "true" : "false") + '" data-tip="' + escape(chipTip(e)) + '">' +
++        (e.error ? " disabled" : "") + ' aria-pressed="' + (on[e.id] ? "true" : "false") + '" data-tip="' + escape(aboutTip(e)) + '">' +
+         escape(e.name) + (e.error ? "" : '<span class="chip-sub">' + escape(halvesText(e)) + "</span>") + "</button>";
+     }).join("");
+     S.host.querySelector(".lora-hint").textContent = hints().join(" ");
+@@ -190,6 +221,12 @@
+     if (JSON.stringify(S.catalog) !== before) paint();
+   }
+ 
++  function setSources(map) {
++    var before = JSON.stringify(S.sources);
++    S.sources = map && typeof map === "object" ? map : {};
++    if (JSON.stringify(S.sources) !== before) paint();
++  }
++
+   function set(list) {
+     S.choice = (list || []).map(function (c) {
+       return { id: String(c.id), ar: Number(c.ar) || 0, nar: Number(c.nar) || 0 };
+@@ -217,5 +254,5 @@
+   }
+ 
+   root.YueLoras = { mount: mount, setCatalog: setCatalog, set: set, value: value, describe: describe, repaint: paint,
+-    listInto: listInto };
++    listInto: listInto, setSources: setSources };
+ })(window);
+diff --git a/tools/console/vaes.js b/tools/console/vaes.js
+new file mode 100644
+index 0000000..4e95772
+--- /dev/null
++++ b/tools/console/vaes.js
+@@ -0,0 +1,83 @@
++/* The Engine panel's VAE tiles: one per decoder, with where it came from
++   (official or third-party, and a link to it), a recap under its (i), and an
++   On/Off switch that picks it for the next song. A song has exactly one VAE,
++   so turning one on turns the others off; the form's VAE follows. The same
++   file ships in both consoles; each page hands it its decoders.
++
++   window.YueVaes:
++     listInto(list, note, opts)  opts: { current() -> name, choose(name) }
++     set(vaes, def)              [{name, label, repo, installed}] and the Engine default
++     setSources(map)             {name: {official, url, about}} from loras/sources.json
++     repaint()                   after the form's VAE changes */
++(function (root) {
++  "use strict";
++
++  var NOTES = { standard: "best sound", legacy: "benchmark", blend: "⅔ standard, ⅓ legacy" };
++  var S = { vaes: [], def: "", sources: {}, list: null, note: null, opts: {} };
++
++  function escape(text) {
++    return String(text === undefined || text === null ? "" : text).replace(/[&<>"']/g, function (c) {
++      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
++    });
++  }
++
++  function labelOf(v) { return v.label || v.name; }
++
++  function paint() {
++    if (!S.list) return;
++    var current = S.opts.current ? S.opts.current() : "", onLabel = "";
++    S.list.innerHTML = S.vaes.map(function (v) {
++      var src = S.sources[v.name] || {}, ok = v.installed !== false, on = ok && v.name === current;
++      var kind = src.official === true ? "official" : src.official === false ? "third-party" : "";
++      if (on) onLabel = labelOf(v);
++      var badge = kind ? '<span class="tile-kind' + (src.official ? "" : " is-third") + '" data-tip="' +
++          escape(src.official ? "Official: released by the model's own publisher"
++                              : "Third-party: made by someone else from the official releases, not by the model's publisher") +
++          '">' + kind + "</span>" : "";
++      var tags = (ok ? '<button type="button" class="lora-switch" data-vae-switch="' + escape(v.name) + '" aria-pressed="' + on + '" data-tip="' +
++          escape(on ? "On: the next song uses this VAE. A song needs one, so turn another on to switch"
++                    : "Off. Press to use this VAE for the next song (the form's VAE follows)") + '">' + (on ? "On" : "Off") + "</button>" : "");
++      var recap = [labelOf(v) + (kind ? " · " + kind : ""), src.about || "", v.repo ? "Weights: " + v.repo : ""].filter(Boolean).join("\n");
++      var where = src.url
++        ? '<a class="tile-link" href="' + escape(src.url) + '" target="_blank" rel="noopener noreferrer" data-tip="' +
++          escape("Open its model card (new tab): " + src.url) + '"><span>' + escape(v.repo || src.url) + "</span>\u2197</a>"
++        : '<span class="tile-repo" data-tip="' + escape(v.repo || v.name) + '">' + escape(v.repo || v.name) + "</span>";
++      var meta = [NOTES[v.name] || "", v.name === S.def ? "engine default" : "", ok ? "" : "not downloaded"].filter(Boolean).join(" · ");
++      return '<li class="lora-item vae-item' + (on ? " is-on" : "") + (src.official === false ? " is-third" : "") + (ok ? "" : " is-bad") + '">' +
++        '<div class="lora-item-head"><span class="lora-item-name">' + escape(labelOf(v)) + badge + '</span><span class="lora-item-tags">' + tags + "</span></div>" +
++        '<div class="tile-src">' + where + '<span class="info" tabindex="0" role="img" aria-label="About the ' + escape(labelOf(v)) +
++        ' VAE" data-tip="' + escape(recap) + '">i</span></div>' +
++        (meta ? '<div class="lora-item-meta">' + escape(meta) + "</div>" : "") + "</li>";
++    }).join("");
++    if (S.note) {
++      S.note.textContent = S.vaes.length + " decoder" + (S.vaes.length === 1 ? "" : "s") +
++        (onLabel ? " · " + onLabel + " on for the next song" : "") + " · a finished song can add another from its page";
++    }
++  }
++
++  function listInto(list, note, opts) {
++    S.list = list;
++    S.note = note || null;
++    S.opts = opts || {};
++    list.addEventListener("click", function (event) {
++      var button = event.target.closest("[data-vae-switch]");
++      if (!button || button.getAttribute("aria-pressed") === "true") return;
++      if (S.opts.choose) S.opts.choose(button.dataset.vaeSwitch);
++      paint();
++    });
++    paint();
++  }
++
++  function set(vaes, def) {
++    S.vaes = (vaes || []).slice();
++    S.def = def || "";
++    paint();
++  }
++
++  function setSources(map) {
++    S.sources = map && typeof map === "object" ? map : {};
++    paint();
++  }
++
++  root.YueVaes = { listInto: listInto, set: set, setSources: setSources, repaint: paint };
++})(window);
+diff --git a/tools/yue-server.cpp b/tools/yue-server.cpp
+index 14b0656..0953218 100644
+--- a/tools/yue-server.cpp
++++ b/tools/yue-server.cpp
+@@ -1125,6 +1125,16 @@ static void handle_props(const httplib::Request &, httplib::Response & res) {
+     }
+     yyjson_mut_obj_add_val(doc, root, "sliders", sliders);
+     yyjson_mut_obj_add_val(doc, root, "loras", lora_catalog_json(doc));
++    // <loras>/sources.json: where each LoRA and VAE came from and what it does,
++    // passed through for the page ({} when there is none)
++    yyjson_doc * sources = g_pipeline.lora_dir.empty() ? nullptr
++        : yyjson_read_file((g_pipeline.lora_dir + "/sources.json").c_str(), 0, nullptr, nullptr);
++    if (sources && yyjson_is_obj(yyjson_doc_get_root(sources))) {
++        yyjson_mut_obj_add_val(doc, root, "sources", yyjson_val_mut_copy(doc, yyjson_doc_get_root(sources)));
++    } else {
++        yyjson_mut_obj_add_val(doc, root, "sources", yyjson_mut_obj(doc));
++    }
++    yyjson_doc_free(sources);
+     yyjson_mut_obj_add_int(doc, root, "max_batch", g_pipeline.params.max_batch);
+     yyjson_mut_obj_add_bool(doc, root, "transcriber", !g_transcriber_path.empty());
+     yyjson_mut_obj_add_bool(doc, root, "outputs", !g_outputs_dir.empty());

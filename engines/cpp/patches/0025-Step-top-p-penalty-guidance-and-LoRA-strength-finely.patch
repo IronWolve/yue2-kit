@@ -1,0 +1,114 @@
+From 0b5aa7cfbac7e5e684877ac97ba13beb1dc51881 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 12:49:00 -0700
+Subject: [PATCH 25/36] Step top-p, penalty, guidance and LoRA strength finely
+ enough for documented values
+
+Top-p by 0.005 (a model card uses 0.975), the music repetition penalty by 0.01 (1.18, 1.24), guidance by 0.01 (the protocol's 1.01, presets 0.85-1.15), LoRA strengths by 0.025 (a card's 0.375), and strength readouts keep a third decimal when the value has one.
+---
+ tools/console/app.js     | 17 +++++++++--------
+ tools/console/index.html |  2 +-
+ tools/console/loras.js   | 18 +++++++++++++-----
+ 3 files changed, 23 insertions(+), 14 deletions(-)
+
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 0a02947..872d820 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -317,15 +317,16 @@
+ 
+   /* ------------------------------------------------------------ sampling */
+ 
+-  // Decimal knobs step in their own scale: temperature 0.70 -> 0.71 (the presets
+-  // and the useful range, 0.9-0.95, sit on hundredths), not 0.7 -> 1.
+-  // Repetition penalty sits near 1.0 in the planner (1.005) and higher for music
+-  // tokens (1.2), so its step follows the default. Anything else uses the step
+-  // column of SAMPLER_KNOBS (top-k 1, window 1, max tokens 100).
++  // Decimal knobs step fine enough to reach every value the docs and model cards
++  // use: temperature 0.70 -> 0.71 (presets 0.55/0.85, cards 0.82/0.88/0.94), top-p
++  // by 0.005 (a card uses 0.975), repetition penalty 0.005 in the planner (1.005)
++  // and 0.01 for music tokens (cards use 1.18 and 1.24 around the 1.2 default).
++  // Anything else uses the step column of SAMPLER_KNOBS (top-k 1, window 1, max
++  // tokens 100).
+   function knobStep(knob, def) {
+     if (knob[0] === "temperature") return 0.01;
+-    if (knob[0] === "top_p") return 0.05;
+-    if (knob[0] === "repetition_penalty") return def < 1.05 ? 0.005 : 0.05;
++    if (knob[0] === "top_p") return 0.005;
++    if (knob[0] === "repetition_penalty") return def < 1.05 ? 0.005 : 0.01;
+     return knob[2] || 1;
+   }
+   // the server refuses values past these (protocol bounds)
+@@ -390,7 +391,7 @@
+   function fillCfg() {
+     if ($("cfg").dataset.touched) return;
+     var def = currentCot() === "off" ? "1.01" : "1.0";
+-    $("cfg").setAttribute("value", def);   // step base: arrows go 1.0 -> 1.1 / 0.9
++    $("cfg").setAttribute("value", def);   // step base: arrows go 1.0 -> 1.01 / 0.99
+     $("cfg").value = def;
+   }
+   $("cfg").addEventListener("input", function () { this.dataset.touched = this.value.trim() ? "1" : ""; if (!this.value.trim()) fillCfg(); });
+diff --git a/tools/console/index.html b/tools/console/index.html
+index d276326..1de68df 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -387,7 +387,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+           <div class="field-row">
+             <label class="field">
+               <span class="label">Guidance (CFG)<em>1.0 for full and melody, 1.01 for direct</em></span>
+-              <input type="number" id="cfg" step="0.1" placeholder="default" />
++              <input type="number" id="cfg" step="0.01" placeholder="default" />
+             </label>
+             <div class="field grow reset-cell">
+               <button type="button" class="btn ghost" id="resetSampling">Reset sampling</button>
+diff --git a/tools/console/loras.js b/tools/console/loras.js
+index fb8e094..3e4cb30 100644
+--- a/tools/console/loras.js
++++ b/tools/console/loras.js
+@@ -90,6 +90,14 @@
+     return lines.join("\n");
+   }
+ 
++  // A strength as written: at least `min` decimals, more only when the value has
++  // them (a card's 0.375 stays 0.375, 0.5 stays 0.5)
++  function fmt(v, min) {
++    var s = Number(v).toFixed(3);
++    while (s.length - s.indexOf(".") - 1 > min && s.charAt(s.length - 1) === "0") s = s.slice(0, -1);
++    return s;
++  }
++
+   function halfControl(choice, e, half) {
+     var label = half === "ar" ? "Music" : "Sound", on = has(e, half) || !e;
+     var value = on ? choice[half] : 0;
+@@ -97,9 +105,9 @@
+       ? (half === "ar" ? "Strength on the music half: the score and the music tokens (0 off, 1 as trained)"
+                        : "Strength on the sound half: the acoustic stage that turns music tokens into sound (0 off, 1 as trained)")
+       : "This file has no " + label.toLowerCase() + " half") + '"><span>' + label + "</span>" +
+-      '<input type="range" min="0" max="2" step="0.05" value="' + value + '"' + (on ? "" : " disabled") +
++      '<input type="range" min="0" max="2" step="0.025" value="' + value + '"' + (on ? "" : " disabled") +
+       ' data-lora="' + escape(choice.id) + '" data-half="' + half + '" aria-label="' + escape(nameOf(choice.id)) + " " + label + ' strength" />' +
+-      "<output>" + (on ? Number(value).toFixed(2) : "—") + "</output></label>";
++      "<output>" + (on ? fmt(value, 2) : "—") + "</output></label>";
+   }
+ 
+   function hints() {
+@@ -220,7 +228,7 @@
+       var id = event.target.dataset.lora, half = event.target.dataset.half;
+       if (!id || !half) return;
+       S.choice.forEach(function (c) { if (c.id === id) c[half] = parseFloat(event.target.value); });
+-      event.target.nextElementSibling.textContent = parseFloat(event.target.value).toFixed(2);
++      event.target.nextElementSibling.textContent = fmt(event.target.value, 2);
+       S.host.querySelector(".lora-hint").textContent = hints().join(" ");
+     });
+     paint();
+@@ -258,8 +266,8 @@
+   function describe(list) {
+     return (list || []).map(function (c) {
+       var parts = [];
+-      if (Number(c.ar)) parts.push("music " + Number(c.ar).toFixed(1));
+-      if (Number(c.nar)) parts.push("sound " + Number(c.nar).toFixed(1));
++      if (Number(c.ar)) parts.push("music " + fmt(c.ar, 1));
++      if (Number(c.nar)) parts.push("sound " + fmt(c.nar, 1));
+       return (c.name || nameOf(c.id)) + " (" + parts.join(" · ") + ")";
+     }).join(", ");
+   }

@@ -1,0 +1,136 @@
+From 72df1b13f384171c01f2369e491522032be3d968 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 21:55:53 -0700
+Subject: [PATCH 16/36] Show the Engine panel's LoRAs as tiles in their own
+ card; keep the waveform
+
+The list squeezed long names and details into narrow key/value rows and
+stretched the whole row of cards. LoRAs now get a full-width card under the
+VAEs with one compact tile each: name, an in use tag, then what it steers,
+folder, rank, size, trigger and mode; a file that cannot load has a red edge
+and the reason.
+
+The player's waveform was drawn only while a take was open on the page, so
+opening a running song blanked it although the song kept playing. It now
+follows the song in the player.
+---
+ tools/console/app.css    | 16 ++++++++++++++--
+ tools/console/app.js     |  3 ++-
+ tools/console/index.html |  9 ++++++---
+ tools/console/loras.js   | 25 ++++++++++++++-----------
+ 4 files changed, 36 insertions(+), 17 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index 875d82f..13ae76c 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -1541,8 +1541,20 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex;
+ .panel-head .copy-icon { align-self: center; color: var(--dim); }
+ .panel-head .copy-icon:hover, .panel-head .copy-icon:focus-visible { color: var(--amber); }
+ 
+-/* a second heading inside an Engine card (LoRAs under the VAEs) */
+-.card h3.card-sub { margin-top: 18px; }
++/* Engine panel: every LoRA in loras/ as a small tile, under the VAEs */
++.lora-card-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
++.lora-card-note { color: var(--dim); font-size: 12px; }
++.lora-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
++.lora-item { min-width: 0; padding: 8px 10px; background: var(--sunk); border: 1px solid var(--line-soft); border-left: 3px solid var(--line-strong);
++  border-radius: var(--r-sm); }
++.lora-item.is-on { border-left-color: var(--amber); }
++.lora-item.is-bad { border-left-color: var(--bad); }
++.lora-item-head { display: flex; align-items: flex-start; gap: 8px; }
++.lora-item-name { flex: 1; min-width: 0; font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
++.lora-item-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; flex: none; max-width: 55%; }
++.lora-item-meta { margin-top: 4px; font: 11px/1.45 var(--mono); color: var(--dim); overflow-wrap: anywhere; }
++.lora-item.is-bad .lora-item-meta { color: var(--bad); }
++.tag.in-use { color: var(--amber); border-color: var(--amber-dim); }
+ 
+ /* the style box grows with its text; the meter under it counts the prompt against the context */
+ #style { field-sizing: content; min-height: 76px; max-height: 50vh; }
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 1cbb88a..24490d0 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -3302,7 +3302,8 @@
+     ctx.lineTo(width, middle + 0.5);
+     ctx.stroke();
+ 
+-    if (!STATE.take) return;
++    // the waveform belongs to the song in the player, whatever the page is showing (a run, another take)
++    if (!STATE.playerTake) return;
+     var progress = (isFinite(audio.duration) && audio.duration > 0) ? audio.currentTime / audio.duration : 0;
+ 
+     if (!STATE.peaks || STATE.peaks === "none") {
+diff --git a/tools/console/index.html b/tools/console/index.html
+index 2f14620..9a79409 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -111,9 +111,12 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+       <h3>VAEs</h3>
+       <dl class="kv wrap" id="vaeCard"></dl>
+       <p class="hint">The form picks one per song; a finished song can get another from its page.</p>
+-      <h3 class="card-sub">LoRAs <span class="info" tabindex="0" role="img" aria-label="About LoRAs" data-tip-ref="tip-loras">i</span></h3>
+-      <dl class="kv wrap" id="loraCard"></dl>
+-      <p class="hint" id="loraCardNote"></p>
++    </div>
++
++    <div class="card wide lora-card">
++      <div class="lora-card-head"><h3>LoRAs <span class="info" tabindex="0" role="img" aria-label="About LoRAs" data-tip-ref="tip-loras">i</span></h3>
++        <span class="lora-card-note" id="loraCardNote"></span></div>
++      <ul class="lora-list" id="loraCard"></ul>
+     </div>
+ 
+     <div class="card">
+diff --git a/tools/console/loras.js b/tools/console/loras.js
+index 15f6809..b548e6c 100644
+--- a/tools/console/loras.js
++++ b/tools/console/loras.js
+@@ -9,7 +9,7 @@
+      set(list)             [{id, ar, nar}] from a take, to render it again
+      value()               [{id, ar, nar}] for the request (installed files only)
+      describe(list)        "sv-billie (music 0.8 · sound 1.0), ..." for a song's info
+-     listInto(dl, note)    also keep an Engine-panel list (a <dl class="kv">) of every installed LoRA */
++     listInto(list, note)  also keep an Engine-panel list (a <ul>) of every installed LoRA */
+ (function (root) {
+   "use strict";
+ 
+@@ -84,26 +84,29 @@
+     return notes;
+   }
+ 
+-  // The Engine panel's list: every file in loras/, what it steers, and which are on in the form
++  // The Engine panel's list: one tile per file in loras/ (name, halves, in use), details under it
+   function paintList() {
+     if (!S.list) return;
+     var on = {};
+     S.choice.forEach(function (c) { on[c.id] = c; });
+     S.list.innerHTML = S.catalog.length ? S.catalog.map(function (e) {
+-      var detail = e.error ? "cannot load: " + e.error
+-        : halvesText(e) + " · rank " + e.rank + " · " + e.size_mb + " MB" + (e.trigger ? " · trigger " + e.trigger : "");
+-      return '<div data-tip="' + escape(chipTip(e)) + '"><dt>' + escape(e.name) + (on[e.id] ? " · in use" : "") + '</dt><dd class="' +
+-        (e.error ? "no" : on[e.id] ? "amber" : "") + '">' + escape(detail) + "</dd></div>";
+-    }).join("") : "<div><dt>None</dt><dd>no .safetensors in loras/</dd></div>";
++      var parts = String(e.name).split(" / "), main = parts.pop(), folder = parts.join(" / ");
++      var tags = on[e.id] ? '<span class="tag in-use">in use</span>' : "";
++      var meta = e.error ? "cannot load: " + e.error
++        : [halvesText(e), folder, "rank " + e.rank, e.size_mb + " MB", e.trigger ? "trigger " + e.trigger : "", e.mode ? e.mode + " mode" : ""]
++          .filter(Boolean).join(" · ");
++      return '<li class="lora-item' + (on[e.id] ? " is-on" : "") + (e.error ? " is-bad" : "") + '" data-tip="' + escape(chipTip(e)) + '">' +
++        '<div class="lora-item-head"><span class="lora-item-name">' + escape(main) + '</span><span class="lora-item-tags">' + tags + "</span></div>" +
++        '<div class="lora-item-meta">' + escape(meta) + "</div></li>";
++    }).join("") : '<li class="lora-item"><div class="lora-item-meta">No .safetensors files in the app\'s loras/ folder.</div></li>';
+     if (S.note) {
+       var active = S.choice.filter(function (c) { return entry(c.id); }).length;
+-      S.note.textContent = S.catalog.length + " installed in the app's loras/ folder" +
+-        (active ? "; " + active + " on in the form (in use)." : ". Pick them per song in the form.");
++      S.note.textContent = S.catalog.length + " in loras/" + (active ? " · " + active + " in use in the form" : " · pick them per song in the form");
+     }
+   }
+ 
+-  function listInto(dl, note) {
+-    S.list = dl;
++  function listInto(list, note) {
++    S.list = list;
+     S.note = note || null;
+     paintList();
+   }

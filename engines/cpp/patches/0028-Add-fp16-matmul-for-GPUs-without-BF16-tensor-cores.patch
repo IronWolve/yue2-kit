@@ -1,0 +1,124 @@
+From 817fd6f37464eab77b219ea4862a34665e7f6b64 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 14:24:05 -0700
+Subject: [PATCH 28/36] Add --fp16-matmul for GPUs without BF16 tensor cores
+
+On older GPUs with FP16 but no BF16 tensor cores (compute 7.x), a batched BF16 matmul runs on the FP32 cores. With the flag, matmuls of more than 8 rows cast the BF16 weight to F16 and run on the FP16 tensor cores; single-token decode keeps reading BF16. Measured on his 8 GB laptop GPU: sound stage 9.25 -> 3.4 s per step, a song 440 -> 215 s, closer to the full-precision render than Q8_0. It changes the output, so earlier seeds do not reproduce exactly. Off by default.
+---
+ src/pipeline.h       |  5 +++++
+ src/qwen3-enc.h      | 10 ++++++++++
+ tools/yue-plan.cpp   |  5 ++++-
+ tools/yue-server.cpp |  3 +++
+ tools/yue-synth.cpp  |  3 +++
+ 5 files changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/src/pipeline.h b/src/pipeline.h
+index 6c3afe4..f2b4360 100644
+--- a/src/pipeline.h
++++ b/src/pipeline.h
+@@ -43,6 +43,7 @@ struct Yue2PipelineParams {
+     int  max_batch  = 1;              // song batch limit, one KV set per song, two under guidance
+     bool no_fa      = false;          // disable flash attention
+     bool clamp_fp16 = false;          // clamp hidden states on sub-Ampere CUDA
++    bool fp16_matmul = false;         // Local addition: batched BF16 matmuls on FP16 tensor cores (qwen3-enc.h)
+     int  vae_core   = 512;            // VAE tile core frames
+     int  vae_halo   = 16;             // VAE tile halo frames
+ 
+@@ -133,6 +134,10 @@ static bool pipeline_configure(Yue2Pipeline *             p,
+     if (params.clamp_fp16) {
+         fprintf(stderr, "[Pipeline] FP16 clamp enabled\n");
+     }
++    g_qwen3_fp16_matmul = params.fp16_matmul;  // Local addition
++    if (params.fp16_matmul) {
++        fprintf(stderr, "[Pipeline] FP16 matmul enabled (batched BF16 matmuls on the FP16 tensor cores)\n");
++    }
+     if (!store_bpe(p->store, model_path)) {
+         return false;
+     }
+diff --git a/src/qwen3-enc.h b/src/qwen3-enc.h
+index f8d8ebf..2f22a76 100644
+--- a/src/qwen3-enc.h
++++ b/src/qwen3-enc.h
+@@ -64,7 +64,17 @@ static struct ggml_tensor * qwen3_f32(struct ggml_context * ctx, struct ggml_ten
+     return ggml_cast(ctx, t, GGML_TYPE_F32);
+ }
+ 
++// Local addition: --fp16-matmul. A GPU without BF16 tensor cores (NVIDIA before
++// Ampere: RTX 20, Volta) runs a batched BF16 matmul on its FP32 cores. With this
++// set, a matmul of more than 8 rows (a prefill, every sound-stage evaluation)
++// casts its BF16 weight to F16 first, which sends it to the FP16 tensor cores.
++// Single-token decode keeps reading BF16. start.sh turns it on for compute 7.x.
++inline bool g_qwen3_fp16_matmul = false;
++
+ static struct ggml_tensor * qwen3_linear(struct ggml_context * ctx, struct ggml_tensor * w, struct ggml_tensor * x) {
++    if (g_qwen3_fp16_matmul && w->type == GGML_TYPE_BF16 && ggml_nrows(x) > 8) {
++        w = ggml_cast(ctx, w, GGML_TYPE_F16);
++    }
+     return ggml_mul_mat(ctx, w, x);
+ }
+ 
+diff --git a/tools/yue-plan.cpp b/tools/yue-plan.cpp
+index ec69e74..8966e3d 100644
+--- a/tools/yue-plan.cpp
++++ b/tools/yue-plan.cpp
+@@ -33,7 +33,8 @@ static void print_usage(const char * prog) {
+             "  --max-seq <N>          KV cache size (default: model context)\n"
+             "  --dump-tokens <path>   Dump prefix token IDs (CSV)\n"
+             "  --no-fa                Disable flash attention\n"
+-            "  --clamp-fp16           Clamp hidden states to FP16 range\n",
++            "  --clamp-fp16           Clamp hidden states to FP16 range\n"
++            "  --fp16-matmul          BF16 prefills on FP16 tensor cores (RTX 20, Volta)\n",
+             prog);
+ }
+ 
+@@ -86,6 +87,8 @@ int main(int argc, char ** argv) {
+             no_fa = true;
+         } else if (!strcmp(argv[i], "--clamp-fp16")) {
+             clamp_fp16 = true;
++        } else if (!strcmp(argv[i], "--fp16-matmul")) {  // Local addition: see g_qwen3_fp16_matmul
++            g_qwen3_fp16_matmul = true;
+         } else {
+             print_usage(argv[0]);
+             return 1;
+diff --git a/tools/yue-server.cpp b/tools/yue-server.cpp
+index 37e9af4..0d87925 100644
+--- a/tools/yue-server.cpp
++++ b/tools/yue-server.cpp
+@@ -1368,6 +1368,7 @@ static void print_usage(const char * prog) {
+             "  --port <N>             Listen port (default: 8087)\n"
+             "  --max-batch <N>        Song batch limit, one KV set each (default: 1)\n"
+             "  --keep-loaded          Keep every model resident in VRAM (default: evict between stages)\n"
++            "  --fp16-matmul          BF16 prefills and flow matching on FP16 tensor cores (RTX 20, Volta)\n"
+             "\n"
+             "Debug:\n"
+             "  --max-seq <N>          KV cache size (default: model context)\n"
+@@ -1459,6 +1460,8 @@ int main(int argc, char ** argv) {
+             params.no_fa = true;
+         } else if (!strcmp(argv[i], "--clamp-fp16")) {
+             params.clamp_fp16 = true;
++        } else if (!strcmp(argv[i], "--fp16-matmul")) {  // Local addition
++            params.fp16_matmul = true;
+         } else {
+             print_usage(argv[0]);
+             return 1;
+diff --git a/tools/yue-synth.cpp b/tools/yue-synth.cpp
+index b004470..c929097 100644
+--- a/tools/yue-synth.cpp
++++ b/tools/yue-synth.cpp
+@@ -56,6 +56,7 @@ static void print_usage(const char * prog) {
+             "  --vae-halo <N>         VAE tile halo frames (default: 16)\n"
+             "  --no-fa                Disable flash attention\n"
+             "  --clamp-fp16           Clamp hidden states to FP16 range\n"
++            "  --fp16-matmul          BF16 prefills and flow matching on FP16 tensor cores (RTX 20, Volta)\n"
+             "  --dump <dir>           Dump intermediate tensors\n",
+             prog);
+ }
+@@ -116,6 +117,8 @@ int main(int argc, char ** argv) {
+             params.no_fa = true;
+         } else if (!strcmp(argv[i], "--clamp-fp16")) {
+             params.clamp_fp16 = true;
++        } else if (!strcmp(argv[i], "--fp16-matmul")) {  // Local addition
++            params.fp16_matmul = true;
+         } else if (!strcmp(argv[i], "--dump") && !last) {
+             params.dump_dir = argv[++i];
+         } else {

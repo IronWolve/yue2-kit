@@ -1,0 +1,672 @@
+From e75af98f70262c44fbe94a3a4b5cedec4472c72b Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Thu, 24 Sep 2026 13:52:16 -0700
+Subject: [PATCH 01/36] Add stackable voice and genre sliders and an optional
+ full-precision weight load
+
+Sliders are routed-particle adapters on the four attention projections of
+every autoregressive layer, all in float32, summed when several are active,
+in both the prefill graph and the static decode graph. The graph size grows
+to fit sixteen of them. Weights stored as bfloat16 or float16 can now be
+widened to float32 as they load, fused projections included. Two parity
+harnesses cover the adapters alone and the backbone with sliders attached.
+---
+ src/gguf-weights.h         |  43 +++++++-
+ src/qwen3-lm.h             |  50 +++++++--
+ src/sliders.h              | 213 +++++++++++++++++++++++++++++++++++++
+ tests/CMakeLists.txt       |   6 ++
+ tests/test-slider-unit.cpp |  68 ++++++++++++
+ tests/test-slider.cpp      |  91 ++++++++++++++++
+ 6 files changed, 462 insertions(+), 9 deletions(-)
+ create mode 100644 src/sliders.h
+ create mode 100644 tests/test-slider-unit.cpp
+ create mode 100644 tests/test-slider.cpp
+
+diff --git a/src/gguf-weights.h b/src/gguf-weights.h
+index ce1c67d..c9ff266 100644
+--- a/src/gguf-weights.h
++++ b/src/gguf-weights.h
+@@ -164,6 +164,28 @@ static bool gf_load(GGUFModel * gf, const char * path) {
+     return true;
+ }
+ 
++// Local addition: the console's precision setting. When true, every BF16 or
++// F16 weight loads converted to F32 (exact), so matrix products run F32 x F32
++// instead of rounding their activation input to 16 bits. One instance for
++// the whole process (the store loads modules from another translation unit).
++inline bool g_gf_weights_f32 = false;
++
++static struct ggml_tensor * gf_load_tensor_f32(WeightCtx * wctx, const GGUFModel & gf, const std::string & name);
++
++static bool gf_widen(enum ggml_type t) {
++    return g_gf_weights_f32 && (t == GGML_TYPE_BF16 || t == GGML_TYPE_F16);
++}
++
++// One part of a fused weight, converted to F32 into a staging buffer
++static void gf_push_part_f32(WeightCtx * wctx, struct ggml_tensor * fused, const struct ggml_tensor * src,
++                             const void * raw, size_t offset_bytes) {
++    size_t n   = ggml_nelements(src);
++    auto   buf = std::make_unique<float[]>(n);
++    ggml_get_type_traits(src->type)->to_float(raw, buf.get(), (int64_t) n);
++    wctx->pending.push_back({ fused, buf.get(), n * sizeof(float), offset_bytes });
++    wctx->staging.push_back(std::move(buf));
++}
++
+ // Load a tensor from GGUF into the weight context.
+ // Returns ggml_tensor (not yet backed by memory; call wctx_alloc after all loads).
+ // Tensor shapes are already in ggml order (ne[0]=innermost).
+@@ -184,6 +206,9 @@ static struct ggml_tensor * gf_load_tensor(WeightCtx *         wctx,
+         fprintf(stderr, "[GGUF] FATAL: tensor '%s' not in meta context\n", name.c_str());
+         exit(1);
+     }
++    if (gf_widen(src->type) && !(shape_override && n_dims_override > 0)) {
++        return gf_load_tensor_f32(wctx, gf, name);
++    }
+ 
+     int     n_dims;
+     int64_t ne[4] = { 1, 1, 1, 1 };
+@@ -296,7 +321,8 @@ static struct ggml_tensor * gf_load_qkv_fused(WeightCtx *         wctx,
+     int64_t              ne0       = q_src->ne[0];
+     int64_t              fused_ne1 = q_src->ne[1] + k_src->ne[1] + v_src->ne[1];
+     int64_t              ne[2]     = { ne0, fused_ne1 };
+-    struct ggml_tensor * fused     = ggml_new_tensor(wctx->ctx, q_src->type, 2, ne);
++    bool                 widen     = gf_widen(q_src->type);
++    struct ggml_tensor * fused     = ggml_new_tensor(wctx->ctx, widen ? GGML_TYPE_F32 : q_src->type, 2, ne);
+ 
+     size_t row_size = ggml_row_size(q_src->type, ne0);
+     size_t q_bytes  = q_src->ne[1] * row_size;
+@@ -309,6 +335,13 @@ static struct ggml_tensor * gf_load_qkv_fused(WeightCtx *         wctx,
+         return gf.mapping + gf.data_offset + off;
+     };
+ 
++    if (widen) {
++        size_t row_f32 = ggml_row_size(GGML_TYPE_F32, ne0);
++        gf_push_part_f32(wctx, fused, q_src, get_data(q_name), 0);
++        gf_push_part_f32(wctx, fused, k_src, get_data(k_name), q_src->ne[1] * row_f32);
++        gf_push_part_f32(wctx, fused, v_src, get_data(v_name), (q_src->ne[1] + k_src->ne[1]) * row_f32);
++        return fused;
++    }
+     wctx->pending.push_back({ fused, get_data(q_name), q_bytes, 0 });
+     wctx->pending.push_back({ fused, get_data(k_name), k_bytes, q_bytes });
+     wctx->pending.push_back({ fused, get_data(v_name), v_bytes, q_bytes + k_bytes });
+@@ -332,7 +365,8 @@ static struct ggml_tensor * gf_load_pair_fused(WeightCtx *         wctx,
+ 
+     int64_t              ne0   = a_src->ne[0];
+     int64_t              ne[2] = { ne0, a_src->ne[1] + b_src->ne[1] };
+-    struct ggml_tensor * fused = ggml_new_tensor(wctx->ctx, a_src->type, 2, ne);
++    bool                 widen = gf_widen(a_src->type);
++    struct ggml_tensor * fused = ggml_new_tensor(wctx->ctx, widen ? GGML_TYPE_F32 : a_src->type, 2, ne);
+ 
+     size_t row_size = ggml_row_size(a_src->type, ne0);
+     size_t a_bytes  = a_src->ne[1] * row_size;
+@@ -344,6 +378,11 @@ static struct ggml_tensor * gf_load_pair_fused(WeightCtx *         wctx,
+         return gf.mapping + gf.data_offset + off;
+     };
+ 
++    if (widen) {
++        gf_push_part_f32(wctx, fused, a_src, get_data(a_name), 0);
++        gf_push_part_f32(wctx, fused, b_src, get_data(b_name), a_src->ne[1] * ggml_row_size(GGML_TYPE_F32, ne0));
++        return fused;
++    }
+     wctx->pending.push_back({ fused, get_data(a_name), a_bytes, 0 });
+     wctx->pending.push_back({ fused, get_data(b_name), b_bytes, a_bytes });
+     return fused;
+diff --git a/src/qwen3-lm.h b/src/qwen3-lm.h
+index 9f9617b..79c98a6 100644
+--- a/src/qwen3-lm.h
++++ b/src/qwen3-lm.h
+@@ -5,6 +5,7 @@
+ // The AR half of the MoT backbone: the nar_* weight set is read by nar.h
+ #pragma once
+ 
++#include "sliders.h"
+ #include "graph-arena.h"
+ #include "qwen3-enc.h"  // Qwen3Layer, Qwen3Config, layer build helpers
+ #include "static-graph.h"
+@@ -33,7 +34,9 @@ struct Qwen3LMConfig {
+ // KV cache set (one per CFG path: conditional + unconditional)
+ #define QW3LM_MAX_KV_SETS 32  // batch N * 2 (cond + uncond CFG)
+ #define QW3LM_MAX_LAYERS  64
+-#define QW3LM_GRAPH_NODES 16384
++// Local change: room for up to 16 stacked sliders, about 6000 nodes each
++// (112 projections x ~50 ops and weights), on top of the 16384 of the backbone
++#define QW3LM_GRAPH_NODES (16384 + 16 * 6144)
+ 
+ // Static batched decode graph. Built once per shape class and replayed with a
+ // fresh input upload per step: n_kv_pad advances every 256 steps, N and the
+@@ -47,6 +50,7 @@ struct Qw3lmGraphCache {
+     int                   key_rows     = 0;
+     struct ggml_tensor *  key_kv       = nullptr;  // the cache the graph reads, reallocated on growth
+     int                   key_s0       = 0;
++    const SliderSet *     key_sliders  = nullptr;  // local addition: the sliders baked into the graph
+     struct ggml_cgraph *  gf           = nullptr;
+     struct ggml_tensor *  token_ids_t  = nullptr;
+     struct ggml_tensor *  positions    = nullptr;
+@@ -100,6 +104,10 @@ struct Qwen3LM {
+ 
+     // Static batched decode graph, replayed across the token loop.
+     Qw3lmGraphCache batch_graph;
++
++    // Local addition: voice/genre sliders on the attention projections while
++    // the music tokens are written (qw3lm_set_sliders), NULL otherwise
++    const SliderSet * sliders = nullptr;
+ };
+ 
+ // Parse config.json integers, floats, bools
+@@ -198,7 +206,7 @@ static void qw3lm_init_backend(Qwen3LM * m) {
+     BackendPair bp    = backend_init("LM");
+     m->backend        = bp.backend;
+     m->cpu_backend    = bp.cpu_backend;
+-    m->sched          = backend_sched_new(bp, 8192);
++    m->sched          = backend_sched_new(bp, QW3LM_GRAPH_NODES);
+     m->use_flash_attn = bp.has_gpu;
+     m->clamp_fp16     = false;
+ }
+@@ -388,7 +396,9 @@ static struct ggml_tensor * qw3lm_build_attn(struct ggml_context * ctx,
+                                              int                   n_kv_pad,
+                                              int                   n_tokens,
+                                              bool                  use_flash_attn = true,
+-                                             bool                  clamp_fp16     = false) {
++                                             bool                  clamp_fp16     = false,
++                                             const SliderSet *     sliders        = nullptr,
++                                             int                   layer          = -1) {
+     int D   = c.head_dim;
+     int Nh  = c.n_heads;
+     int Nkv = c.n_kv_heads;
+@@ -413,6 +423,11 @@ static struct ggml_tensor * qw3lm_build_attn(struct ggml_context * ctx,
+         k = qwen3_linear(ctx, ly->k_proj, x);
+         v = qwen3_linear(ctx, ly->v_proj, x);
+     }
++    if (sliders_active(sliders)) {
++        q = slider_apply(ctx, sliders, layer, SLIDER_Q, x, q);
++        k = slider_apply(ctx, sliders, layer, SLIDER_K, x, k);
++        v = slider_apply(ctx, sliders, layer, SLIDER_V, x, v);
++    }
+ 
+     // Reshape to heads: [X*D, S] -> [D, X, S]
+     q = ggml_reshape_3d(ctx, q, D, Nh, S);
+@@ -471,7 +486,7 @@ static struct ggml_tensor * qw3lm_build_attn(struct ggml_context * ctx,
+     attn = ggml_reshape_2d(ctx, attn, Nh * D, S);
+ 
+     // O projection
+-    return qwen3_linear(ctx, ly->o_proj, attn);
++    return slider_apply(ctx, sliders, layer, SLIDER_O, attn, qwen3_linear(ctx, ly->o_proj, attn));
+ }
+ 
+ // Rows [row0, row0 + rows) of the LM head, the vocabulary window a stage
+@@ -551,7 +566,7 @@ static void qw3lm_forward(Qwen3LM *      m,
+         // Self-attention with KV cache
+         struct ggml_tensor * attn =
+             qw3lm_build_attn(ctx, gf, c, ly, norm, positions, mask, kv_rows, kv->k[kv_set][l], kv->v[kv_set][l],
+-                             n_kv_pad, n_tokens, m->use_flash_attn, m->clamp_fp16);
++                             n_kv_pad, n_tokens, m->use_flash_attn, m->clamp_fp16, m->sliders, l);
+ 
+         // Residual
+         hidden = ggml_add(ctx, hidden, attn);
+@@ -683,7 +698,7 @@ static void qw3lm_forward_batch(Qwen3LM *      m,
+     const bool need_build = !m->batch_graph.built || m->batch_graph.key_n_kv_pad != n_kv_pad ||
+                             m->batch_graph.key_N != N || m->batch_graph.key_s0 != s0 ||
+                             m->batch_graph.key_row0 != row0 || m->batch_graph.key_rows != rows ||
+-                            m->batch_graph.key_kv != kv->k4[0];
++                            m->batch_graph.key_kv != kv->k4[0] || m->batch_graph.key_sliders != m->sliders;
+     if (need_build) {
+         static_graph_release(&m->batch_graph.graph, m->sched);
+         m->batch_graph.built      = false;
+@@ -742,6 +757,11 @@ static void qw3lm_forward_batch(Qwen3LM *      m,
+                 k = qwen3_linear(ctx, ly->k_proj, norm);
+                 v = qwen3_linear(ctx, ly->v_proj, norm);
+             }
++            if (sliders_active(m->sliders)) {
++                q = slider_apply(ctx, m->sliders, l, SLIDER_Q, norm, q);
++                k = slider_apply(ctx, m->sliders, l, SLIDER_K, norm, k);
++                v = slider_apply(ctx, m->sliders, l, SLIDER_V, norm, v);
++            }
+ 
+             // Reshape to heads: [D, Heads, N]
+             q = ggml_reshape_3d(ctx, q, D, Nh, N);
+@@ -811,7 +831,8 @@ static void qw3lm_forward_batch(Qwen3LM *      m,
+             struct ggml_tensor * attn_cat = ggml_reshape_2d(ctx, attn_result, Nh * D, N);
+ 
+             // Batched O proj
+-            struct ggml_tensor * attn_out = qwen3_linear(ctx, ly->o_proj, attn_cat);
++            struct ggml_tensor * attn_out =
++                slider_apply(ctx, m->sliders, l, SLIDER_O, attn_cat, qwen3_linear(ctx, ly->o_proj, attn_cat));
+             hidden                        = ggml_add(ctx, hidden, attn_out);
+             if (m->clamp_fp16) {
+                 hidden = ggml_clamp(ctx, hidden, -65504.0f, 65504.0f);
+@@ -850,6 +871,7 @@ static void qw3lm_forward_batch(Qwen3LM *      m,
+         m->batch_graph.key_row0     = row0;
+         m->batch_graph.key_rows     = rows;
+         m->batch_graph.key_kv       = kv->k4[0];
++        m->batch_graph.key_sliders  = m->sliders;
+         m->batch_graph.pos_data.resize((size_t) N);
+         m->batch_graph.rows_data.resize((size_t) N);
+         m->batch_graph.mask_data.resize((size_t) n_kv_pad * (size_t) N);
+@@ -898,6 +920,20 @@ static void qw3lm_forward_batch(Qwen3LM *      m,
+ }
+ 
+ // Free all resources
++// Local addition: attach (or with NULL, detach) the sliders. The static decode
++// graph bakes them in, so a change drops it and the next step rebuilds.
++static void qw3lm_set_sliders(Qwen3LM * m, const SliderSet * sliders) {
++    const SliderSet * next = sliders_active(sliders) ? sliders : nullptr;
++    if (m->sliders == next) {
++        return;
++    }
++    if (m->batch_graph.graph.sched_allocated) {
++        static_graph_release(&m->batch_graph.graph, m->sched);
++    }
++    m->batch_graph.built = false;
++    m->sliders           = next;
++}
++
+ static void qw3lm_free(Qwen3LM * m) {
+     static_graph_release(&m->batch_graph.graph, m->sched);
+     graph_arena_free(&m->arena_batch);
+diff --git a/src/sliders.h b/src/sliders.h
+new file mode 100644
+index 0000000..41aee1b
+--- /dev/null
++++ b/src/sliders.h
+@@ -0,0 +1,213 @@
++#pragma once
++// sliders.h: voice and genre sliders on the AR attention projections (local addition)
++//
++// A slider is a routed-particle adapter (ntc-ai/yue2-particle-sliders) on each
++// of the 4 attention projections of every AR layer. For a projection input x:
++//
++//   f = down x                                    rank 8
++//   q = router(f)                                 MLP 8-16-16-16-4, LeakyReLU 0.2
++//   z = softmax(P q / sqrt(4)) P                  P: 128 particles of dim 4
++//   h = net(concat(f, z))                         MLP 12-48-48-48-8, LeakyReLU 0.2
++//   y = W x + strength * alpha / rank * up h
++//
++// Every term is F32. Several sliders stack by summing their corrections. The
++// sliders act while the music tokens are written; the pipeline clears them
++// before any other stage reads the backbone.
++//
++// convert-extras.py writes one GGUF per slider, tensor names sld.<layer>.<p>.*
++// with p in q, k, v, o, plus sld.particles [4, 128] and sld.particles_t [128, 4].
++
++#include "ggml-backend.h"
++#include "ggml.h"
++#include "gguf-weights.h"
++#include "weight-ctx.h"
++
++#include <string>
++#include <utility>
++#include <vector>
++
++#define SLIDER_MAX_LAYERS 64
++
++enum SliderProjKind { SLIDER_Q = 0, SLIDER_K = 1, SLIDER_V = 2, SLIDER_O = 3 };
++
++struct SliderProj {
++    struct ggml_tensor * down;
++    struct ggml_tensor * up;
++    struct ggml_tensor * rw[4];
++    struct ggml_tensor * rb[4];
++    struct ggml_tensor * nw[4];
++    struct ggml_tensor * nb[4];
++};
++
++struct Slider {
++    std::string          id;
++    float                gain;  // strength * alpha / rank
++    struct ggml_tensor * particles;
++    struct ggml_tensor * particles_t;
++    SliderProj           proj[SLIDER_MAX_LAYERS][4];
++};
++
++struct SliderSet {
++    std::vector<Slider> sliders;
++    WeightCtx           wctx;
++    bool                allocated = false;
++};
++
++static bool sliders_active(const SliderSet * s) {
++    return s && !s->sliders.empty();
++}
++
++// Load the chosen sliders onto the backbone's backend. choices: GGUF path and
++// strength; a strength of 0 is skipped outright (exactly the base model).
++static bool sliders_load(SliderSet *                                         set,
++                         ggml_backend_t                                      backend,
++                         const std::vector<std::pair<std::string, float>> & choices,
++                         int                                                 n_layers) {
++    set->sliders.clear();
++    set->allocated = false;
++    std::vector<std::pair<std::string, float>> used;
++    for (const auto & c : choices) {
++        if (c.second != 0.0f) {
++            used.push_back(c);
++        }
++    }
++    if (used.empty()) {
++        return true;
++    }
++    if (n_layers > SLIDER_MAX_LAYERS) {
++        fprintf(stderr, "[Sliders] FATAL: %d layers exceed %d\n", n_layers, SLIDER_MAX_LAYERS);
++        return false;
++    }
++    std::vector<GGUFModel> files(used.size());
++    const int              per_slider = 2 + n_layers * 4 * 18;
++    wctx_init(&set->wctx, per_slider * (int) used.size());
++    const char proj_char[4] = { 'q', 'k', 'v', 'o' };
++    for (size_t i = 0; i < used.size(); i++) {
++        if (!gf_load(&files[i], used[i].first.c_str())) {
++            fprintf(stderr, "[Sliders] FATAL: cannot read %s\n", used[i].first.c_str());
++            for (size_t j = 0; j < i; j++) {
++                gf_close(&files[j]);
++            }
++            return false;
++        }
++        const GGUFModel & gf    = files[i];
++        int64_t           kr    = gguf_find_key(gf.gguf, "yue2-slider.rank");
++        int64_t           ka    = gguf_find_key(gf.gguf, "yue2-slider.alpha");
++        int64_t           kl    = gguf_find_key(gf.gguf, "yue2-slider.layers");
++        int64_t           kid   = gguf_find_key(gf.gguf, "yue2-slider.id");
++        int               rank  = kr >= 0 ? (int) gguf_get_val_u32(gf.gguf, kr) : 8;
++        float             alpha = ka >= 0 ? gguf_get_val_f32(gf.gguf, ka) : (float) rank;
++        if (kl < 0 || (int) gguf_get_val_u32(gf.gguf, kl) != n_layers) {
++            fprintf(stderr, "[Sliders] FATAL: %s does not match this backbone\n", used[i].first.c_str());
++            for (size_t j = 0; j <= i; j++) {
++                gf_close(&files[j]);
++            }
++            return false;
++        }
++        Slider s;
++        s.id          = kid >= 0 ? gguf_get_val_str(gf.gguf, kid) : used[i].first;
++        s.gain        = used[i].second * alpha / (float) rank;
++        s.particles   = gf_load_tensor_f32(&set->wctx, gf, "sld.particles");
++        s.particles_t = gf_load_tensor_f32(&set->wctx, gf, "sld.particles_t");
++        for (int l = 0; l < n_layers; l++) {
++            for (int p = 0; p < 4; p++) {
++                char base[48];
++                snprintf(base, sizeof(base), "sld.%d.%c", l, proj_char[p]);
++                SliderProj & pr = s.proj[l][p];
++                pr.down         = gf_load_tensor_f32(&set->wctx, gf, std::string(base) + ".down");
++                pr.up           = gf_load_tensor_f32(&set->wctx, gf, std::string(base) + ".up");
++                for (int k = 0; k < 4; k++) {
++                    char name[64];
++                    snprintf(name, sizeof(name), "%s.r%d.w", base, k);
++                    pr.rw[k] = gf_load_tensor_f32(&set->wctx, gf, name);
++                    snprintf(name, sizeof(name), "%s.r%d.b", base, k);
++                    pr.rb[k] = gf_load_tensor_f32(&set->wctx, gf, name);
++                    snprintf(name, sizeof(name), "%s.n%d.w", base, k);
++                    pr.nw[k] = gf_load_tensor_f32(&set->wctx, gf, name);
++                    snprintf(name, sizeof(name), "%s.n%d.b", base, k);
++                    pr.nb[k] = gf_load_tensor_f32(&set->wctx, gf, name);
++                }
++            }
++        }
++        set->sliders.push_back(s);
++    }
++    bool ok = wctx_alloc(&set->wctx, backend);
++    for (auto & gf : files) {
++        gf_close(&gf);
++    }
++    if (!ok) {
++        set->sliders.clear();
++        return false;
++    }
++    set->allocated = true;
++    for (const Slider & s : set->sliders) {
++        fprintf(stderr, "[Sliders] %s at gain %.2f\n", s.id.c_str(), (double) s.gain);
++    }
++    return true;
++}
++
++static void sliders_free(SliderSet * set) {
++    if (set->allocated) {
++        wctx_free(&set->wctx);
++    }
++    set->sliders.clear();
++    set->allocated = false;
++}
++
++// Linear + bias of a slider MLP layer, [in, n] -> [out, n]
++static struct ggml_tensor * slider_linear(struct ggml_context * ctx,
++                                          struct ggml_tensor *  w,
++                                          struct ggml_tensor *  b,
++                                          struct ggml_tensor *  x) {
++    return ggml_add(ctx, ggml_mul_mat(ctx, w, x), b);
++}
++
++// The summed correction of every active slider for one projection, or NULL.
++// x: the projection input [in, n]; the result is [out, n] in F32.
++static struct ggml_tensor * slider_delta(struct ggml_context * ctx,
++                                         const SliderSet *     set,
++                                         int                   layer,
++                                         int                   proj,
++                                         struct ggml_tensor *  x) {
++    if (!sliders_active(set) || layer < 0) {
++        return nullptr;
++    }
++    struct ggml_tensor * xf    = x->type == GGML_TYPE_F32 ? x : ggml_cast(ctx, x, GGML_TYPE_F32);
++    struct ggml_tensor * total = nullptr;
++    for (const Slider & s : set->sliders) {
++        const SliderProj &   p = s.proj[layer][proj];
++        struct ggml_tensor * f = ggml_mul_mat(ctx, p.down, xf);  // [8, n]
++        struct ggml_tensor * q = f;
++        for (int k = 0; k < 4; k++) {
++            q = slider_linear(ctx, p.rw[k], p.rb[k], q);
++            if (k < 3) {
++                q = ggml_leaky_relu(ctx, q, 0.2f, false);
++            }
++        }
++        // route: softmax over the 128 particles of P q / sqrt(particle_dim)
++        struct ggml_tensor * scores = ggml_mul_mat(ctx, s.particles, q);  // [128, n]
++        struct ggml_tensor * route  = ggml_soft_max_ext(ctx, scores, nullptr, 0.5f, 0.0f);
++        struct ggml_tensor * z      = ggml_mul_mat(ctx, s.particles_t, route);  // [4, n]
++        struct ggml_tensor * h      = ggml_concat(ctx, f, z, 0);                // [12, n]
++        for (int k = 0; k < 4; k++) {
++            h = slider_linear(ctx, p.nw[k], p.nb[k], h);
++            if (k < 3) {
++                h = ggml_leaky_relu(ctx, h, 0.2f, false);
++            }
++        }
++        struct ggml_tensor * d = ggml_scale(ctx, ggml_mul_mat(ctx, p.up, h), s.gain);  // [out, n]
++        total                  = total ? ggml_add(ctx, total, d) : d;
++    }
++    return total;
++}
++
++// y + correction, or y unchanged when no slider is active
++static struct ggml_tensor * slider_apply(struct ggml_context * ctx,
++                                         const SliderSet *     set,
++                                         int                   layer,
++                                         int                   proj,
++                                         struct ggml_tensor *  x,
++                                         struct ggml_tensor *  y) {
++    struct ggml_tensor * d = slider_delta(ctx, set, layer, proj, x);
++    return d ? ggml_add(ctx, y, d) : y;
++}
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 8bf5243..1bf80ab 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -6,6 +6,12 @@ link_ggml_backends(test-vae)
+ add_executable(test-lm test-lm.cpp)
+ link_ggml_backends(test-lm)
+ 
++# test-slider: voice/genre slider parity harness (local addition).
++add_executable(test-slider test-slider.cpp)
++link_ggml_backends(test-slider)
++add_executable(test-slider-unit test-slider-unit.cpp)
++link_ggml_backends(test-slider-unit)
++
+ # test-nar: backbone NAR path parity harness against the torch reference.
+ add_executable(test-nar test-nar.cpp)
+ link_ggml_backends(test-nar)
+diff --git a/tests/test-slider-unit.cpp b/tests/test-slider-unit.cpp
+new file mode 100644
+index 0000000..cb4ebe1
+--- /dev/null
++++ b/tests/test-slider-unit.cpp
+@@ -0,0 +1,68 @@
++// test-slider-unit.cpp: one slider's correction in isolation (local addition)
++//
++// Feeds the same input rows to slider_delta for a few (layer, projection)
++// pairs and dumps the corrections, so the adapter math is compared against a
++// plain reference without the backbone's own rounding around it.
++//
++// usage: test-slider-unit slider.gguf strength n_layers x.bin n_rows out_prefix L:P [L:P ...]
++//        x.bin holds n_rows rows of 2048 float32; P is q, k, v or o.
++
++#include "backend.h"
++#include "ggml-alloc.h"
++#include "sliders.h"
++
++#include <cstdio>
++#include <cstdlib>
++#include <string>
++#include <vector>
++
++int main(int argc, char ** argv) {
++    if (argc < 8) {
++        fprintf(stderr, "usage: %s slider.gguf strength n_layers x.bin n_rows out_prefix L:P ...\n", argv[0]);
++        return 1;
++    }
++    const int in = 2048;
++    int       n  = atoi(argv[5]);
++    std::vector<float> x((size_t) in * n);
++    FILE *             f = fopen(argv[4], "rb");
++    if (!f || fread(x.data(), sizeof(float), x.size(), f) != x.size()) {
++        fprintf(stderr, "cannot read %s\n", argv[4]);
++        return 1;
++    }
++    fclose(f);
++
++    BackendPair bp = backend_init("Unit");
++    SliderSet   set;
++    if (!sliders_load(&set, bp.backend, { { argv[1], (float) atof(argv[2]) } }, atoi(argv[3]))) {
++        return 1;
++    }
++    for (int a = 7; a < argc; a++) {
++        std::string spec = argv[a];
++        int         l    = atoi(spec.substr(0, spec.find(':')).c_str());
++        char        pc   = spec.back();
++        int         p    = pc == 'q' ? SLIDER_Q : pc == 'k' ? SLIDER_K : pc == 'v' ? SLIDER_V : SLIDER_O;
++
++        struct ggml_init_params ip  = { ggml_tensor_overhead() * 256 + ggml_graph_overhead(), NULL, true };
++        struct ggml_context *   ctx = ggml_init(ip);
++        struct ggml_tensor *    xt  = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, in, n);
++        ggml_set_input(xt);
++        struct ggml_tensor * d = slider_delta(ctx, &set, l, p, xt);
++        ggml_set_output(d);
++        struct ggml_cgraph * gf = ggml_new_graph(ctx);
++        ggml_build_forward_expand(gf, d);
++        ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(bp.backend));
++        ggml_gallocr_alloc_graph(alloc, gf);
++        ggml_backend_tensor_set(xt, x.data(), 0, x.size() * sizeof(float));
++        ggml_backend_graph_compute(bp.backend, gf);
++        std::vector<float> out((size_t) ggml_nelements(d));
++        ggml_backend_tensor_get(d, out.data(), 0, out.size() * sizeof(float));
++        std::string path = std::string(argv[6]) + "_" + std::to_string(l) + pc + ".bin";
++        FILE *      o    = fopen(path.c_str(), "wb");
++        fwrite(out.data(), sizeof(float), out.size(), o);
++        fclose(o);
++        ggml_gallocr_free(alloc);
++        ggml_free(ctx);
++    }
++    sliders_free(&set);
++    return 0;
++}
+diff --git a/tests/test-slider.cpp b/tests/test-slider.cpp
+new file mode 100644
+index 0000000..4ff5fce
+--- /dev/null
++++ b/tests/test-slider.cpp
+@@ -0,0 +1,91 @@
++// test-slider.cpp: voice/genre slider parity harness (local addition)
++//
++// test-lm with sliders attached: prefills each sequence into its own KV set,
++// decodes the last ids in one batched step, and dumps the logits of every
++// forward. Sliders come as --slider path:strength, repeatable; none gives the
++// plain backbone, so one binary produces both sides of the slider delta.
++
++#include "qwen3-lm.h"
++
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <string>
++#include <utility>
++#include <vector>
++
++static bool dump(const std::string & path, const std::vector<float> & data) {
++    FILE * f = fopen(path.c_str(), "wb");
++    if (!f || fwrite(data.data(), sizeof(float), data.size(), f) != data.size()) {
++        fprintf(stderr, "[Test-Slider] cannot write %s\n", path.c_str());
++        return false;
++    }
++    fclose(f);
++    return true;
++}
++
++int main(int argc, char ** argv) {
++    if (argc < 4) {
++        fprintf(stderr, "usage: %s lm.gguf out_prefix [--slider path:strength ...] id0 [id1 ...] [/ ids ...]\n",
++                argv[0]);
++        return 1;
++    }
++    std::vector<std::pair<std::string, float>> chosen;
++    std::vector<std::vector<int>>              seqs(1);
++    for (int i = 3; i < argc; i++) {
++        if (strcmp(argv[i], "--slider") == 0 && i + 1 < argc) {
++            std::string arg   = argv[++i];
++            size_t      colon = arg.rfind(':');
++            chosen.push_back({ arg.substr(0, colon), (float) atof(arg.substr(colon + 1).c_str()) });
++        } else if (strcmp(argv[i], "/") == 0) {
++            seqs.emplace_back();
++        } else {
++            seqs.back().push_back(atoi(argv[i]));
++        }
++    }
++    int N = (int) seqs.size();
++
++    // YUE2_WEIGHTS_F32=1 loads the BF16 weights widened to F32 (the console's F32 precision)
++    g_gf_weights_f32 = getenv("YUE2_WEIGHTS_F32") != nullptr;
++    Qwen3LM lm;
++    if (!qw3lm_load(&lm, argv[1])) {
++        return 1;
++    }
++    SliderSet sliders;
++    if (!sliders_load(&sliders, lm.backend, chosen, lm.cfg.n_layers)) {
++        return 1;
++    }
++    qw3lm_set_sliders(&lm, &sliders);
++
++    Qw3lmKvCache kv;
++    qw3lm_kv_init(&kv, lm.cfg, lm.backend);
++    if (!qw3lm_kv_sets(&kv, N)) {
++        return 1;
++    }
++
++    int                V = lm.cfg.vocab_size;
++    std::string        prefix(argv[2]);
++    std::vector<float> logits((size_t) N * V);
++    std::vector<int>   last(N), sets(N);
++    for (int s = 0; s < N; s++) {
++        qw3lm_forward(&lm, &kv, seqs[s].data(), (int) seqs[s].size() - 1, s, logits.data() + (size_t) s * V, 0, V);
++        std::vector<float> one(logits.begin() + (size_t) s * V, logits.begin() + (size_t) (s + 1) * V);
++        if (!dump(prefix + "_prefill_" + std::to_string(s) + "_logits.bin", one)) {
++            return 1;
++        }
++        last[s] = seqs[s].back();
++        sets[s] = s;
++    }
++    qw3lm_forward_batch(&lm, &kv, last.data(), sets.data(), N, logits.data(), 0, V);
++    for (int s = 0; s < N; s++) {
++        std::vector<float> one(logits.begin() + (size_t) s * V, logits.begin() + (size_t) (s + 1) * V);
++        if (!dump(prefix + "_decode_" + std::to_string(s) + "_logits.bin", one)) {
++            return 1;
++        }
++    }
++    qw3lm_set_sliders(&lm, nullptr);
++    sliders_free(&sliders);
++    qw3lm_kv_free(&kv);
++    qw3lm_free(&lm);
++    return 0;
++}

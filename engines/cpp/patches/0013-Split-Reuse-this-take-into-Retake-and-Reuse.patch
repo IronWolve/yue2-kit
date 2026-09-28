@@ -1,0 +1,61 @@
+From 4b13f5ed858a72cbf8de4d02280caefa06b397b2 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 21:00:41 -0700
+Subject: [PATCH 13/36] Split Reuse this take into Retake and Reuse
+
+Retake loads the exact request, score, both seeds and music codes
+included, so Generate renders the same music again. Reuse loads the
+prompt, lyrics and every setting without the score, seeds or codes, so
+Generate writes a new song from them.
+---
+ tools/console/app.js     | 18 ++++++++++++++++--
+ tools/console/index.html |  3 ++-
+ 2 files changed, 18 insertions(+), 3 deletions(-)
+
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 9b1b0c9..7fe4887 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -2751,12 +2751,26 @@
+     }).catch(function (error) { toast(error.message, "bad"); });
+   });
+ 
+-  $("reuseTake").addEventListener("click", function () {
++  // Retake: this exact take again (score, seeds and music codes); Reuse: the same prompt,
++  // lyrics and settings for a new song (no score, no seeds, no codes)
++  $("retakeTake").addEventListener("click", function () {
+     var take = STATE.take;
+     if (!take) return;
+     getRequest(take).then(function (req) {
+       loadRequestIntoForm(req, { title: displayTitle(take), fromTake: take.session ? null : take.name, codesTitle: displayTitle(take) });
+-      toast("Take loaded into the form with its music codes: Generate renders that music again. Drop the codes to write new music.", "good");
++      toast("Retake: this take is in the form with its music codes, so Generate renders that music again. Drop the codes to write new music.", "good");
++    }).catch(function (error) { toast(error.message, "bad"); });
++  });
++
++  $("reuseTake").addEventListener("click", function () {
++    var take = STATE.take;
++    if (!take) return;
++    getRequest(take).then(function (req) {
++      var fresh = Object.assign({}, req, { abc: "", lm_seed: -1, seed: -1, semantic_tokens: "" });
++      loadRequestIntoForm(fresh, { title: displayTitle(take) });
++      $("scoreDrawer").open = false;
++      show("compose");
++      toast("Reuse: prompt, lyrics and settings are in the form, with no score, seeds or music codes. Generate writes a new song from them.", "good");
+     }).catch(function (error) { toast(error.message, "bad"); });
+   });
+ 
+diff --git a/tools/console/index.html b/tools/console/index.html
+index dd56790..f5f25d8 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -467,7 +467,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+           <option value="320">320 kbps</option><option value="256">256 kbps</option>
+           <option value="192">192 kbps</option><option value="128">128 kbps</option>
+         </select>
+-        <button type="button" class="btn ghost small" id="reuseTake" title="Load this take's exact request into the form, music codes included">Reuse this take</button>
++        <button type="button" class="btn ghost small" id="retakeTake" data-tip="Retake: this exact take into the form, with its score, both seeds and its music codes. Generate renders the same music again: try another VAE, sound seed or sound variations">Retake</button>
++        <button type="button" class="btn ghost small" id="reuseTake" data-tip="Reuse: the prompt, lyrics and every setting (mode, sampling, guidance, VAE, sliders, LoRAs, output) for a new song: no score, no seeds, no music codes, so Generate writes new music">Reuse</button>
+         <button type="button" class="btn ghost small" id="rerenderSound" title="Same music, a new sound seed (seconds)">Re-render sound</button>
+         <button type="button" class="btn ghost small" id="dlRequest" title="The replay request: prompt, score, codes and both seeds">Request .json</button>
+         <button type="button" class="btn ghost small" id="dlScore">Score .abc</button>

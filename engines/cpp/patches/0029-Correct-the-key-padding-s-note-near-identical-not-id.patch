@@ -1,0 +1,30 @@
+From 67900111749ad2f5cfe9651ae9fb5e40e1785d51 Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 14:35:29 -0700
+Subject: [PATCH 29/36] Correct the key padding's note: near-identical, not
+ identical, on newer cards
+
+Measured on his desktop GPU with a 242 s song: each sound-stage step 690 -> 443 ms, and the output is no longer the same bytes, since the faster path adds up in another order; its spectrum stays 0.99998 alike. On his laptop's older GPU it was the same bytes.
+---
+ src/nar.h | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/src/nar.h b/src/nar.h
+index 22b2e2d..f188a20 100644
+--- a/src/nar.h
++++ b/src/nar.h
+@@ -225,9 +225,11 @@ static struct ggml_tensor * nar_linear_bias(struct ggml_context * ctx,
+ // Local addition: masked zero key rows after the latent block, so the key count
+ // is a multiple of 256. CUDA flash attention takes its grouped-query path (both
+ // query heads of a KV head on one K/V tile) only then; otherwise every query
+-// head reads K and V again. The mask hides the extra rows, so CUDA gives the
+-// same bytes (measured on an RTX 2070: attention per layer 55 -> 29 ms). Only on
+-// CUDA: other backends would just attend over more masked keys.
++// head reads K and V again. The mask hides the extra rows. Measured: on an RTX
++// 2070 the same bytes, attention per layer 55 -> 29 ms; on an RTX 5090 a step
++// 690 -> 443 ms on a 242 s song, and not the same bytes (that path adds up in
++// another order): spectrum similarity 0.99998 to before. Only on CUDA: other
++// backends would just attend over more masked keys.
+ static int nar_kv_pad(int ar_len, int N) {
+     int kv = ar_len + N;
+     return (kv + YUE2_NAR_KV_PAD - 1) / YUE2_NAR_KV_PAD * YUE2_NAR_KV_PAD - kv;

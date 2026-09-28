@@ -1,0 +1,386 @@
+From b9ead1aae61b6e617a8bedeeaaf7e2c2637447fb Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sun, 27 Sep 2026 15:41:16 -0700
+Subject: [PATCH 33/36] Clean up the song details: grouped buttons and one
+ aligned card
+
+Favourite, Rename and Delete become icons on the title line; the line under the title says age, length and render time instead of repeating the music seed; the buttons sit in Download, Make again and Files groups with MP3 and its bitrate as one split button. The pills become one card in five sections (song, sound, shape, add-ons, seeds) with fixed label and value columns: the shape sliders on a five-step scale, one line per slider or LoRA with its halves together, seeds with copy buttons. The card folds its columns in a narrow window.
+---
+ tools/console/app.css    |  64 +++++++++++++------
+ tools/console/app.js     | 132 ++++++++++++++++++++++++++-------------
+ tools/console/index.html |  34 +++++-----
+ tools/console/loras.js   |  19 +++++-
+ 4 files changed, 170 insertions(+), 79 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index d49e8c5..1349706 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -925,7 +925,20 @@ select:disabled { opacity: .7; }
+ .take-empty strong { color: var(--muted); }
+ 
+ .take-body { display: flex; flex-direction: column; gap: 20px; }
+-.take-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
++/* the song's buttons in three labelled groups: Download, Make again, Files */
++.take-tools { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; }
++.tool-group { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
++.tool-cap { font: 600 10px/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
++.tool-row { display: flex; flex-wrap: wrap; gap: 6px; }
++.split-btn { display: inline-flex; }
++.split-btn > .btn:not(.is-hidden) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
++.split-btn > .btn:not(.is-hidden) + .mp3-rate { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: none; }
++
++/* Favourite, Rename, Delete: small icons on the title line; the line under the title on its own row */
++.head-actions .icon-act { min-width: 30px; justify-content: center; font-size: 14px; }
++.head-actions .icon-act.danger { color: var(--bad); border-color: var(--bad-line); }
++.head-actions .icon-act svg { display: block; }
++.take-col #takeEyebrow { order: 20; flex-basis: 100%; white-space: normal; }
+ 
+ /* ------------------------------------------------------------------ score */
+ 
+@@ -1196,25 +1209,36 @@ pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-br
+ .prompt-text.dim { color: var(--dim); font-size: 12px; }
+ .prompt-text:empty { display: none; }
+ 
+-.meta-strip {
+-  display: flex;
+-  flex-wrap: wrap;
+-  gap: 6px;
+-  margin: 0;
+-}
+-.meta-strip div {
+-  display: flex;
+-  align-items: baseline;
+-  gap: 6px;
+-  padding: 4px 9px;
+-  background: var(--panel);
+-  border: 1px solid var(--line-soft);
+-  border-radius: 20px;
+-  min-width: 0;
++/* the song's details: one card, a section label on the left, labels and values in fixed columns */
++.meta-card { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); container-type: inline-size; }
++.meta-sec { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 0 14px; padding: 11px 16px; border-top: 1px solid var(--line-soft); }
++.meta-sec:first-child { border-top: none; }
++.meta-sec h4 { margin: 2px 0 0; font: 600 10.5px/1.6 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
++.meta-kv { display: grid; gap: 5px 12px; align-items: baseline; margin: 0; min-width: 0; }
++.meta-kv > div { display: contents; }
++.mkv2 { grid-template-columns: 104px minmax(0, 1fr) 84px minmax(0, 1fr); }
++.mkv1 { grid-template-columns: 104px minmax(0, 1fr); }
++.mkv3 { grid-template-columns: 104px minmax(0, 11em) minmax(0, 1fr); }
++.meta-kv dt { color: var(--muted); font-size: 12.5px; }
++.meta-kv dd { margin: 0; min-width: 0; color: var(--ink); font-size: 13.5px; font-weight: 500; overflow-wrap: anywhere; }
++.meta-kv dd.num, .meta-kv .num { font-family: var(--mono); font-size: 12.5px; }
++.meta-kv dd.warn { color: var(--amber); }
++.kv-note { margin-left: 4px; color: var(--muted); font-family: var(--mono); font-size: 11.5px; font-weight: 400; }
++.dots { display: inline-flex; gap: 5px; margin-right: 10px; vertical-align: 0; }
++.dots i { width: 9px; height: 9px; border: 1px solid var(--amber-dim); border-radius: 50%; }
++.dots i.on { background: var(--amber); border-color: var(--amber); }
++.dots.custom i { border-style: dashed; }
++.meta-card .bar { position: relative; display: inline-block; width: 64px; height: 4px; margin-right: 8px; overflow: hidden;
++  border-radius: 2px; background: var(--line-soft); vertical-align: middle; }
++.meta-card .bar b { position: absolute; inset: 0 auto 0 0; background: var(--amber); }
++.seed-copy { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--line-soft); border-radius: 5px; background: transparent;
++  color: var(--dim); font: 11px/1.4 var(--sans); cursor: pointer; }
++.seed-copy:hover { color: var(--ink); border-color: var(--line); }
++@container (max-width: 560px) {
++  .meta-sec { grid-template-columns: minmax(0, 1fr); gap: 6px; }
++  .mkv2 { grid-template-columns: 96px minmax(0, 1fr); }
++  .mkv3 { grid-template-columns: 96px minmax(0, 1fr) auto; }
+ }
+-.meta-strip dt { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+-.meta-strip dd { margin: 0; font-family: var(--mono); font-size: 11.5px; color: var(--ink); overflow-wrap: anywhere; }
+-.meta-strip dd.warn { color: var(--amber); }
+ 
+ /* rename in place: the title becomes a field */
+ .title-edit {
+@@ -1380,7 +1404,7 @@ textarea:hover::-webkit-scrollbar-thumb,
+ 
+ /* A plan-only run shows its score and nothing else. */
+ .take-body.is-running .word-row,
+-.take-body.is-running .meta-strip,
++.take-body.is-running .meta-card,
+ .take-body.is-running .take-tools,
+ .take-body.is-running .decode-switch { display: none; }
+ 
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 9a9392c..70347e9 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -2584,7 +2584,7 @@
+     var take = STATE.take, flac = $("dlTakeFlac");
+     $("mp3Rate").value = String(mp3Rate());
+     $("mp3Rate").classList.toggle("is-hidden", !convertible(take));
+-    paintMp3Link($("dlTakeMp3"), take, "MP3 · " + mp3Rate() + "k");
++    paintMp3Link($("dlTakeMp3"), take, "MP3");
+     paintMp3Link($("dlMp3Bar"), STATE.playerTake, "MP3");
+     flac.classList.toggle("is-hidden", !convertible(take));
+     if (convertible(take)) {
+@@ -2644,7 +2644,7 @@
+       loadPlayer(take, false);
+     }
+     $("dlTakeAudio").href = url;
+-    $("dlTakeAudio").textContent = "Audio ." + formatExt(take.format);
++    $("dlTakeAudio").textContent = formatExt(take.format).toUpperCase();
+     $("dlTakeAudio").setAttribute("download", audioFileName(take));
+     paintMp3();
+ 
+@@ -2679,35 +2679,46 @@
+   function paintTakeHead() {
+     var take = STATE.take;
+     if (!take) return;
+-    $("takeEyebrow").textContent = ago(take.created) + " · music seed " + seedText(take.lm_seed);
++    // how old, how long, how long it took (the seeds are in the details below)
++    var eyebrow = [ago(take.created)];
++    if (take.seconds) eyebrow.push(clock(take.seconds) + " long");
++    if (take.render_seconds) eyebrow.push("made in " + clock(take.render_seconds));
++    $("takeEyebrow").textContent = eyebrow.join(" · ");
+     $("takeTitle").textContent = displayTitle(take);
++    // Favourite, Rename and Delete as small icons on the title line (Delete asks first)
+     $("takeActions").innerHTML =
+-      '<button type="button" class="btn ghost small' + (take.favorite ? " is-on" : "") + '" id="favTake" aria-pressed="' +
+-      (take.favorite ? "true" : "false") + '" title="' + (take.favorite ? "Remove from favourites" : "Keep as a favourite") + '">' +
+-      (take.favorite ? "★ Favourite" : "☆ Favourite") + "</button>" +
+-      '<button type="button" class="btn ghost small" id="renameTake" title="Rename this take">Rename</button>';
++      '<button type="button" class="btn ghost small icon-act' + (take.favorite ? " is-on" : "") + '" id="favTake" aria-pressed="' +
++      (take.favorite ? "true" : "false") + '" aria-label="Favourite" data-tip="' + (take.favorite ? "Remove from favourites" : "Keep as a favourite") + '">' +
++      (take.favorite ? "★" : "☆") + "</button>" +
++      '<button type="button" class="btn ghost small icon-act" id="renameTake" aria-label="Rename" data-tip="Rename this take">✎</button>' +
++      '<button type="button" class="btn ghost small icon-act danger" id="deleteTake" aria-label="Delete take" data-tip="Delete this take (asks first)">' +
++      '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
++      '<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5"/></svg></button>';
+     paintPlayHere();
+   }
+ 
+-  // Where a song's sampling sat on the three shape sliders: the position's name, or "custom" with the
+-  // values. Keys a saved request leaves out are the defaults.
+-  function shapeOf(id, sampling) {
++  // Where a song's sampling sat on the three shape sliders: the position (0 lowest .. 4 highest, -1
++  // custom), a note, and the same as plain text. Keys a saved request leaves out are the defaults.
++  function shapeInfo(id, sampling) {
+     var spec = SHAPES[id], pos = -1;
+     var value = function (key) {
+       return sampling && sampling[key] !== undefined ? round(Number(sampling[key]), 6) : round(samplingDefault(spec.group, key), 6);
+     };
+     spec.steps.forEach(function (v, i) { if (spec.keys.every(function (k, j) { return value(k) === v[j]; })) pos = i; });
+-    return pos >= 0 ? SHAPE_LABELS[pos]
+-      : "custom: temperature " + value("temperature") + " · top-p " + value("top_p") + " · top-k " + value("top_k");
++    var values = "temperature " + value("temperature") + " · top-p " + value("top_p") + " · top-k " + value("top_k");
++    return pos >= 0 ? { pos: pos, note: "", text: SHAPE_LABELS[pos] } : { pos: -1, note: values, text: "custom: " + values };
+   }
+ 
+-  function styleInfluence(take) {
++  function styleInfo(take) {
+     var auto = !(typeof take.cfg_scale === "number" && take.cfg_scale >= 0), fallback = take.cot === "off" ? 1.01 : 1.0;
+     var value = auto ? fallback : round(take.cfg_scale, 3);
+     var pos = value === fallback ? 2 : SHAPES.shapeStyle.cfg.indexOf(value);
+-    return (pos >= 0 ? SHAPE_LABELS[pos] : "custom") + " · guidance " + (auto ? "default " + (take.cot === "off" ? "1.01" : "1.0") : value);
++    var note = "guidance " + (auto ? "default " + (take.cot === "off" ? "1.01" : "1.0") : value);
++    return { pos: pos, note: note, text: (pos >= 0 ? SHAPE_LABELS[pos] : "custom") + " · " + note };
+   }
+ 
++  // The song's details: one card in five sections (song, sound, shape, add-ons, seeds), labels and values
++  // in fixed columns. Every field also carries its value as plain text (data-value), which the tests read.
+   function paintTakeMeta() {
+     var take = STATE.take;
+     if (!take) return;
+@@ -2718,37 +2729,74 @@
+       getRequest(take).then(function () { if (STATE.take === take) paintTakeMeta(); })
+         .catch(function () { STATE.noRequest[take.name] = true; if (STATE.take === take) paintTakeMeta(); });
+     }
+-    var cells = [
+-      ["Length", clock(take.seconds)],
+-      ["Mode", MODES[take.cot] || take.cot || "—"],
+-      ["Music seed", seedText(take.lm_seed) || "—"],
+-      ["Sound seed", seedText(take.seed) || "—"],
+-      ["VAE", vaeLabel(take.vae)],
+-      ["Model", take.model || "—"],
+-      ["Sliders", (take.sliders || []).length ? take.sliders.map(function (c) {
+-        return (labels[c.id] || c.id) + " " + round(c.strength, 2); }).join(", ") : "none"],
+-      ["LoRAs", (take.loras || []).length ? YueLoras.describe(take.loras) : "none"],
+-      ["Steps", take.steps || "—"],
+-      ["Composition", shapes ? shapeOf("shapeComposition", req.abc_sampling) : (shapes === null ? "…" : "—")],
+-      ["Performance", shapes ? shapeOf("shapePerformance", req.semantic_sampling) : (shapes === null ? "…" : "—")],
+-      ["Style influence", styleInfluence(take)],
+-      ["Format", FORMAT_LABELS[take.format] || take.format || "—"],
+-      ["Render time", take.render_seconds ? clock(take.render_seconds) : "—"]
+-    ];
+-    if (take.truncated) cells.push(["Limit", "hit token cap"]);
+-    if (take.provided_score) cells.push(["Score", "supplied"]);
++    var field = function (label, html, text, key, cls) {
++      return '<div data-field="' + escape(key || label) + '" data-value="' + escape(text) + '"><dt>' + escape(label) + "</dt><dd" +
++        (cls ? ' class="' + cls + '"' : "") + ">" + html + "</dd></div>";
++    };
++    var plain = function (label, text, cls) { return field(label, escape(String(text)), String(text), "", cls); };
++    var section = function (title, cls, body) {
++      return '<section class="meta-sec"><h4>' + title + '</h4><dl class="meta-kv ' + cls + '">' + body + "</dl></section>";
++    };
++    var scale = function (label, info) {
++      var dots = "";
++      for (var i = 0; i < 5; i++) dots += "<i" + (i === info.pos ? ' class="on"' : "") + "></i>";
++      var shown = (info.pos >= 0 ? escape(SHAPE_LABELS[info.pos]) : "custom") + (info.note ? ' <span class="kv-note">' + escape(info.note) + "</span>" : "");
++      return field(label, '<span class="dots' + (info.pos < 0 ? " custom" : "") + '" aria-hidden="true">' + dots + "</span>" + shown, info.text);
++    };
++    // add-on rows: the type's label on its first row only; the whole list as plain text on that row
++    var addon = function (label, key, text, name, amount) {
++      return "<div" + (key ? ' data-field="' + key + '" data-value="' + escape(text) + '"' : "") + "><dt>" + label + "</dt><dd>" +
++        escape(name) + '</dd><dd class="num">' + amount + "</dd></div>";
++    };
++    var seed = function (label, key, value) {
++      return field(label, '<span class="num">' + escape(value || "—") + "</span>" + (value ? '<button type="button" class="seed-copy" data-copy="' +
++        escape(value) + '" data-what="' + label.toLowerCase() + ' seed" aria-label="Copy the ' + label.toLowerCase() + ' seed">copy</button>' : ""), value || "—", key);
++    };
++
++    var song = plain("Mode", MODES[take.cot] || take.cot || "—") + plain("Format", FORMAT_LABELS[take.format] || take.format || "—") +
++      plain("Length", clock(take.seconds), "num") + plain("Made in", take.render_seconds ? clock(take.render_seconds) : "—", "num");
++    if (take.truncated) song += plain("Limit", "hit token cap", "warn");
++    if (take.provided_score) song += plain("Score", "supplied");
+     // made while the F32 option existed (removed 2026-09-26): kept so those songs can still be compared
+-    if (take.precision === "f32") cells.push(["Precision", "F32 (option since removed)"]);
++    if (take.precision === "f32") song += plain("Precision", "F32 (option since removed)");
+     if (take.song > 0 || take.variation > 0) {
+-      cells.push(["Batch", "song " + ((take.song || 0) + 1) + (take.variation > 0 ? ", sound " + (take.variation + 1) : "")]);
++      song += plain("Batch", "song " + ((take.song || 0) + 1) + (take.variation > 0 ? ", sound " + (take.variation + 1) : ""));
+     }
+-    if (take.session) cells.push(["Kept", "this tab only"]);
+-    $("metaGrid").innerHTML = cells.map(function (cell) {
+-      var warn = cell[0] === "Limit" ? ' class="warn"' : "";
+-      return "<div><dt>" + cell[0] + "</dt><dd" + warn + ">" + escape(String(cell[1])) + "</dd></div>";
+-    }).join("");
++    if (take.session) song += plain("Kept", "this tab only");
++
++    var sound = plain("VAE", vaeLabel(take.vae)) + plain("Model", take.model || "—") + plain("Steps", take.steps || "—", "num");
++
++    var shape = (shapes ? scale("Composition", shapeInfo("shapeComposition", req.abc_sampling)) +
++                          scale("Performance", shapeInfo("shapePerformance", req.semantic_sampling))
++                        : plain("Composition", shapes === null ? "…" : "—") + plain("Performance", shapes === null ? "…" : "—")) +
++                scale("Style influence", styleInfo(take));
++
++    var sliders = take.sliders || [], loraLines = YueLoras.lines(take.loras);
++    var slidersText = sliders.length ? sliders.map(function (c) { return (labels[c.id] || c.id) + " " + round(c.strength, 2); }).join(", ") : "none";
++    var lorasText = (take.loras || []).length ? YueLoras.describe(take.loras) : "none";
++    var addons = sliders.length ? "" : addon("Sliders", "Sliders", "none", "none", "");
++    sliders.forEach(function (c, i) {
++      var strength = Math.max(0, Math.min(1, Number(c.strength) || 0));
++      addons += addon(i ? "" : "Sliders", i ? "" : "Sliders", slidersText, labels[c.id] || c.id,
++        '<span class="bar"><b style="width:' + Math.round(strength * 100) + '%"></b></span>' + (Number(c.strength) || 0).toFixed(2));
++    });
++    if (!loraLines.length) addons += addon("LoRAs", "LoRAs", "none", "none", "");
++    loraLines.forEach(function (l, i) { addons += addon(i ? "" : "LoRAs", i ? "" : "LoRAs", lorasText, l.name, escape(l.amounts)); });
++
++    var seeds = seed("Music", "Music seed", seedText(take.lm_seed)) + seed("Sound", "Sound seed", seedText(take.seed));
++
++    $("metaGrid").innerHTML = section("Song", "mkv2", song) + section("Sound", "mkv2", sound) + section("Shape", "mkv1", shape) +
++      section("Add-ons", "mkv3", addons) + section("Seeds", "mkv1", seeds);
+   }
+ 
++  $("metaGrid").addEventListener("click", function (event) {
++    var button = event.target.closest("[data-copy]");
++    if (!button) return;
++    navigator.clipboard.writeText(button.dataset.copy)
++      .then(function () { toast("The " + button.dataset.what + " is copied"); })
++      .catch(function () { toast("The browser refused clipboard access", "bad"); });
++  });
++
+   function renderScore(abc) {
+     $("scoreAbc").textContent = abc || "";
+     STATE.abcRendered = abc || "";
+@@ -2868,15 +2916,13 @@
+       .then(function () { button.disabled = false; });
+   });
+ 
+-  $("deleteTake").addEventListener("click", function () {
+-    if (STATE.take) deleteTake(STATE.take);
+-  });
+ 
+   $("takeActions").addEventListener("click", function (event) {
+     var take = STATE.take;
+     if (!take) return;
+     if (event.target.closest("#favTake")) toggleFavorite(take);
+     if (event.target.closest("#renameTake")) startRename();
++    if (event.target.closest("#deleteTake")) deleteTake(take);
+   });
+ 
+   /* ------------------------------------------------------- lyrics export */
+diff --git a/tools/console/index.html b/tools/console/index.html
+index ff9a728..a7689a9 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -471,23 +471,27 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+ 
+     <div class="take-body is-hidden" id="takeBody">
+       <div class="take-tools" id="takeTools">
+-        <a class="btn ghost small" id="dlTakeAudio" download title="Download this song">Audio .wav</a>
+-        <a class="btn ghost small" id="dlTakeFlac" download data-tip="FLAC: the same song, lossless (every sample identical to the WAV) at about three quarters of the size. Made on the spot in about a second; the title and lyrics are written into the file.">FLAC</a>
+-        <a class="btn ghost small" id="dlTakeMp3" download data-tip="MP3 converter: makes a shareable MP3 from the lossless song on the server (a few seconds the first time, then kept). 320 kbps is near transparent (about 7 MB for 3 minutes); 256 is very good; 192 is good and smaller (about 4 MB); 128 is small, with audible loss on cymbals and reverb. The song title and lyrics are written into the file.">MP3 · 320k</a>
+-        <select class="mp3-rate" id="mp3Rate" aria-label="MP3 bitrate" data-tip="MP3 converter: makes a shareable MP3 from the lossless song on the server (a few seconds the first time, then kept). 320 kbps is near transparent (about 7 MB for 3 minutes); 256 is very good; 192 is good and smaller (about 4 MB); 128 is small, with audible loss on cymbals and reverb. The song title and lyrics are written into the file.">
+-          <option value="320">320 kbps</option><option value="256">256 kbps</option>
+-          <option value="192">192 kbps</option><option value="128">128 kbps</option>
+-        </select>
+-        <button type="button" class="btn ghost small" id="retakeTake" data-tip="Retake: this exact take into the form, with its score, both seeds and its music codes. Generate renders the same music again: try another VAE, sound seed or sound variations">Retake</button>
+-        <button type="button" class="btn ghost small" id="reuseTake" data-tip="Reuse: the prompt, lyrics and every setting (mode, sampling, guidance, VAE, sliders, LoRAs, output) for a new song: no score, no seeds, no music codes, so Generate writes new music">Reuse</button>
+-        <button type="button" class="btn ghost small" id="rerenderSound" title="Same music, a new sound seed (seconds)">Re-render sound</button>
+-        <button type="button" class="btn ghost small" id="dlRequest" title="The replay request: prompt, score, codes and both seeds">Request .json</button>
+-        <button type="button" class="btn ghost small" id="dlScore">Score .abc</button>
+-        <div class="spacer"></div>
+-        <button type="button" class="btn ghost small danger" id="deleteTake">Delete take</button>
++        <div class="tool-group"><span class="tool-cap">Download</span><div class="tool-row">
++          <a class="btn ghost small" id="dlTakeAudio" download title="Download this song">WAV</a>
++          <a class="btn ghost small" id="dlTakeFlac" download data-tip="FLAC: the same song, lossless (every sample identical to the WAV) at about three quarters of the size. Made on the spot in about a second; the title and lyrics are written into the file.">FLAC</a>
++          <span class="split-btn"><a class="btn ghost small" id="dlTakeMp3" download data-tip="MP3 converter: makes a shareable MP3 from the lossless song on the server (a few seconds the first time, then kept). 320 kbps is near transparent (about 7 MB for 3 minutes); 256 is very good; 192 is good and smaller (about 4 MB); 128 is small, with audible loss on cymbals and reverb. The song title and lyrics are written into the file.">MP3</a>
++            <select class="mp3-rate" id="mp3Rate" aria-label="MP3 bitrate" data-tip="MP3 converter: makes a shareable MP3 from the lossless song on the server (a few seconds the first time, then kept). 320 kbps is near transparent (about 7 MB for 3 minutes); 256 is very good; 192 is good and smaller (about 4 MB); 128 is small, with audible loss on cymbals and reverb. The song title and lyrics are written into the file.">
++          <option value="320">320k</option><option value="256">256k</option>
++          <option value="192">192k</option><option value="128">128k</option>
++        </select></span>
++        </div></div>
++        <div class="tool-group"><span class="tool-cap">Make again</span><div class="tool-row">
++          <button type="button" class="btn ghost small" id="retakeTake" data-tip="Retake: this exact take into the form, with its score, both seeds and its music codes. Generate renders the same music again: try another VAE, sound seed or sound variations">Retake</button>
++          <button type="button" class="btn ghost small" id="reuseTake" data-tip="Reuse: the prompt, lyrics and every setting (mode, sampling, guidance, VAE, sliders, LoRAs, output) for a new song: no score, no seeds, no music codes, so Generate writes new music">Reuse</button>
++          <button type="button" class="btn ghost small" id="rerenderSound" title="Same music, a new sound seed (seconds)">Re-render sound</button>
++        </div></div>
++        <div class="tool-group"><span class="tool-cap">Files</span><div class="tool-row">
++          <button type="button" class="btn ghost small" id="dlRequest" title="The replay request (.json): prompt, score, codes and both seeds">Request</button>
++          <button type="button" class="btn ghost small" id="dlScore" title="The score as ABC notation (.abc)">Score</button>
++        </div></div>
+       </div>
+ 
+-      <dl class="meta-strip" id="metaGrid"></dl>
++      <div class="meta-card" id="metaGrid"></div>
+       <div class="decode-switch" id="decodeSwitch"></div>
+       <div class="decode-switch" id="soundSwitch"></div>
+ 
+diff --git a/tools/console/loras.js b/tools/console/loras.js
+index 3e4cb30..8e2cc48 100644
+--- a/tools/console/loras.js
++++ b/tools/console/loras.js
+@@ -263,6 +263,23 @@
+     });
+   }
+ 
++  // One line per LoRA for a song's info: a LoRA's two halves (often two files) share its line
++  function lines(list) {
++    var byName = {}, order = [];
++    (list || []).forEach(function (c) {
++      var name = c.name || nameOf(c.id);
++      if (!byName[name]) { byName[name] = { music: 0, sound: 0 }; order.push(name); }
++      if (Number(c.ar)) byName[name].music = Number(c.ar);
++      if (Number(c.nar)) byName[name].sound = Number(c.nar);
++    });
++    return order.map(function (name) {
++      var l = byName[name], parts = [];
++      if (l.music) parts.push("music " + fmt(l.music, 2));
++      if (l.sound) parts.push("sound " + fmt(l.sound, 2));
++      return { name: name, amounts: parts.join(" · ") };
++    });
++  }
++
+   function describe(list) {
+     return (list || []).map(function (c) {
+       var parts = [];
+@@ -272,6 +289,6 @@
+     }).join(", ");
+   }
+ 
+-  root.YueLoras = { mount: mount, setCatalog: setCatalog, set: set, value: value, describe: describe, repaint: paint,
++  root.YueLoras = { mount: mount, setCatalog: setCatalog, set: set, value: value, describe: describe, lines: lines, repaint: paint,
+     listInto: listInto, setSources: setSources };
+ })(window);

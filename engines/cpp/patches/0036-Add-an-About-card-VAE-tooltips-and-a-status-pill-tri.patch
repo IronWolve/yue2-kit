@@ -1,0 +1,284 @@
+From a93af9875a3923f0bbe888782248c97607c1840c Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Sun, 27 Sep 2026 17:32:10 -0700
+Subject: [PATCH 36/36] Add an About card, VAE tooltips and a status pill; trim
+ the player bar
+
+About closes the Engine page: the credit, then YuE2 (project page, code, weights, decoder, covers, report, paper), the C++ engine and ggml (and its fork), then every add-on from sources.json. Standard, Legacy and Blend explain themselves on hover (Standard: the quality choice and the newer model; Blend: two thirds Standard, one third Legacy) instead of Blend spelling the mix out. The player bar drops its WAV and MP3 buttons and the style line (the style is on hover of the name) and gains a fixed-size status: Rendering, Queued, Playing, Paused or Idle; a click shows the run or opens the song.
+---
+ tools/console/app.css    | 41 ++++++++++++++++++++--
+ tools/console/app.js     | 76 ++++++++++++++++++++++++++++++++++------
+ tools/console/index.html | 40 ++++++++++++++++++---
+ 3 files changed, 141 insertions(+), 16 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index f4e373f..cdd017a 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -415,6 +415,29 @@ button, input, select, textarea { font: inherit; color: inherit; }
+ .brand h1 { margin: 0; font: 400 21px/1 var(--display); letter-spacing: .01em; }
+ .brand h1 .two { color: var(--amber); }
+ .brand-link { color: inherit; text-decoration: none; }   /* the model's repo */
++
++/* About, at the bottom of the Engine page: the credit, then every project this app is built on */
++.about-card { display: flex; flex-direction: column; gap: 14px; }
++.about-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
++.about-credit { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0; color: var(--muted); font-size: 13px; }
++.about-credit strong { color: var(--ink); font-weight: 600; }
++.about-gh { color: var(--muted); font: 12px var(--mono); text-decoration: none; border-bottom: 1px solid var(--line); }
++.about-gh:hover { color: var(--ink); border-color: var(--line-strong); }
++/* two bands: the three projects (the model, the engine, the tensor library), then the add-ons */
++.about-grid { display: flex; flex-direction: column; gap: 16px; container-type: inline-size; }
++.about-projects, .about-addons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 28px; }
++.about-addons { padding-top: 14px; border-top: 1px solid var(--line-soft); }
++.about-project h4 { margin: 0; font: 400 17px/1.2 var(--display); color: var(--ink); letter-spacing: 0; text-transform: none; }
++.about-what { margin: 2px 0 9px; color: var(--muted); font-size: 12px; }
++.about-addons h4 { margin: 0 0 7px; font: 600 10px/1.3 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
++@container (max-width: 760px) { .about-projects, .about-addons { grid-template-columns: minmax(0, 1fr); } }
++.about-links { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
++.about-links li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
++.about-links a, .about-links .about-name { color: var(--ink); font-size: 13.5px; font-weight: 500; text-decoration: none; }
++.about-links a::after { content: " \2197"; color: var(--dim); font-size: 11px; }
++.about-links a:hover { text-decoration: underline; text-underline-offset: 3px; }
++.about-where { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
++.about-none { color: var(--dim); font-size: 12.5px; }
+ .brand-link:hover, .brand-link:focus-visible { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+ .engine-tag {
+   font: 500 9.5px/1 var(--mono);
+@@ -1338,11 +1361,25 @@ textarea:hover::-webkit-scrollbar-thumb,
+ }
+ /* dim what is on the empty bar, not its background: pages scroll under it */
+ .playbar.is-empty > * { opacity: .55; }
+-.playbar.is-empty .play, .playbar.is-empty .volume, .playbar.is-empty #dlAudio { pointer-events: none; }
++.playbar.is-empty .play, .playbar.is-empty .volume { pointer-events: none; }
++
++/* the player bar's status: one fixed size whatever it says; a coloured dot for what is happening */
++.status-pill { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 7px; width: 104px; height: 28px;
++  border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--muted); font: 500 12px/1 var(--sans); cursor: default; }
++.status-pill:not([data-s="idle"]) { color: var(--ink); cursor: pointer; }
++.status-pill:not([data-s="idle"]):hover { border-color: var(--line-strong); }
++.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
++.status-pill[data-s="rendering"] { border-color: var(--amber-dim); }
++.status-pill[data-s="rendering"] .status-dot { background: var(--amber); animation: status-pulse 1.4s ease-in-out infinite; }
++.status-pill[data-s="queued"] .status-dot { background: var(--amber-dim); }
++.status-pill[data-s="playing"] { border-color: var(--good-line); }
++.status-pill[data-s="playing"] .status-dot { background: var(--good); }
++.status-pill[data-s="paused"] .status-dot { background: var(--muted); }
++@keyframes status-pulse { 50% { opacity: .35; transform: scale(.75); } }
++@media (prefers-reduced-motion: reduce) { .status-pill .status-dot { animation: none; } }
+ 
+ .playbar-id { flex: none; width: 200px; min-width: 0; }
+ .playbar-id strong { display: block; font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+-.playbar-id small { display: block; font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ 
+ .play {
+   width: 36px; height: 36px;
+diff --git a/tools/console/app.js b/tools/console/app.js
+index 5991249..d9b15d9 100644
+--- a/tools/console/app.js
++++ b/tools/console/app.js
+@@ -86,7 +86,13 @@
+ 
+   var FRAME_RATE = 25;    // music tokens per second of audio
+ 
+-  var VAE_NOTES = { standard: "best sound", legacy: "benchmark", blend: "\u2154 standard, \u2153 legacy" };
++  var VAE_NOTES = { standard: "best sound", legacy: "benchmark" };
++  // what each VAE is, on hover (the repo follows on its own line)
++  var VAE_TIPS = {
++    standard: "Standard: the quality choice, and the newer model. The current official decoder and the default, the cleanest sound.",
++    legacy: "Legacy: the older official decoder. The published benchmark scores were made with it; less clean than Standard, and some hear it as more musical.",
++    blend: "Blend: a mix of the two official decoders, \u2154 Standard and \u2153 Legacy (a community weight mix, not newly trained)."
++  };
+   var VAE_NOTES_LONG = {
+     standard: "stock: current official, best sound",
+     legacy: "stock: older official, used for the published scores",
+@@ -572,8 +578,10 @@
+   function paintVaes() {
+     var current = selectedVae(true);
+     $("decoders").innerHTML = STATE.vaes.map(function (v) {
+-      return '<label class="toggle" data-tip="' + escape(v.repo || v.name) + '"><input type="radio" name="vae" value="' +
+-        escape(v.name) + '" /><span>' + escape(v.label || v.name) + (YueVaes.kindOf(v) === "add-on" ? YueVaes.badge("add-on") : "") + "</span>" +
++      var tip = (VAE_TIPS[v.name] ? VAE_TIPS[v.name] + "\n" : "") + (v.repo || v.name);
++      return '<label class="toggle" data-tip="' + escape(tip) + '"><input type="radio" name="vae" value="' +
++        escape(v.name) + '" /><span><span class="vae-name">' + escape(v.label || v.name) + "</span>" +
++        (YueVaes.kindOf(v) === "add-on" ? YueVaes.badge("add-on") : "") + "</span>" +
+         (VAE_NOTES[v.name] ? "<small>" + VAE_NOTES[v.name] + "</small>" : "") + "</label>";
+     }).join("");
+     var want = current || recall("yue2.vae");
+@@ -2004,6 +2012,7 @@
+     STATE.running = STATE.job && isLive(STATE.job) && !STATE.job.provisional ? STATE.job : liveMainJobs()[0] || null;
+     paintRun();
+     paintRunReturn();
++    paintStatus();
+     paintEngine();
+     paintSubmitNote();
+     // The library and the VAE row only change when the set of runs does; a
+@@ -2277,6 +2286,7 @@
+     STATE.sliderCatalog = Array.isArray(props.sliders) ? props.sliders : [];
+     YueLoras.setCatalog(Array.isArray(props.loras) ? props.loras : []);
+     STATE.sources = props.sources || {};
++    paintAbout();
+     YueLoras.setSources(STATE.sources.loras);
+     YueVaes.setSources(STATE.sources.vaes);
+     STATE.maxBatch = Math.max(1, parseInt(props.max_batch, 10) || 1);
+@@ -2585,7 +2595,6 @@
+     $("mp3Rate").value = String(mp3Rate());
+     $("mp3Rate").classList.toggle("is-hidden", !convertible(take));
+     paintMp3Link($("dlTakeMp3"), take, "MP3");
+-    paintMp3Link($("dlMp3Bar"), STATE.playerTake, "MP3");
+     flac.classList.toggle("is-hidden", !convertible(take));
+     if (convertible(take)) {
+       flac.href = "/library/flac?name=" + encodeURIComponent(take.name);
+@@ -2791,6 +2800,36 @@
+         seed("Sound", "Sound seed", seedText(take.seed)) + "</dl></div>";
+   }
+ 
++  // About (bottom of the Engine page): the add-ons' own pages, from loras/sources.json. Only web links
++  // become links; a LoRA split into two files (music half, sound half) appears once.
++  function paintAbout() {
++    var src = STATE.sources || {};
++    var web = function (u) { return /^https?:\/\//i.test(String(u || "")) ? String(u) : ""; };
++    var where = function (u) {
++      var m = u.match(/^https?:\/\/[^/]+\/([^/?#]+\/[^/?#]+)/);
++      return m ? m[1] : u.replace(/^https?:\/\//, "");
++    };
++    var item = function (name, url) {
++      var u = web(url);
++      return "<li>" + (u ? '<a href="' + escape(u) + '" target="_blank" rel="noopener noreferrer">' + escape(name) + '</a><span class="about-where">' +
++        escape(where(u)) + "</span>" : '<span class="about-name">' + escape(name) + "</span>") + "</li>";
++    };
++    var list = function (title, items) {
++      return "<section><h4>" + title + '</h4><ul class="about-links">' + (items.length ? items.join("") : '<li class="about-none">none listed</li>') + "</ul></section>";
++    };
++    var vaeNames = { standard: "Standard VAE", legacy: "Legacy VAE", blend: "Blend VAE" };
++    var vaes = Object.keys(src.vaes || {}).map(function (k) { return item(vaeNames[k] || k + " VAE", (src.vaes[k] || {}).url); });
++    var sliders = src.sliders && src.sliders.url ? [item("Voice and genre sliders", src.sliders.url)] : [];
++    var byUrl = {}, order = [];
++    Object.keys(src.loras || {}).forEach(function (k) {
++      var e = src.loras[k] || {}, key = web(e.url) || "~" + k, name = e.title || k.replace(/\/+$/, "");
++      if (!byUrl[key]) { byUrl[key] = { names: [], url: e.url }; order.push(key); }
++      if (byUrl[key].names.indexOf(name) < 0) byUrl[key].names.push(name);
++    });
++    var loras = order.map(function (k) { return item(byUrl[k].names.join(" / "), byUrl[k].url); });
++    $("aboutAddons").innerHTML = list("Sound decoders", vaes) + list("Sliders", sliders) + list("LoRAs", loras);
++  }
++
+   $("metaGrid").addEventListener("click", function (event) {
+     var button = event.target.closest("[data-copy]");
+     if (!button) return;
+@@ -3152,7 +3191,7 @@
+     STATE.peaks = null;
+     $("playbar").classList.add("is-empty");
+     $("playbarTitle").textContent = "Nothing loaded";
+-    $("playbarStyle").textContent = "pick a take on the right";
++    $("playbarTitle").dataset.tip = "Pick a take on the right";
+     $("timeNow").textContent = "0:00";
+     $("timeTotal").textContent = "0:00";
+     drawWave();
+@@ -3236,11 +3275,9 @@
+       }
+     }
+     $("playbar").classList.remove("is-empty");
++    // just the name; its style prompt on hover (downloads are on the song page)
+     $("playbarTitle").textContent = displayTitle(take);
+-    $("playbarStyle").textContent = take.style;
+-    $("dlAudio").href = url;
+-    $("dlAudio").textContent = take.format === "mp3" ? "MP3" : "WAV";
+-    $("dlAudio").setAttribute("download", audioFileName(take));
++    if (take.style) $("playbarTitle").dataset.tip = take.style; else $("playbarTitle").removeAttribute("data-tip");
+     paintMp3();
+     $("timeTotal").textContent = clock(take.seconds);
+     loadPeaks(take);
+@@ -3310,7 +3347,26 @@
+     all("#libList .take[data-name]").forEach(function (card) {
+       card.classList.toggle("is-playing", !!name && card.dataset.name === name);
+     });
+-  }
++    paintStatus();
++  }
++
++  // The player bar's status: Rendering or Queued while a song is being made (a click shows the run),
++  // Playing or Paused for the song in the player (a click opens it), else Idle.
++  function paintStatus() {
++    var job = STATE.running, pill = $("statusPill"), s = "idle", text = "Idle", tip = "Nothing is being made or played";
++    if (job && job.status === "queued") { s = "queued"; text = "Queued"; tip = "Waiting to start: " + job.title + ". Click to watch it"; }
++    else if (job) { s = "rendering"; text = "Rendering"; tip = "Making " + job.title + ". Click to watch it"; }
++    else if (isPlaying() && STATE.playerTake) { s = "playing"; text = "Playing"; tip = "Playing " + displayTitle(STATE.playerTake) + ". Click to open it"; }
++    else if (STATE.playerTake && audio.getAttribute("src")) { s = "paused"; text = "Paused"; tip = displayTitle(STATE.playerTake) + " is paused. Click to open it"; }
++    pill.dataset.s = s;
++    pill.dataset.tip = tip;
++    $("statusText").textContent = text;
++  }
++  $("statusPill").addEventListener("click", function () {
++    var s = this.dataset.s;
++    if ((s === "rendering" || s === "queued") && STATE.running) $("backToRun").click();
++    else if ((s === "playing" || s === "paused") && STATE.playerTake) openTake(STATE.playerTake.name);
++  });
+   audio.addEventListener("timeupdate", function () {
+     $("timeNow").textContent = clock(audio.currentTime);
+     drawWave();
+diff --git a/tools/console/index.html b/tools/console/index.html
+index 88ccf3a..44e7868 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -158,6 +158,39 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+       </div>
+       <div class="log-body mono" id="logBody" role="log" aria-live="off"></div>
+     </div>
++
++    <!-- credits: upstream project names, not paths (build-page.sh's folder-name guard skips this block) -->
++    <div class="card wide about-card" id="aboutCard">
++      <div class="about-head">
++        <h3>About</h3>
++        <p class="about-credit">Customized Collection by <strong>SeattleSysop</strong>
++          <a class="about-gh" href="https://github.com/IronWolve" target="_blank" rel="noopener noreferrer">github.com/IronWolve</a></p>
++      </div>
++      <div class="about-grid">
++        <div class="about-projects">
++          <section class="about-project"><h4>YuE2</h4><p class="about-what">the music model, by the Multimodal Art Projection team</p><ul class="about-links">
++            <li><a href="https://map-yue2.github.io/" target="_blank" rel="noopener noreferrer">Project page</a><span class="about-where">map-yue2.github.io</span></li>
++            <li><a href="https://github.com/multimodal-art-projection/YuE" target="_blank" rel="noopener noreferrer">Code and guides</a><span class="about-where">github · multimodal-art-projection/YuE</span></li>
++            <li><a href="https://huggingface.co/m-a-p/YuE2-3B" target="_blank" rel="noopener noreferrer">Model weights</a><span class="about-where">hugging face · m-a-p/YuE2-3B</span></li>
++            <li><a href="https://huggingface.co/m-a-p/YuE2-Vae" target="_blank" rel="noopener noreferrer">Sound decoder</a><span class="about-where">hugging face · m-a-p/YuE2-Vae</span></li>
++            <li><a href="https://huggingface.co/m-a-p/SheetSage2" target="_blank" rel="noopener noreferrer">Covers: transcriber</a><span class="about-where">hugging face · m-a-p/SheetSage2</span></li>
++            <li><a href="https://huggingface.co/m-a-p/MERT-v2-FullSong" target="_blank" rel="noopener noreferrer">Covers: audio encoder</a><span class="about-where">hugging face · m-a-p/MERT-v2-FullSong</span></li>
++            <li><a href="https://github.com/multimodal-art-projection/YuE/blob/main/docs/technical_report.pdf" target="_blank" rel="noopener noreferrer">Technical report</a><span class="about-where">pdf</span></li>
++            <li><a href="https://arxiv.org/abs/2503.08638" target="_blank" rel="noopener noreferrer">Paper</a><span class="about-where">arxiv · 2503.08638</span></li>
++          </ul></section>
++          <section class="about-project"><h4>yue2.cpp</h4><p class="about-what">the C++ engine and server this app runs on</p><ul class="about-links">
++            <li><a href="https://github.com/ServeurpersoCom/yue2.cpp" target="_blank" rel="noopener noreferrer">Code</a><span class="about-where">github · ServeurpersoCom/yue2.cpp</span></li>
++            <li><a href="https://huggingface.co/Serveurperso/YuE2-GGUF" target="_blank" rel="noopener noreferrer">Ready-made model files</a><span class="about-where">hugging face · Serveurperso/YuE2-GGUF</span></li>
++          </ul></section>
++          <section class="about-project"><h4>ggml</h4><p class="about-what">the tensor library underneath</p><ul class="about-links">
++            <li><a href="https://github.com/ggml-org/ggml" target="_blank" rel="noopener noreferrer">Code</a><span class="about-where">github · ggml-org/ggml</span></li>
++            <li><a href="https://github.com/ServeurpersoCom/ggml" target="_blank" rel="noopener noreferrer">The fork yue2.cpp uses</a><span class="about-where">github · ServeurpersoCom/ggml</span></li>
++          </ul></section>
++        </div>
++        <div class="about-addons" id="aboutAddons"></div>
++      </div>
++    </div>
++    <!-- /credits -->
+   </div>
+ </section>
+ 
+@@ -560,8 +593,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+ <!-- ---------------------------------------------------------------- playbar -->
+ <footer class="playbar is-empty" id="playbar">
+   <div class="playbar-id">
+-    <strong id="playbarTitle">Nothing loaded</strong>
+-    <small id="playbarStyle">pick a take on the right</small>
++    <strong id="playbarTitle" data-tip="Pick a take on the right">Nothing loaded</strong>
+   </div>
+ 
+   <button class="play" id="playBtn" aria-label="Play"><span id="playGlyph">▶</span></button>
+@@ -575,8 +607,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
+     <input type="range" id="volume" min="0" max="1" step="0.01" value="1" aria-label="Volume" />
+   </div>
+ 
+-  <a class="btn ghost small" id="dlAudio" download>WAV</a>
+-  <a class="btn ghost small" id="dlMp3Bar" download data-tip="Download the playing song as MP3 (bitrate from the song page)">MP3</a>
++  <button type="button" class="status-pill" id="statusPill" data-s="idle" data-tip="Nothing is being made or played"><span class="status-dot" aria-hidden="true"></span><span id="statusText" aria-live="polite">Idle</span></button>
++
+   <audio id="audio" preload="auto"></audio>
+ </footer>
+ 
