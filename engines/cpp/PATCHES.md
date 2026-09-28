@@ -538,3 +538,11 @@ Files:
 - `tools/console/app.js` (+9 −3)
 - `tools/console/help.js` (+0 −1)
 - `tools/console/index.html` (+11 −16)
+
+## 0041 Drawer headings: the name, with one sentence under it
+
+2026-09-27. Each drawer's heading is its name on one line and a proper sentence under it (Sound and output keeps its live summary there), instead of a lower-case fragment pushed to the right that wrapped beside the name in a narrow column.
+
+Files:
+- `tools/console/app.css` (+9 −5)
+- `tools/console/index.html` (+6 −6)

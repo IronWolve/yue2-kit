@@ -1,7 +1,7 @@
 From 0b5aa7cfbac7e5e684877ac97ba13beb1dc51881 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 12:49:00 -0700
-Subject: [PATCH 25/40] Step top-p, penalty, guidance and LoRA strength finely
+Subject: [PATCH 25/41] Step top-p, penalty, guidance and LoRA strength finely
  enough for documented values
 
 Top-p by 0.005 (a model card uses 0.975), the music repetition penalty by 0.01 (1.18, 1.24), guidance by 0.01 (the protocol's 1.01, presets 0.85-1.15), LoRA strengths by 0.025 (a card's 0.375), and strength readouts keep a third decimal when the value has one.

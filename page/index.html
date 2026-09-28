@@ -726,18 +726,22 @@ select:disabled { opacity: .7; }
 
 .drawer { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel); }
 
+/* a drawer's heading: its name, and under it one sentence (or its live summary) that wraps under the
+   name in a narrow column, never beside it */
 .drawer > summary {
   display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 11px 13px;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
   cursor: pointer;
-  font-size: 13px;
   list-style: none;
   color: var(--ink);
 }
 .drawer > summary::-webkit-details-marker { display: none; }
-.summary-note { font-style: normal; font-size: 11.5px; color: var(--dim); margin-left: auto; }
+.drawer > summary .chev { flex: none; margin-top: 6px; }
+.sum-head { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sum-name { font-size: 13.5px; font-weight: 500; }
+.sum-say { font-size: 12px; line-height: 1.45; color: var(--dim); }
 
 .chev {
   width: 0; height: 0;
@@ -3409,7 +3413,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     </div>
 
     <details class="drawer" id="museDrawer">
-      <summary><span class="chev" aria-hidden="true"></span> Start from an idea <em class="summary-note">a local chat model drafts the title, style and lyrics</em></summary>
+      <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Start from an idea</span><span class="sum-say">A local chat model writes the title, style and lyrics from one line.</span></span></summary>
       <div class="drawer-body">
     <section class="muse" id="muse">
       <label class="field">
@@ -3539,7 +3543,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       </div>
 
       <details class="drawer" id="coverDrawer">
-        <summary><span class="chev" aria-hidden="true"></span> Cover or remix <em class="summary-note">reuse a melody, change the style</em></summary>
+        <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Cover or remix</span><span class="sum-say">Reuse a melody and change the style.</span></span></summary>
         <div class="drawer-body">
           <h4 class="mini">From a recording <span class="info" tabindex="0" role="img" aria-label="About transcription" data-tip-ref="tip-transcribe">i</span></h4>
           <p class="hint">Transcribe the melody of any song you have as a file, then render it with your own
@@ -3579,7 +3583,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       </details>
 
       <details class="drawer" id="scoreDrawer">
-        <summary><span class="chev" aria-hidden="true"></span> Supply your own score <em class="summary-note">ABC, for covers and edits</em></summary>
+        <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Supply your own score</span><span class="sum-say">Bring an ABC score, for covers and edits.</span></span></summary>
         <div class="drawer-body">
           <p class="hint">Paste an ABC score to condition the song on a melody you already have. Available in full and melody modes; for covers, use melody mode with a score that carries no chord symbols.</p>
           <div class="chiprow">
@@ -3594,7 +3598,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       </details>
 
       <details class="drawer" id="advDrawer">
-        <summary><span class="chev" aria-hidden="true"></span> Sampling <em class="summary-note">defaults are tuned</em></summary>
+        <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Sampling</span><span class="sum-say">The defaults are tuned; change them to experiment.</span></span></summary>
         <div class="drawer-body">
           <div class="shape" id="shape">
             <label class="shape-row"><span class="shape-name">Composition<em>familiar ↔ unexpected melody and chords</em></span>
@@ -3630,7 +3634,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       </details>
 
       <details class="drawer" id="outDrawer">
-        <summary><span class="chev" aria-hidden="true"></span> Sound and output <em class="summary-note" id="outSummary">WAV 24-bit</em></summary>
+        <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Sound and output</span><span class="sum-say" id="outSummary">WAV 24-bit</span></span></summary>
         <div class="drawer-body">
           <div class="out-grid">
             <label class="field"><span class="label">ODE steps <em>sound solver</em></span>
@@ -3755,7 +3759,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       </div>
 
       <details class="drawer" id="scorePanel">
-        <summary><span class="chev" aria-hidden="true"></span> Score <em class="summary-note">the editable plan</em></summary>
+        <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Score</span><span class="sum-say">The song's plan, which you can edit.</span></span></summary>
         <div class="drawer-body">
           <div class="score-head">
             <div class="score-tabs">
