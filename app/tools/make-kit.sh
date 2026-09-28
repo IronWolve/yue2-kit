@@ -82,8 +82,12 @@ STAGE="$DIST"
 FACTS="$ROOT/tmp/kit-facts.json"
 rm -rf "$STAGE/app" "$STAGE/loras" "$STAGE/settings" "$STAGE/docs"
 mkdir -p "$STAGE"/{app,loras,settings,docs/screenshots}
-if command grep -l -i -E 'co-authored-by|generated with' "$DIST"/engines/cpp/patches/*.patch >/dev/null 2>&1; then
-  fail "a patch names an AI vendor or carries an attribution trailer"
+# names no published file may carry: attribution trailers, and the vendor names in the owner's untracked
+# .kit-denylist (one extended regex; a dotfile, so the root copy below never takes it along)
+DENY='co-authored-by|generated with'
+[ -f "$ROOT/.kit-denylist" ] && DENY="$DENY|$(tr -d '\n' < "$ROOT/.kit-denylist")"
+if command grep -l -i -E "$DENY" "$DIST"/engines/cpp/patches/*.patch >/dev/null 2>&1; then
+  fail "a patch carries an attribution trailer or a name from .kit-denylist"
 fi
 
 # --- 3. every root script and the whole tools/ folder (by rule, so a new script is never left out)
@@ -254,9 +258,10 @@ cp "$ROOT/tools/kit/CHANGELOG.md" "$STAGE/CHANGELOG.md"
 
 # --- 5. his notes, marked as his, and the screenshots: optional. New ones come from tools/screenshots.mjs
 #     (run it only for a GitHub push or when he wants them in a kit); otherwise the kit keeps repo/'s.
-header() { printf '> The original owner'"'"'s %s, copied as they were on %s. His paths (%s/..., ~/work/...),\n> his shared model folder under %s/models and his personal rules do not apply to this\n> install; the technical facts do. The install itself is ../INSTALL.md.\n\n' "$1" "$DATE" "$HOME" "$HOME"; }
-{ header "working notes"; cat "$ROOT/AGENTS.md"; } > "$STAGE/docs/notes.md"
-{ header "list of how his install differs from a stock one"; cat "$ROOT/LOCAL-CHANGES.md"; } > "$STAGE/docs/local-changes.md"
+header() { printf '> The original owner'"'"'s %s, copied as they were on %s. His paths (under ~), his shared model\n> folder (~/models) and his personal rules do not apply to this install; the technical facts do.\n> The install itself is ../INSTALL.md.\n\n' "$1" "$DATE"; }
+# published copies say ~ where his home folder is
+{ header "working notes"; sed "s|$HOME|~|g" "$ROOT/AGENTS.md"; } > "$STAGE/docs/notes.md"
+{ header "list of how his install differs from a stock one"; sed "s|$HOME|~|g" "$ROOT/LOCAL-CHANGES.md"; } > "$STAGE/docs/local-changes.md"
 SHOTS="$ROOT/tmp/shots/showcase"
 page_built=$(stat -c %Y "$BUILD/tools/public/index.html.gz")
 shots_new=0 shots_kept=0
@@ -298,7 +303,7 @@ settings = (f"model **{st.get('model', 'BF16')}**, precision **{str(st.get('prec
             f"{'**keep models loaded** between songs' if st.get('keep_loaded') else 'models unloaded after each song'}, "
             f"{ctx}, VAE tiles **{st.get('vae_core', 512)}** frames")
 quant = "\n".join(facts["quantize"]) or "# (no smaller copies in the original install)"
-fill = {"HOME": "$HOME", "DATE": "$DATE", "KITVER": "$KITVER", "BASE": "$BASE7", "BASEDATE": "$BASEDATE", "NPATCH": "$NPATCH", "TREE": "$TREE",
+fill = {"HOME": "~", "DATE": "$DATE", "KITVER": "$KITVER", "BASE": "$BASE7", "BASEDATE": "$BASEDATE", "NPATCH": "$NPATCH", "TREE": "$TREE",
         "UPSTREAM": "$UPSTREAM", "GGML": "$GGML", "BATCH": "$BATCH", "CDP_CHECKS": "$CDP", "SETTINGS": settings,
         "QUANTIZE": quant, "MODELS": ", ".join(facts["models"]), "NLORA": str(facts["loras"]),
         "NLORAREPO": str(facts["lora_repos"]), "NSLIDER": str(facts["sliders"]),
@@ -335,7 +340,7 @@ print("  - his songs (outputs/): personal")
 print("  - browser-side choices (the theme picked, favourites, form drafts): they live in his browser")
 print("  - the built programs: they are compiled for his GPU; the friend compiles for theirs")
 print("  - the model, slider and LoRA files: downloaded at the revisions above and converted locally")
-print("  - his shared model folder ($HOME/models): the friend's copies are plain folders in the install")
+print("  - his shared model folder (~/models): the friend's copies are plain folders in the install")
 print("  - tmp/: test runs, caches, the converter venv (rebuilt from converter-requirements.txt)")
 PY
 
@@ -362,7 +367,7 @@ fi
 # --- audit: what this kit carries, counted from the files themselves, and what it leaves out on purpose
 nsrc=$(find "$BUILD/tools/console" -type f | wc -l | tr -d ' '); nsrc_kit=$(find "$DIST/page/src" -type f 2>/dev/null | wc -l | tr -d ' ')
 [ "$nsrc_kit" = "$nsrc" ] || fail "repo/page/src has $nsrc_kit of the page's $nsrc source files"
-nroot=$(find "$ROOT" -maxdepth 1 -type f ! -name AGENTS.md ! -name LOCAL-CHANGES.md ! -name settings.json | wc -l | tr -d ' ')
+nroot=$(find "$ROOT" -maxdepth 1 -type f ! -name ".*" ! -name AGENTS.md ! -name LOCAL-CHANGES.md ! -name settings.json | wc -l | tr -d ' ')
 nroot_kit=$(find "$DIST/app" -maxdepth 1 -type f | wc -l | tr -d ' ')
 [ "$nroot_kit" = "$nroot" ] || fail "repo/app has $nroot_kit of the $nroot root scripts"
 echo "${B}audit${X}  engine: ${G}$NPATCH${X} patches + PATCHES.md notes + BASE.txt ($BASE7, $BASEDATE) + the built page"
@@ -375,6 +380,17 @@ echo "       ${D}left out on purpose: songs, compiled programs, model/LoRA files
 
 # --- 10. manifest of every file, then commit in repo/; with --release, tag it and zip exactly that tag
 (cd "$STAGE" && find . -path ./.git -prune -o -type f ! -name MANIFEST.txt -printf '%P\n' | sort | xargs -d '\n' sha256sum) > "$STAGE/MANIFEST.txt"
+# nothing published names his home folder, carries an attribution or names a denied vendor (whole repo, not just app/)
+# (grep finds nothing = exit 1: "|| true" keeps set -e from stopping the run here; the trailer words are left
+# out, since the guards themselves spell them)
+VENDORS=$(tr -d '\n' < "$ROOT/.kit-denylist" 2>/dev/null || true)
+leaks=$( { command grep -r -l -F "$HOME" "$STAGE" --exclude-dir=.git || true
+           [ -z "$VENDORS" ] || command grep -r -l -i -E "$VENDORS" "$STAGE" --exclude-dir=.git || true; } 2>/dev/null |
+         sed "s|^$STAGE/||" | sort -u | head -5 | tr '\n' ' ')
+if [ -n "$leaks" ]; then
+  [ "$RELEASE" = 1 ] && fail "published files name the home folder or a denied name: $leaks"
+  note "published files name the home folder or a denied name: $leaks"
+fi
 command git -C "$DIST" add -A
 if command git -C "$DIST" diff --cached --quiet; then
   state="no change in repo/"

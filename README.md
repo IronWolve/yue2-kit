@@ -43,16 +43,18 @@ it builds in its own folder and never changes an existing yue2.cpp install.
 ## Features
 
 - **A studio page**: song form, song page and library side by side, with columns you can drag wider or
-  narrower, 50 colour themes and an (i) help on every setting.
+  narrower, 50 colour themes, your own choice of fonts, and an (i) help on every setting.
 - **Add-ons**: 3 VAEs (Standard, Legacy and a Blend of the two), 16 stackable voice and genre sliders,
   and 11 LoRAs, each with its own strength for the music and the sound, and its trigger word.
 - **Songs**: Full plan, Melody only and Direct modes, the official Instrumental mode, covers from a
-  recording or from a song, and an editable score. Retake, Reuse, or give a song another VAE in seconds.
+  recording (listen to it first) or from a song, and an editable score. Retake, Reuse, or give a song
+  another VAE in seconds.
 - **Library**: every song kept on disk, with favourites and versions; FLAC, WAV and MP3 downloads;
   double-click a song to play it; a status light in the player.
-- **Idea writer**: a local chat model drafts the title, style and lyrics from one line.
-- **Engine page**: memory presets from 8 to 32 GB, a hardware readout, the live server log, and an About
-  card with every link.
+- **Idea writer**: a local chat model drafts the title, style and lyrics from one line; a Connected or
+  Offline button shows the chat server's state at a glance.
+- **Engine page**: memory presets from 8 to 32 GB, a hardware readout, the live server log, a Fonts card,
+  and an About card with every link.
 - **Engine patches**: the sound stage's steps take about a third less time on the GPU, a half-precision path
   for older cards, and a coloured server log.
 
@@ -145,6 +147,7 @@ Everything comes at a pinned revision, the exact files this kit was made from, a
 ## Credits and licences
 
 Customized Collection by **SeattleSysop** ([github.com/IronWolve](https://github.com/IronWolve)).
+
 HTML layout inspired by [Ladypoly/YuE2_WebUI](https://github.com/Ladypoly/YuE2_WebUI).
 
 - **YuE2 weights**: CC BY-NC 4.0, with a creator permission for selling your own songs (the
