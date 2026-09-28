@@ -161,7 +161,7 @@ for (const [w, h] of [[1536, 730], [1920, 960]]) {
       const links = [...c.querySelectorAll("a")], cards = [...document.querySelectorAll("#view-engine .engine-grid > .card")];
       const onScreen = c.getBoundingClientRect();
       return { last: cards[cards.length - 1] === c, credit: c.querySelector(".about-credit").textContent.replace(/\\s+/g, " ").trim(),
-        gh: links.some(a => a.href === "https://github.com/IronWolve"), yue: links.some(a => a.href === "https://github.com/multimodal-art-projection/YuE"),
+        gh: links.some(a => a.href === "https://github.com/IronWolve"), kit: c.querySelector(".about-credit a.about-kit")?.href, yue: links.some(a => a.href === "https://github.com/multimodal-art-projection/YuE"),
         cpp: links.some(a => a.href === "https://github.com/ServeurpersoCom/yue2.cpp"), weights: links.some(a => a.href === "https://huggingface.co/m-a-p/YuE2-3B"),
         page: links.some(a => a.href === "https://map-yue2.github.io/"), ggml: links.some(a => a.href === "https://github.com/ggml-org/ggml"),
         inspired: [...c.querySelectorAll(".about-project")].find(e => e.querySelector("h4").textContent === "YuE2_WebUI")?.querySelector(".about-what").textContent,
@@ -171,7 +171,7 @@ for (const [w, h] of [[1536, 730], [1920, 960]]) {
         addons: [...c.querySelectorAll("#aboutAddons a")].map(a => a.textContent).join(","),
         plain: [...c.querySelectorAll("#aboutAddons .about-name")].map(e => e.textContent).join(","), shown: onScreen.bottom <= innerHeight && onScreen.top < innerHeight }; })()`);
     check("About closes the Engine page: your credit and GitHub, the model's and the engine's pages, all in new tabs", !!about && about.last &&
-      about.credit === "Customized Collection by SeattleSysop github.com/IronWolve" &&
+      about.credit === "Customized Collection by SeattleSysop github.com/IronWolve" && about.kit === "https://github.com/IronWolve/yue2-kit" &&
       about.inspired === "HTML layout inspired by Ladypoly/YuE2_WebUI" && about.inspiredLink && about.gh && about.yue && about.cpp && about.weights && about.page && about.ggml && about.projects === "YuE2,yue2.cpp,YuE2_WebUI,ggml" && about.newTab && about.web,
       JSON.stringify(about));
     check("  the add-ons come from sources.json; a non-web link stays plain text", about?.addons === "Standard VAE,Blend VAE,Voice and genre sliders,sv-billie,Industrial rock" &&
@@ -250,6 +250,9 @@ check("drawer headings: the name on one line with its sentence under it, even in
   JSON.stringify(heads.filter(h => !h.oneLine || !h.under).map(h => h.name)) + " " + heads[0].say);
 await send("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
 await waitFor(`getComputedStyle(document.getElementById("gripLeft")).display === "none"`, 3000, 50);
+const smallStrip = await ev(`(() => { const d = document.getElementById("hwStats"); return { shown: getComputedStyle(d).display !== "none" && d.getBoundingClientRect().width > 0,
+  rows: d.children.length }; })()`);
+check("  at 1100 px the top bar still shows the GPU readout (it used to hide below 1500)", smallStrip.shown && smallStrip.rows === 2, JSON.stringify(smallStrip));
 const gripsNarrow = await ev(`[getComputedStyle(document.getElementById("gripLeft")).display, getComputedStyle(document.getElementById("gripRight")).display].join()`);
 check("  a narrow window stacks the columns and hides the grips", gripsNarrow === "none,none", gripsNarrow);
 await send("Emulation.setDeviceMetricsOverride", { width: 1920, height: 960, deviceScaleFactor: 1, mobile: false });
@@ -1055,7 +1058,9 @@ const staleSettings = await mockGet("settings");
 check("a stale precision from an older page is ignored (no error, not stored)", stale.ok && !("precision" in staleSettings), JSON.stringify(staleSettings));
 check("  the top bar has no precision next to the backbone", !/Precision/.test(await ev(`document.getElementById("hwStats").innerText`)));
 const strip = await ev(`document.getElementById("hwStats").innerText.replace(/\\s+/g, " ")`);
-check("top bar shows the GPU and its memory from /hardware", /Mock GPU/.test(strip) && /VRAM \d+\.\d \/ 31\.8 GiB/.test(strip) && /Backbone BF16/.test(strip), strip);
+const stripTip = await ev(`document.getElementById("hwStats").dataset.tip`);
+check("top bar shows two small lines, the GPU and its memory from /hardware; the rest is in its tip", /^GPU Mock GPU VRAM \d+\.\d \/ 31\.8 GB$/.test(strip.trim()) &&
+  /Mock GPU \(32 GB\) · backbone BF16 · context whole · batch 4/.test(stripTip), strip + " | " + stripTip);
 check("Unload model is off while nothing is loaded", (await ev(`document.getElementById("unloadModel").disabled && document.getElementById("unloadNow").disabled`)) === true);
 t = await hoverOn('[data-tip-ref="tip-model"]');
 check("(i) beside Model explains BF16 and the quantized copies", t?.on && /BF16/.test(t.text) && /quantized/.test(t.text));
@@ -1072,8 +1077,8 @@ await click("#saveSettings");
 await waitFor(`/Saved/.test([...document.querySelectorAll(".toast")].map(t => t.textContent).join())`, 5000);
 const s8 = await mockGet("settings");
 check("Save posts /settings and the server takes it", s8.model === "Q8_0" && s8.max_seq === 12288 && s8.vae_core === 256 && s8.keep_loaded === false, JSON.stringify(s8));
-check("  the top bar follows (backbone, context)", !!(await waitFor(`/Backbone Q8_0/.test(document.getElementById("hwStats").innerText.replace(/\\s+/g, " ")) &&
-  /Context 12,288/.test(document.getElementById("hwStats").innerText.replace(/\\s+/g, " "))`, 12000, 250)));
+check("  the top bar's tip follows (backbone, context)", !!(await waitFor(`/backbone Q8_0/.test(document.getElementById("hwStats").dataset.tip) &&
+  /context 12,288/.test(document.getElementById("hwStats").dataset.tip)`, 12000, 250)));
 await mockClear();
 await ev(`(() => { const i = document.getElementById("setMaxSeq"); i.value = "1000"; i.dispatchEvent(new Event("input")); return true; })()`);
 await waitFor(`!document.getElementById("saveSettings").disabled`, 3000, 100);
@@ -1099,7 +1104,7 @@ check("with keep loaded on, the models stay after the song: Unload model lights 
 const keepMeta = await ev(`Object.fromEntries([...document.querySelectorAll("#metaGrid [data-field]")].map(d => [d.dataset.field, d.dataset.value]))`);
 check("a new song has no precision row", !("Precision" in (keepMeta || {})) && keepMeta?.Model === "BF16", JSON.stringify({ p: keepMeta?.Precision, m: keepMeta?.Model }));
 const hwLoaded = await ev(`[...document.querySelectorAll("#hwCard div")].map(d => d.innerText.replace(/\\s+/g, " ")).find(t => /^Loaded/.test(t))`);
-check("  the Hardware card shows the BF16 models loaded (about 7.5 GiB)", /^Loaded\s*[67]\.\d GiB/.test(hwLoaded || ""), hwLoaded);
+check("  the Hardware card shows the BF16 models loaded (about 7.5 GB)", /^Loaded\s*[67]\.\d GB/.test(hwLoaded || ""), hwLoaded);
 // a song made while the F32 option existed still says so: copy this song as an old F32 one, in the mock's own
 // library folder (the mock says where it is: an already running one, named on the command line, may keep it elsewhere)
 const mockInfo = await fetch(BASE + "mock/info").then((r) => (r.ok ? r.json() : null)).catch(() => null);
