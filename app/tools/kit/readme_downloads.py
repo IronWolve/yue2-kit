@@ -6,13 +6,15 @@ sizes from the Hugging Face API (cached in tmp/kit-hf-files/: a pinned revision 
     readme_downloads.py PINS UPSTREAM BASE GGML NPATCH [PROPS]
 
 PINS is the kit's hf-revisions.txt; PROPS, a /props saved from a running server, adds each LoRA's halves.
-Prints Markdown; says on stderr what it could not size (offline). Standard library only.
+Prints Markdown; says on stderr what it could not size (offline), and names every listed file or pattern
+the pinned revision does not have (an error, never counted as 0 bytes). Standard library only.
 """
 import fnmatch
 import json
 import os
 import re
 import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
@@ -21,8 +23,15 @@ import hf_expect  # noqa: E402
 pins_path, upstream, base, ggml, npatch = sys.argv[1:6]
 props = json.load(open(sys.argv[6], encoding="utf-8")) if len(sys.argv) > 6 and os.path.isfile(sys.argv[6]) else {}
 pins = dict(l.split() for l in open(pins_path, encoding="utf-8") if l.strip() and not l.startswith("#"))
-sources = json.load(open(os.path.join(ROOT, "loras", "sources.json"), encoding="utf-8"))
-missing = []
+with open(os.path.join(ROOT, "loras", "sources.json"), encoding="utf-8") as _f:
+    sources = json.load(_f)
+missing = []       # what could not be sized (offline) or is not in the pinned revision; printed on stderr
+
+
+def not_in_revision(repo, what):
+    msg = f"{repo} @ {pins.get(repo, 'main')[:12]}: {what} is not in the pinned revision"
+    if msg not in missing:
+        missing.append(msg)
 
 
 def entries(script, var):
@@ -36,23 +45,44 @@ def files_of(repo):
     rev = pins.get(repo, "main")
     cache = os.path.join(ROOT, "tmp", "kit-hf-files", repo.replace("/", "__") + "@" + rev + ".json")
     if os.path.isfile(cache):
-        return json.load(open(cache, encoding="utf-8"))
+        try:
+            with open(cache, encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            pass                                   # unreadable: ask again and rewrite it
     try:
         got = {p: (v["size"] or 0) for p, v in hf_expect.expected_files(repo, rev).items()}
     except Exception as e:
-        missing.append(f"{repo}: {e}")
+        missing.append(f"could not size {repo}: {e}")
         return None
     if rev != "main":
+        # a temporary file beside it, renamed over it: an interrupted run never leaves half a cache
         os.makedirs(os.path.dirname(cache), exist_ok=True)
-        json.dump(got, open(cache, "w", encoding="utf-8"))
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(cache), prefix=".", suffix=".part")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(got, f)
+        os.replace(tmp, cache)
     return got
+
+
+def sizes_of(repo, files, paths):
+    """The summed size of PATHS in the revision, or None when it is unknown or one is not there."""
+    if files is None:
+        return None
+    absent = [p for p in paths if p not in files]
+    for p in absent:
+        not_in_revision(repo, p)
+    return None if absent else sum(files[p] for p in paths)
 
 
 def size(n):
     if n is None:
         return "?"
-    # no-break spaces and hyphens: a narrow table column must not split "6.8 GB" or "add-on" in two
-    return f"{n / 1024 ** 3:.1f}\u00a0GB" if n >= 1024 ** 3 else f"{max(1, round(n / 1024 ** 2))}\u00a0MB"
+    # no-break spaces and hyphens: a narrow table column must not split "6.8 GB" or "add-on" in two;
+    # anything under a megabyte (but not nothing) shows as 1 MB
+    if n >= 1024 ** 3:
+        return f"{n / 1024 ** 3:.1f}\u00a0GB"
+    return f"{max(1 if n else 0, round(n / 1024 ** 2))}\u00a0MB"
 
 
 def hf(repo, url=None):
@@ -85,7 +115,12 @@ models, vaes, sliders = [], [], []
 for name, repo, only in entries("download-checkpoints.sh", "REPOS"):
     files = files_of(repo)
     pats = only.split()
-    n = None if files is None else sum(s for p, s in files.items() if not pats or any(fnmatch.fnmatch(p, x) for x in pats))
+    n = None
+    if files is not None:
+        for x in pats:
+            if not any(fnmatch.fnmatch(p, x) for p in files):
+                not_in_revision(repo, f"pattern {x!r}")
+        n = sum(s for p, s in files.items() if not pats or any(fnmatch.fnmatch(p, x) for x in pats))
     count(n)
     if repo in vae_by_repo:
         key, v = vae_by_repo[repo]
@@ -107,7 +142,7 @@ lora_repos = {}
 for folder, repo, sub, names in entries("download-loras.sh", "LORAS"):
     files = files_of(repo)
     wanted = [(sub + "/" if sub else "") + f for f in names.split()]
-    count(None if files is None else sum(files.get(p, 0) for p in wanted))
+    count(sizes_of(repo, files, wanted))
     lora_repos[folder] = (repo, sub, names.split(), files)
 for key, v in sources.get("loras", {}).items():
     folder, _, rest = key.partition("/")
@@ -115,8 +150,8 @@ for key, v in sources.get("loras", {}).items():
         continue
     repo, sub, names, files = lora_repos[folder]
     mine = [f for f in names if f.endswith(".safetensors") and f.startswith(rest)]
-    n = None if files is None else sum(files.get((sub + "/" if sub else "") + f, 0) for f in mine)
-    ids = [i for i in halves if i.startswith(key if key.endswith("/") else key)]
+    n = sizes_of(repo, files, [(sub + "/" if sub else "") + f for f in mine])
+    ids = [i for i in halves if i.startswith(key)]
     half = HALF.get(tuple(sorted(set(sum((halves[i] for i in ids), [])))), "")
     loras.append(f"| **{v.get('title', key)}** | {v.get('tag', '')} | {half} | {hf(repo, v.get('url'))} | {size(n)} |")
 
@@ -133,4 +168,4 @@ out += ["### Code", "", "| | What it is | From |", "|---|---|---|",
         "| **Python packages** | For the model converter, at pinned versions | [app/tools/converter-requirements.txt](app/tools/converter-requirements.txt) |"]
 print("\n".join(out))
 for m in missing:
-    print("could not size " + m, file=sys.stderr)
+    print(m, file=sys.stderr)

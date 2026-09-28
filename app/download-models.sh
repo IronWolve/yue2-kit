@@ -12,16 +12,21 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="Serveurperso/YuE2-GGUF"
 QUANT="BF16"
 TRANSCRIBER=0
+usage() { awk 'NR == 1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "${BASH_SOURCE[0]}"; exit 2; }   # the comment block above
 while [ $# -gt 0 ]; do
     case "$1" in
-        --quant) QUANT="$2"; shift ;;
+        --quant) [ -n "${2:-}" ] && [ "${2#-}" = "$2" ] || { echo "--quant needs a value (BF16, Q8_0, ...)"; usage; }
+                 QUANT="$2"; shift ;;
         --transcriber) TRANSCRIBER=1 ;;
-        *) echo "unknown option: $1"; exit 1 ;;
+        -h|--help) usage ;;
+        *) echo "unknown option: $1"; usage ;;
     esac
     shift
 done
 
 G=$'\e[32m' Y=$'\e[33m' R=$'\e[31m' D=$'\e[2m' B=$'\e[1m' X=$'\e[0m'
+# plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then G="" Y="" R="" D="" B="" X=""; fi
 
 # every cache in tmp/, the pinned downloader in tmp/hf-venv (tools/downloader-requirements.txt)
 # shellcheck source=tools/hf-env.sh
@@ -54,6 +59,6 @@ done
 
 secs=$(( $(date +%s) - start ))
 echo
-echo "${B}models${X}  downloaded ${G}$got${X}  already here ${skipped}  failed ${R}$failed${X}  in ${secs}s"
+echo "${B}models${X}  downloaded ${G}$got${X}  already here ${skipped}  failed $([ "$failed" -gt 0 ] && echo "$R")$failed${X}  in ${secs}s"
 echo "        folder $(du -sh "$ROOT/models" | cut -f1), disk free $(df -h "$ROOT" | awk 'NR==2 {print $4}')"
 [ "$failed" = 0 ]

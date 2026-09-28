@@ -3,6 +3,33 @@
 Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
 `d48e6e2e4a4e9bff24f8f60c943eddd976358df1`. v5 is the first kit that changes the app itself.
 
+## v11 (2026-09-27)
+
+51 patches, tree `10b2ed565bc7fe787eaf654989198819bc4c421d`. Mostly from a real upgrade of an RTX 2070 laptop from v3 to v10.
+
+- **Install and upgrade**:
+  - the page test runs on a fresh install without building the page (it unpacks the committed one);
+  - the emoji font check no longer reports an installed font as missing;
+  - temp files and the compiler cache stay inside the install (`tmp/`, `tmp/ccache`), which also makes the
+    next upgrade's rebuild much faster; ggml is downloaded once, not twice;
+  - the step recorder is in place from the first code step;
+  - SheetSage2 is checked by structure: its conversion merges weights in float32, which rounds differently
+    on another CPU, so its bytes can differ while the file is correct;
+  - the batch limit is one line in `start.sh`, shown and passed alike;
+  - the upgrade path covers a running server, older installers' leftovers and the install's own README;
+  - `verify-install` shows the current settings.
+- **Safer scripts**: `convert-models.sh` touches only the files it makes and moves a rejected one to
+  `tmp/rejected/` instead of deleting it; a failed checkpoint download keeps its resume data; `--check` and
+  `--verify` write nothing; colours turn off for pipes and `NO_COLOR`; the downloaders cache pinned file
+  lists; the GGUF download path is pinned too.
+- **Page**: a steadier start (a library that fails to load no longer restarts everything); a finished song
+  stays finished; Space on a focused song opens it without toggling playback; a server back with other LoRAs
+  is picked up; opening a song no longer rebuilds the list; polls rest in a hidden tab; keyboard focus shows
+  everywhere; selected text and hovered buttons stay readable in every theme; reduced motion stops the
+  spinners; narrow windows keep their layout; unused styles are removed.
+- **Tests**: the page suite takes about 60 s, always stops its browser and stand-in server, and a check
+  whose probe fails now fails; the stand-in server answers bad input like the real one.
+
 ## v10 (2026-09-27)
 
 50 patches, tree `0c1ff5bd25a9e13a687290796cc841de56912ba7`. The kit's git repository is named **yue2-kit**, ready for GitHub.
@@ -82,7 +109,9 @@ The app: 31 patches (9 new), tree `c2f76913c2ea42090cbf7a5b7a984e3f69241509`.
   with masked rows to a multiple of 256, which lets CUDA use its faster grouped-query attention. On
   that laptop the output stayed byte-identical; on the owner's RTX 5090 each sound-stage step got 36%
   faster and the output is near-identical, not bit-identical (spectrum similarity 0.99998). Other
-  backends are unchanged (byte-identical CPU render checked).
+  backends are unchanged: there the padding is 0 and the graph is the one from before the patch (a CPU
+  render on the owner's machine was byte-identical; CPU renders can still differ from run to run with the
+  thread count, patch or not).
 - **`--fp16-matmul` for RTX 20 / Volta** (compute 7.x, no BF16 tensor cores): batched BF16 matrix
   products run on the FP16 tensor cores. On that laptop a 196 s song went from 440 s to 215 s.
   `start.sh` turns it on by itself only on compute 7.x and says so; `YUE2CPP_FP16_MATMUL=0/1`

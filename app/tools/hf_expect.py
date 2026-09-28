@@ -12,17 +12,26 @@ downloader is not proof: this checks the files themselves.
 
 The expected list is the pinned revision's own (name, size, LFS SHA-256) from the Hugging Face API,
 or, when YUE2_HF_EXPECTED=DIR is set, DIR/<owner>__<name>.json in the same shape (for the tests).
-Standard library only.
+A pinned revision (a full commit id) never changes, so its list is cached in
+tmp/hf/expect/<owner>__<name>@<commit>.json and Hugging Face is asked only once; a branch such as
+"main" is never cached. YUE2_HF_CACHE_READONLY=1 reads the cache but writes nothing (the download
+scripts' --check and --verify modes). Standard library only.
 """
 import argparse
 import fnmatch
 import hashlib
 import json
 import os
+import re
 import sys
+import tempfile
 import urllib.request
 
-G, Y, R, D, X = ("\033[32m", "\033[33m", "\033[31m", "\033[2m", "\033[0m") if sys.stdout.isatty() else ("",) * 5
+# plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
+COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+G, Y, R, D, X = ("\033[32m", "\033[33m", "\033[31m", "\033[2m", "\033[0m") if COLOR else ("",) * 5
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # the install: this file is in tools/
+CACHE = os.path.join(ROOT, "tmp", "hf", "expect")
 
 
 def sha256(path):
@@ -33,12 +42,41 @@ def sha256(path):
     return h.hexdigest()
 
 
+def cache_path(repo, rev):
+    """Where a pinned revision's file list is cached, or None for a revision that can move (a branch)."""
+    if not re.fullmatch(r"[0-9a-f]{40}", rev):
+        return None
+    return os.path.join(CACHE, f"{repo.replace('/', '__')}@{rev}.json")
+
+
+def write_atomic(path, data):
+    """Write JSON to a temporary file beside PATH, then rename it over PATH: never a half-written cache."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".", suffix=".part")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
 def expected_files(repo, rev):
-    fixtures = os.environ.get("YUE2_HF_EXPECTED")
+    """{path: {size, sha256}} of the revision: from the fixtures (tests), the cache, or Hugging Face."""
+    fixtures, cached = os.environ.get("YUE2_HF_EXPECTED"), None
     if fixtures:
         with open(os.path.join(fixtures, repo.replace("/", "__") + ".json"), encoding="utf-8") as f:
             data = json.load(f)
     else:
+        cached = cache_path(repo, rev)
+        if cached and os.path.isfile(cached):
+            try:
+                with open(cached, encoding="utf-8") as f:
+                    return json.load(f)
+            except (OSError, ValueError):
+                pass                                   # unreadable: ask again (and rewrite it below)
         url = f"https://huggingface.co/api/models/{repo}/revision/{rev}?blobs=true"
         with urllib.request.urlopen(url, timeout=30) as r:
             data = json.load(r)
@@ -46,6 +84,11 @@ def expected_files(repo, rev):
     for s in data.get("siblings", []):
         lfs = s.get("lfs") or {}
         out[s["rfilename"]] = {"size": lfs.get("size", s.get("size")), "sha256": lfs.get("sha256")}
+    if not fixtures and cached and out and os.environ.get("YUE2_HF_CACHE_READONLY") != "1":
+        try:
+            write_atomic(cached, out)
+        except OSError:
+            pass                                       # a cache only: a read-only install still works
     return out
 
 

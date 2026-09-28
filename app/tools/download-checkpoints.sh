@@ -13,6 +13,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIR="$ROOT/checkpoints"
 G=$'\e[32m' Y=$'\e[33m' R=$'\e[31m' C=$'\e[36m' D=$'\e[2m' B=$'\e[1m' X=$'\e[0m'
+# plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then G="" Y="" R="" C="" D="" B="" X=""; fi
 # shellcheck source=hf-env.sh
 source "$ROOT/tools/hf-env.sh"
 
@@ -32,6 +34,9 @@ case "${1:-}" in --check) MODE="check" ;; --verify) MODE="verify" ;; "") ;; *) e
 start=$(date +%s); got=0; have=0; failed=0
 
 [ "$MODE" = "download" ] && { hf_ready || exit 1; mkdir -p "$DIR"; }
+# --check and --verify write nothing: not even hf_expect.py's file-list cache
+[ "$MODE" = "download" ] || export YUE2_HF_CACHE_READONLY=1
+red_if() { [ "$1" -gt 0 ] && printf '%s' "$R"; }   # a count that is bad only when it is not 0
 
 for entry in "${REPOS[@]}"; do
   IFS='|' read -r name repo only <<< "$entry"
@@ -78,11 +83,16 @@ done
 secs=$(( $(date +%s) - start ))
 echo
 case "$MODE" in
-  check)  echo "${B}checkpoints${X}  on Hugging Face: ${G}$got${X} repos found, ${R}$failed${X} missing  ${D}(${secs}s)${X}" ;;
-  verify) echo "${B}checkpoints${X}  complete ${G}$have${X}, not complete ${R}$failed${X}  ${D}(${secs}s)${X}" ;;
+  check)  echo "${B}checkpoints${X}  on Hugging Face: ${G}$got${X} repos found, $(red_if "$failed")$failed${X} missing  ${D}(${secs}s)${X}" ;;
+  verify) echo "${B}checkpoints${X}  complete ${G}$have${X}, not complete $(red_if "$failed")$failed${X}  ${D}(${secs}s)${X}" ;;
   *)
-    find "$DIR" -name '.cache' -type d -prune -exec rm -rf {} + 2>/dev/null || true
-    echo "${B}checkpoints${X}  downloaded ${G}$got${X}  already complete $have  failed ${R}$failed${X}  in ${secs}s"
+    # the downloader's .cache folders hold its resume data: kept until every repo is complete
+    if [ "$failed" = 0 ]; then
+      find "$DIR" -name '.cache' -type d -prune -exec rm -rf {} + 2>/dev/null || true
+    else
+      echo "${D}kept the downloader's resume data (.cache folders): run this again to continue${X}"
+    fi
+    echo "${B}checkpoints${X}  downloaded ${G}$got${X}  already complete $have  failed $(red_if "$failed")$failed${X}  in ${secs}s"
     echo "             folder $(du -sh "$DIR" | cut -f1), disk free $(df -h "$ROOT" | awk 'NR==2 {print $4}')  ${D}next: ./convert-models.sh${X}" ;;
 esac
 [ "$failed" = 0 ]

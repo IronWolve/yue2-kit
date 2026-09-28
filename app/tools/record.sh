@@ -13,9 +13,22 @@
 #   install-record/logs/          the full output of every step
 #   install-record/notes.md       the notes
 #   install-record/versions-*.txt the version snapshots
+#
+# The install is YUE2_ROOT when it is set, else the folder this script is in (tools/..). Temporary files
+# go to its tmp/. Ctrl-C stops the command, and its step is still recorded (exit 130).
 set -uo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REC="$ROOT/install-record"; mkdir -p "$REC/logs"
+if [ -n "${YUE2_ROOT:-}" ]; then
+  ROOT="$(cd "$YUE2_ROOT" 2>/dev/null && pwd)" || { echo "YUE2_ROOT is not a folder: $YUE2_ROOT"; exit 2; }
+else
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
+REC="$ROOT/install-record"
+case "${1:-}" in
+  "" | -h | --help)
+    # the comment block at the top of this file, and nothing else (and nothing written)
+    awk 'NR == 1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
+esac
+export TMPDIR="$ROOT/tmp"; mkdir -p "$TMPDIR" "$REC/logs"
 now() { python3 -c 'import datetime; print(datetime.datetime.now().astimezone().isoformat(timespec="seconds"))'; }
 
 case "${1:-}" in
@@ -38,7 +51,7 @@ case "${1:-}" in
         [ -x "$ROOT/$v/bin/python" ] && { echo "## $v (pip freeze)"; "$ROOT/$v/bin/python" -m pip freeze 2>/dev/null; }
       done
     } > "$f" 2>&1
-    echo "versions saved to ${f#$ROOT/}" ;;
+    echo "versions saved to ${f#"$ROOT"/}" ;;
   show)
     python3 - "$REC/steps.jsonl" <<'PY'
 import json, sys
@@ -50,8 +63,6 @@ except FileNotFoundError:
     print("no steps recorded yet")
 PY
     ;;
-  "" | -h | --help)
-    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)
     stage="$1"; shift
     [ "${1:-}" = "--" ] && shift
@@ -60,8 +71,17 @@ PY
     attempt=$(( prev + 1 ))
     log="logs/$(date +%Y%m%d-%H%M%S)-$(printf '%s' "$stage" | tr -c 'A-Za-z0-9._-' '_' | cut -c1-40)-$attempt.log"
     start=$(now); t0=$(date +%s)
-    "$@" 2>&1 | tee "$REC/$log"
-    rc=${PIPESTATUS[0]}
+    # Ctrl-C reaches the command (and this script): the trap lets this script go on to write the step's
+    # record line, and tee -i ignores the interrupt so the log keeps the command's last output. The
+    # status is $? under pipefail (the command's own, since tee succeeds): unlike PIPESTATUS, $? is kept
+    # across a trap.
+    trap 'interrupted=1' INT
+    interrupted=0
+    "$@" 2>&1 | tee -i "$REC/$log"
+    rc=$?
+    trap - INT
+    [ "$interrupted" = 1 ] && [ "$rc" = 0 ] && rc=130
+    [ "$interrupted" = 1 ] && echo "interrupted: recorded as exit $rc in install-record/steps.jsonl"
     python3 - "$REC/steps.jsonl" "$stage" "$start" "$(now)" "$(( $(date +%s) - t0 ))" "$rc" "$attempt" "$log" "$@" <<'PY'
 import json, shlex, sys
 out, stage, start, end, secs, rc, attempt, log, *cmd = sys.argv[1:]

@@ -14,6 +14,7 @@ in tmp/mock-outputs unless --outputs names another folder under tmp/.
 
 Test helpers that the real server does not have:
   GET  /mock/requests    every /synth and /transcribe request received, raw
+  GET  /mock/info        where its library is, relative to the install ({"outputs": "tmp/..."})
   POST /mock/clear       forget them
   POST /mock/flags       {"transcriber": bool, "outputs": bool, "peaks": bool} switches any off or on
 Engine settings (/settings, /unload, /hardware) follow the server's rules: every
@@ -32,6 +33,7 @@ import email.policy
 import io
 import json
 import math
+import os
 import queue
 import random
 import re
@@ -61,7 +63,67 @@ ROOT = Path(__file__).resolve().parent.parent
 TMP = ROOT / "tmp"
 PAGE = TMP / "console.html"
 
-G, Y, R, C, D, B, X = "\033[32m", "\033[33m", "\033[31m", "\033[36m", "\033[2m", "\033[1m", "\033[0m"
+
+def paints(stream):
+    """ANSI colours only on a terminal: NO_COLOR (any value) turns them off, FORCE_COLOR keeps them for a pipe."""
+    if os.environ.get("NO_COLOR"):
+        return False
+    if os.environ.get("FORCE_COLOR", "") not in ("", "0"):
+        return True
+    try:
+        return stream.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
+G, Y, R, C, D, B, X = (("\033[32m", "\033[33m", "\033[31m", "\033[36m", "\033[2m", "\033[1m", "\033[0m")
+                       if paints(sys.stdout) else ("",) * 7)
+LOG_DIM, LOG_END = ("\033[2m", "\033[0m") if paints(sys.stderr) else ("", "")    # the echoed log lines go to stderr
+
+
+def shown(path):
+    """A path as the install sees it (tmp/..., relative to the root), for messages and /mock/info: never absolute."""
+    for base, prefix in ((TMP.resolve(), "tmp/"), (ROOT, "")):
+        try:
+            return prefix + Path(path).resolve().relative_to(base).as_posix()
+        except ValueError:
+            pass
+    return Path(path).name
+
+
+def write_atomic(path, text):
+    """The whole file or none of it: written beside it, then renamed over it, so a reader never sees half."""
+    part = path.with_name("%s.%d-%d.part" % (path.name, os.getpid(), threading.get_ident()))
+    try:
+        part.write_text(text)
+        os.replace(part, path)
+    except BaseException:
+        try:
+            part.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def byte_range(header, size):
+    """One Range of the form bytes=first-last, bytes=first- or bytes=-suffix, as (start, end). None when there is
+    none or it is invalid (bytes=5-2, several ranges): the whole file is sent with 200, as RFC 9110 says an invalid
+    Range is ignored. "unsatisfiable" when it starts past the end (416)."""
+    m = re.fullmatch(r"\s*bytes\s*=\s*(\d*)\s*-\s*(\d*)\s*", header or "")
+    if not m or not (m.group(1) or m.group(2)):
+        return None
+    if m.group(1):
+        start = int(m.group(1))
+        if m.group(2) and int(m.group(2)) < start:
+            return None
+        if start >= size:
+            return "unsatisfiable"
+        return start, min(int(m.group(2)) if m.group(2) else size - 1, size - 1)
+    suffix = int(m.group(2))
+    if suffix == 0 or size == 0:
+        return "unsatisfiable"
+    return max(0, size - suffix), size - 1
+
 
 VAES = [
     {"name": "standard", "label": "Standard", "repo": "m-a-p/YuE2-Vae"},
@@ -258,7 +320,7 @@ class Mock:
             self.log_seq += 1
             self.log_cv.notify_all()
         if not self.args.quiet:
-            sys.stderr.write(D + line[:200] + (" …" if len(line) > 200 else "") + X + "\n")
+            sys.stderr.write(LOG_DIM + line[:200] + (" …" if len(line) > 200 else "") + LOG_END + "\n")
 
     def log_request(self, prefix, req):
         text = json.dumps(req, indent=2, ensure_ascii=False)
@@ -504,10 +566,11 @@ class Mock:
         job["status"] = "done"
 
     # -------------------------------------------------------------- library
-    def save(self, req, wav, seconds, track, tracks, song, variation, render_seconds, provided_score=False):
+    def save(self, req, wav, seconds, track, tracks, song, variation, render_seconds, provided_score=False, when=None):
+        when = time.time() if when is None else when
         with self.library_lock:
             self.outputs.mkdir(parents=True, exist_ok=True)
-            base = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + slugify(req["title"])
+            base = datetime.fromtimestamp(when).strftime("%Y%m%d-%H%M%S") + "-" + slugify(req["title"])
             if tracks > 1:
                 base += "-%d" % (track + 1)
             name, n = base, 2
@@ -519,11 +582,11 @@ class Mock:
             ext = "mp3" if req["output_format"] == "mp3" else "wav"   # the mock writes WAV data either way
             (folder / ("audio." + ext)).write_bytes(wav)
             (folder / "request.json").write_text(json.dumps(req, indent=2, ensure_ascii=False))
-            meta = {"title": req["title"], "created": int(time.time()), "seconds": round(seconds, 3),
+            meta = {"title": req["title"], "created": int(when), "seconds": round(seconds, 3),
                     "format": req["output_format"], "favorite": False, "truncated": False,
                     "render_seconds": round(render_seconds, 2), "song": song, "variation": variation,
                     "provided_score": provided_score, "model": self.settings["model"]}
-            (folder / "meta.json").write_text(json.dumps(meta, indent=2))
+            write_atomic(folder / "meta.json", json.dumps(meta, indent=2))   # last: a take is listed once this exists
             return name
 
     def entry(self, name):
@@ -549,13 +612,22 @@ class Mock:
         return [e for e in (self.entry(n) for n in names) if e]
 
     def name_ok(self, name):
-        return bool(name) and "/" not in name and "\\" not in name and ".." not in name and (self.outputs / name).is_dir()
+        """A take's folder name and nothing else: no separators, nothing hidden or relative ("." and ".." included),
+        and it must resolve to a folder directly inside the library (so "." cannot name the library itself)."""
+        if not name or name.startswith(".") or ".." in name or any(c in name for c in "/\\\0"):
+            return False
+        try:
+            folder = (self.outputs / name).resolve()
+            return folder.parent == self.outputs.resolve() and folder.is_dir()
+        except (OSError, ValueError, RuntimeError):
+            return False
 
     def demo(self, count):
         styles = ["English, warm piano pop, expressive female voice, acoustic piano, rounded bass, 88 BPM",
                   "English, dark country, baritone male voice, fiddle, banjo, half-time groove, 86 BPM",
                   "German, synth pop, bright female voice, analog synths, four-on-the-floor, 118 BPM"]
         titles = ["City Lights", "Ridge Road", "Nachtzug"]
+        now = time.time()
         for i in range(count):
             lm_seed, seed = random_seed(), random_seed()
             req = dict(DEFAULTS, title=titles[i % 3], style=styles[i % 3], cot=["full", "melody", "off"][i % 3],
@@ -564,8 +636,8 @@ class Mock:
                        lm_seed=lm_seed, seed=seed, output_format="wav24", vae="standard",
                        abc="" if i % 3 == 2 else (SCORE_FULL if i % 3 == 0 else strip_chords(SCORE_FULL)),
                        semantic_tokens=",".join(str(random.randrange(32768)) for _ in range(100)))
-            self.save(req, sine_wav(4.0, "wav24", lm_seed ^ seed), 4.0, 0, 1, 0, 0, 40.0 + i)
-            time.sleep(1.05)   # one folder per second, like the real names
+            # one second apart, like the real names, and in the past: no take made later can share a name
+            self.save(req, sine_wav(4.0, "wav24", lm_seed ^ seed), 4.0, 0, 1, 0, 0, 40.0 + i, when=now - (count - i))
 
 
 class Cancelled(Exception):
@@ -691,8 +763,36 @@ def make_handler(mock):
     class Handler(BaseHTTPRequestHandler):
         server_version = "yue-server-mock"
 
+        replied = False
+
         def log_message(self, *args):
             pass
+
+        def send_response(self, code, message=None):
+            self.replied = True
+            super().send_response(code, message)
+
+        def guarded(self, route):
+            """Any exception in a route answers 400 with a JSON error (bad input), like the real server, instead
+            of dropping the connection with no reply."""
+            self.replied = False
+            try:
+                route()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            except Exception as exc:
+                mock.log("[Server] %s %s failed: %s: %s" % (self.command, urlparse(self.path).path, type(exc).__name__, exc))
+                if not self.replied:        # once the status line is out, nothing more can be said
+                    try:
+                        self.error(400, "bad request: %s" % exc)
+                    except OSError:
+                        pass
+
+        def do_GET(self):
+            self.guarded(self.route_get)
+
+        def do_POST(self):
+            self.guarded(self.route_post)
 
         # -------------------------------------------------------- helpers
         def send(self, code, body, mime="application/json", extra=None):
@@ -720,7 +820,7 @@ def make_handler(mock):
             return {k: v[0] for k, v in parse_qs(urlparse(self.path).query, keep_blank_values=True).items()}
 
         # ----------------------------------------------------------- GET
-        def do_GET(self):
+        def route_get(self):
             path, q = urlparse(self.path).path, self.query()
             if path == "/":
                 if not PAGE.is_file():
@@ -753,6 +853,8 @@ def make_handler(mock):
                 return self.get_library(path, q)
             if path == "/mock/requests":
                 return self.send(200, mock.requests)
+            if path == "/mock/info":
+                return self.send(200, {"outputs": shown(mock.outputs)})
             if path.startswith("/fakechat-"):
                 return self.fake_chat_get(path)
             self.error(404, "not found")
@@ -818,7 +920,7 @@ def make_handler(mock):
                     if not audio.is_file():
                         audio = folder / "audio.wav"
                     peaks, seconds = wav_peaks(audio.read_bytes())
-                    cache.write_text(json.dumps({"peaks": peaks, "seconds": round(seconds, 3)}))
+                    write_atomic(cache, json.dumps({"peaks": peaks, "seconds": round(seconds, 3)}))
                 return self.send(200, cache.read_bytes())
             if path == "/library/request":
                 return self.send(200, (folder / "request.json").read_bytes())
@@ -843,23 +945,19 @@ def make_handler(mock):
                     audio = folder / "audio.wav"
                 data = audio.read_bytes()
                 mime = "audio/mpeg" if audio.suffix == ".mp3" else "audio/wav"
-                rng = re.match(r"bytes=(\d*)-(\d*)", self.headers.get("Range") or "")
-                if rng and (rng.group(1) or rng.group(2)):
-                    if rng.group(1):
-                        start = int(rng.group(1))
-                        end = int(rng.group(2)) if rng.group(2) else len(data) - 1
-                    else:
-                        start, end = max(0, len(data) - int(rng.group(2))), len(data) - 1
-                    end = min(end, len(data) - 1)
-                    if start >= len(data) or start > end:
-                        return self.send(416, b"", mime, {"Content-Range": "bytes */%d" % len(data)})
-                    return self.send(206, data[start:end + 1], mime,
-                                     {"Content-Range": "bytes %d-%d/%d" % (start, end, len(data)), "Accept-Ranges": "bytes"})
-                return self.send(200, data, mime, {"Accept-Ranges": "bytes"})
+                # saved copies are named after the take, and played in place (like the real server)
+                head = {"Accept-Ranges": "bytes", "Content-Disposition": 'inline; filename="%s%s"' % (name, audio.suffix)}
+                span = byte_range(self.headers.get("Range"), len(data))
+                if span == "unsatisfiable":
+                    return self.send(416, b"", mime, dict(head, **{"Content-Range": "bytes */%d" % len(data)}))
+                if span:
+                    start, end = span
+                    return self.send(206, data[start:end + 1], mime, dict(head, **{"Content-Range": "bytes %d-%d/%d" % (start, end, len(data))}))
+                return self.send(200, data, mime, head)
             self.error(404, "not found")
 
         # ---------------------------------------------------------- POST
-        def do_POST(self):
+        def route_post(self):
             path, q = urlparse(self.path).path, self.query()
             if path == "/synth":
                 raw = self.body()
@@ -942,26 +1040,28 @@ def make_handler(mock):
                     raise ValueError
             except ValueError:
                 return self.error(400, "invalid JSON")
-            nxt = dict(mock.settings)
+            change = {}                 # only the posted fields
             if isinstance(body.get("model"), str):
                 if body["model"] not in mock.models:
                     return self.error(400, "unknown model")
-                nxt["model"] = body["model"]
+                change["model"] = body["model"]
             if isinstance(body.get("keep_loaded"), bool):
-                nxt["keep_loaded"] = body["keep_loaded"]
+                change["keep_loaded"] = body["keep_loaded"]
             if isinstance(body.get("max_seq"), int) and not isinstance(body.get("max_seq"), bool):
                 n = body["max_seq"]
                 if not (n == 0 or 4096 <= n <= 24576):
                     return self.error(400, "context must be 0 (whole) or between 4096 and 24576")
-                nxt["max_seq"] = n
+                change["max_seq"] = n
             if isinstance(body.get("vae_core"), int) and not isinstance(body.get("vae_core"), bool):
                 n = body["vae_core"]
                 if not 64 <= n <= 4096:
                     return self.error(400, "VAE tile frames must be between 64 and 4096")
-                nxt["vae_core"] = n
+                change["vae_core"] = n
 
             def apply():
+                # merged here, on the worker, when it runs: two saves queued behind one render both land
                 old = mock.settings
+                nxt = dict(old, **change)
                 if nxt["model"] != old["model"]:
                     mock.log("[Server] Backbone now %s (models/YuE2-3B-%s.gguf)" % (nxt["model"], nxt["model"]))
                     mock.unload_idle()
@@ -970,8 +1070,10 @@ def make_handler(mock):
                 if nxt["max_seq"] != old["max_seq"]:
                     mock.log("[Server] Context now %d rows" % (nxt["max_seq"] or 24576))
                 mock.settings = nxt
-            applied, _ = mock.run_between_jobs(apply)
-            return self.send(200, dict(self.settings_json(), **nxt, applied=applied))
+                return nxt
+            applied, box = mock.run_between_jobs(apply)
+            now = box.get("value") or dict(mock.settings, **change)    # still queued behind a render: what it will be
+            return self.send(200, dict(self.settings_json(), **now, applied=applied))
 
         def post_library(self, path, q):
             name = q.get("name", "")
@@ -991,7 +1093,7 @@ def make_handler(mock):
                     meta["title"] = change["title"]
                 if isinstance(change.get("favorite"), bool):
                     meta["favorite"] = change["favorite"]
-                (folder / "meta.json").write_text(json.dumps(meta, indent=2))
+                write_atomic(folder / "meta.json", json.dumps(meta, indent=2))
             return self.send(200, mock.entry(name))
 
         # ------------------------------------------------ fake chat server
@@ -1073,9 +1175,9 @@ def main():
     mock.log("[Server] yue-server mock")
     mock.log("[Server] Listening on http://127.0.0.1:%d" % port)
     print("%smock yue-server%s  %shttp://127.0.0.1:%d%s" % (B, X, G, port, X), flush=True)
-    print("  library     %s%s%s  %d takes%s" % (C, outputs.relative_to(ROOT), X, len(mock.library()),
+    print("  library     %s%s%s  %d takes%s" % (C, shown(outputs), X, len(mock.library()),
                                                 "  (off: --no-outputs)" if args.no_outputs else ""), flush=True)
-    print("  page        %s%s%s  %s" % (C, PAGE.relative_to(ROOT), X, "ok" if PAGE.is_file() else Y + "missing: run ./build-page.sh" + X), flush=True)
+    print("  page        %s%s%s  %s" % (C, shown(PAGE), X, "ok" if PAGE.is_file() else Y + "missing: run ./build-page.sh" + X), flush=True)
     print("  runs        %.1f s each at speed %.1f, %s s takes, max batch %d, VAEs %s%s" %
           (3.4 / args.speed, args.speed, args.seconds, args.max_batch, args.vaes,
            "" if not args.no_transcriber else ", no transcriber"), flush=True)

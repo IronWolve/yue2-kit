@@ -1,23 +1,30 @@
 #!/usr/bin/env python3
 """GGUF files: complete or not, and what is inside. Standard library only.
 
-    gguf_check.py complete FILE...     exit 1 when any file is truncated, not GGUF, or unreadable
-    gguf_check.py structure FILE       a digest of the tensor table (names, shapes, types) + counts, as JSON
+    gguf_check.py complete FILE...     exit 1 when any file is truncated, not GGUF, or unreadable; a totals line
+    gguf_check.py structure FILE...    per file, one line of JSON: a digest of the tensor table (names, shapes,
+                                       types) + counts; exit 1 when any file cannot be read
     gguf_check.py sha256 FILE...       SHA-256 of each file (portable: no sha256sum/shasum needed)
 
 A file is complete when its header and tensor table parse and the file is long enough to hold every
 tensor's data. That catches a conversion or quantization that was interrupted part way.
 
 Two ways to compare with the kit owner's files (tools/expected-install.json):
-- exact: the SHA-256, for files that are converted, not quantized (they come out byte for byte the same);
-- structure: for quantized copies (Q8_0, Q6_K, Q5_K_M...). Quantizing can round differently on another
-  platform or compiler, so the bytes may differ while the names, shapes and types of every tensor match.
+- exact: the SHA-256, for files that are converted as they are (they come out byte for byte the same);
+- structure: for quantized copies (Q8_0, Q6_K, Q5_K_M...) and for SheetSage2-F32, whose conversion merges
+  adapter weights in floating point. Both can round differently on another CPU, platform or compiler, so
+  the bytes may differ while the names, shapes and types of every tensor match.
 """
 import hashlib
 import json
 import os
 import struct
 import sys
+import time
+
+# plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
+COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+G, R, D, B, X = ("\033[32m", "\033[31m", "\033[2m", "\033[1m", "\033[0m") if COLOR else ("",) * 5
 
 # ggml type -> (elements per block, bytes per block)
 TYPES = {0: (1, 4), 1: (1, 2), 2: (32, 18), 3: (32, 20), 6: (32, 22), 7: (32, 24), 8: (32, 34), 9: (32, 36),
@@ -127,21 +134,34 @@ def main():
             print(f"{sha256(p)}  {p}")
         return 0
     if mode == "structure":
-        print(json.dumps(structure(files[0])))
-        return 0
-    bad = 0
+        bad = 0
+        for p in files:
+            try:
+                print(json.dumps({"file": p, **structure(p)}))
+            except (OSError, ValueError) as e:
+                bad += 1
+                print(f"{p}: {e}", file=sys.stderr)
+        return 1 if bad else 0
+    bad = incomplete = tensors = size = 0
+    t0 = time.time()
     for p in files:
         try:
             info = parse(p)
+            size += info["size"]
             if info["complete"]:
-                print(f"complete    {p}  ({len(info['tensors'])} tensors)")
+                tensors += len(info["tensors"])
+                print(f"{G}complete{X}    {p}  {D}({len(info['tensors'])} tensors){X}")
             else:
-                bad += 1
-                print(f"INCOMPLETE  {p}  ({info['size']} bytes of {info['need']}: interrupted?)")
+                incomplete += 1
+                print(f"{R}INCOMPLETE{X}  {p}  {D}({info['size']} bytes of {info['need']}: interrupted?){X}")
         except (OSError, ValueError) as e:
             bad += 1
-            print(f"BAD         {p}  ({e})")
-    return 1 if bad else 0
+            print(f"{R}BAD{X}         {p}  {D}({e}){X}")
+    ok = len(files) - incomplete - bad
+    print(f"{B}gguf_check{X}  {G if ok == len(files) else ''}{ok} of {len(files)} complete{X}, "
+          f"{R if incomplete else ''}{incomplete} incomplete{X}, {R if bad else ''}{bad} unreadable{X}  "
+          f"{D}{tensors} tensors, {size / 2**30:.2f} GiB, {time.time() - t0:.2f} s{X}")
+    return 1 if bad or incomplete else 0
 
 
 if __name__ == "__main__":

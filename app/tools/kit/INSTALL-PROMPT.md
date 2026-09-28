@@ -26,6 +26,9 @@ runs on port 41867.
 
 **This app is already installed from an earlier version of this kit** (`ROOT` has `start.sh`, `outputs/`
 and the engine in `build/`, or in `repo/` for kits before v6): **upgrade it, do not reinstall.**
+- **First, a running server**: if a `yue-server` started from this ROOT is running (`pgrep -af yue-server`),
+  ask me to stop it (Ctrl-C in its terminal) before you change anything: it keeps the old code and holds
+  the port. At the end, remind me to start it again (`./start.sh`) and to press Ctrl+Shift+R in the browser.
 - Read this kit's `CHANGELOG.md` for what changed, and follow the ground rules in section 0.
 - Keep my songs (`outputs/`), models, sliders, LoRAs, venvs (`tmp/venv`, `tmp/hf-venv`) and
   `settings.json` (drop any setting the changelog says was removed). Download or convert nothing unless
@@ -35,6 +38,13 @@ and the engine in `build/`, or in `repo/` for kits before v6): **upgrade it, do 
   then the tree check. A kit before v6 had the engine in `repo/`: keep that folder until the new
   `build/` passes the tests, then ask me before deleting it.
 - Copy the kit's `app/` over mine, then re-apply my machine's settings from section 7.
+- **Leftovers of older installers**: list what is there and ask me, for each, to keep it, move it to
+  `install-record/old/`, or delete it: `kit/` (an old copy of a kit), `SETUP-LOG.md` and `logs/` (an older
+  installer's record), `tools/log-step.py` and `tools/run-cpu-validation.py` (replaced by
+  `tools/record.sh` and `tools/test-real.sh`), and `repo/` (see above).
+- **This install's own `README.md`**, if an earlier installer wrote one: bring it up to date (the layout
+  with `upstream/` and `build/`, the kit version and tree hash, where `install-record/` is), or ask me
+  whether to replace it with a short one.
 - Rebuild (section 4), then run `tools/verify-install.sh` and the CPU tests. Ask me before any GPU run.
 - Report what changed, what you saved, and the test results.
 
@@ -268,10 +278,14 @@ export TMPDIR=$ROOT/tmp && mkdir -p tmp outputs tools
 
 ```bash
 cd "$ROOT"
+# every temp file and the compiler cache stay in ROOT (ggml uses ccache whenever it is installed)
+export TMPDIR="$ROOT/tmp" CCACHE_DIR="$ROOT/tmp/ccache" CCACHE_BASEDIR="$ROOT" YUE2_ROOT="$ROOT"
+mkdir -p "$TMPDIR" install-record tools && cp "$KIT"/app/tools/record.sh tools/ && chmod +x tools/record.sh   # the recorder, first
 git clone --recurse-submodules {{UPSTREAM}} upstream       # the engine as its author ships it
 git -C upstream checkout -B master {{BASE}} && git -C upstream submodule update --init --recursive
 git clone upstream build && git -C build remote set-url origin {{UPSTREAM}}   # the copy that gets patched
-git -C build checkout -B master {{BASE}} && git -C build submodule update --init --recursive
+git -C build checkout -B master {{BASE}}
+git -C build submodule update --init --recursive --reference "$ROOT/upstream/ggml" --dissociate   # ggml from upstream/, not the network again
 (cd build && git -c user.name=install -c user.email=install@localhost am "$KIT"/engines/cpp/patches/*.patch)
 cp "$KIT"/engines/cpp/page/index.html.gz build/tools/public/index.html.gz   # the built page (not in the patches)
 git -C build -c user.name=install -c user.email=install@localhost commit -q -am "Add the built page"
@@ -297,8 +311,12 @@ for 12.x. So 8.6 → `86`, 8.9 → `89`, 12.0 → `120a`, 7.5 → `75`; `tools/c
 ARCH=86   # from compute_cap
 tools/record.sh configure -- cmake -S build -B build/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON \
   -DCMAKE_CUDA_COMPILER="$(command -v nvcc)" -DCMAKE_CUDA_ARCHITECTURES=$ARCH
-tools/record.sh build -- nice -n 15 cmake --build build/build -j $(( $(nproc) / 4 > 2 ? $(nproc) / 4 : 2 ))
+tools/record.sh build -- env TMPDIR="$ROOT/tmp" CCACHE_DIR="$ROOT/tmp/ccache" CCACHE_BASEDIR="$ROOT" \
+  nice -n 15 cmake --build build/build -j $(( $(nproc) / 4 > 2 ? $(nproc) / 4 : 2 ))
 ```
+
+The compiler cache (`tmp/ccache`, only used when `ccache` is installed) makes the next upgrade's rebuild
+much faster: `build/` stays at the same path from kit v6 on.
 
 **macOS (Apple Silicon)**: Metal for the GPU, Accelerate for the math libraries. This exact line built
 and ran on an 8 GiB M1:
@@ -307,7 +325,8 @@ and ran on an 8 GiB M1:
 tools/record.sh configure -- cmake -S build -B build/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
   -DGGML_CUDA=OFF -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple
-tools/record.sh build -- nice -n 15 cmake --build build/build -j 2     # more on a bigger Mac: a quarter of the cores
+tools/record.sh build -- env TMPDIR="$ROOT/tmp" CCACHE_DIR="$ROOT/tmp/ccache" CCACHE_BASEDIR="$ROOT" \
+  nice -n 15 cmake --build build/build -j 2     # more on a bigger Mac: a quarter of the cores
 ```
 
 Both:
@@ -366,10 +385,13 @@ His `models/` holds exactly: {{MODELS}}. Yours should match.
   more free disk while it runs. Force it with `YUE2_LOWMEM=1`, or turn it off with `YUE2_LOWMEM=0`.
   The files come out the same either way.
 
-`convert-models.sh` makes these, byte-identical to his (`tools/verify-install.sh` checks their SHA-256):
+`convert-models.sh` makes these (`tools/verify-install.sh` checks them):
 - `models/`: YuE2-3B-BF16 (6.7 GB), YuE2-Vae-F32, YuE2-Vae-legacy-F32, YuE2-Vae-blend-F32
-  (0.5 GB each), SheetSage2-F32 (2.5 GB, the transcriber for covers);
-- `sliders/`: {{NSLIDER}} sliders + `catalog.json` (0.25 GB).
+  (0.5 GB each): byte-identical to his, checked by SHA-256;
+- `models/`: SheetSage2-F32 (2.5 GB, the transcriber for covers): checked by structure (every tensor's
+  name, shape and type). Its conversion merges weights in float32, which rounds differently on another
+  CPU, so its bytes can differ from his while the file is correct;
+- `sliders/`: {{NSLIDER}} sliders + `catalog.json` (0.25 GB): byte-identical, checked by SHA-256.
 
 It installs its own small Python packages into `tmp/venv`, separate from the downloader's `tmp/hf-venv`.
 
@@ -410,8 +432,8 @@ the same values as the Engine page's memory presets, and I can change them there
 |---|---|---|
 | 24 GB+ | as his | as his |
 | 16 GB | `keep_loaded` false, `vae_core` 512 | as his |
-| 12 GB | `keep_loaded` false, `max_seq` 16384, `vae_core` 512 | `--max-batch "${YUE2CPP_BATCH:-{{BATCH}}}"` → `:-1` |
-| 8 GB | `keep_loaded` false, `max_seq` 12288, `vae_core` 256 | `--max-batch "${YUE2CPP_BATCH:-{{BATCH}}}"` → `:-1` |
+| 12 GB | `keep_loaded` false, `max_seq` 16384, `vae_core` 512 | `BATCH="${YUE2CPP_BATCH:-{{BATCH}}}"` → `:-1` |
+| 8 GB | `keep_loaded` false, `max_seq` 12288, `vae_core` 256 | `BATCH="${YUE2CPP_BATCH:-{{BATCH}}}"` → `:-1` |
 
 - **Never set `max_seq` below 12288.** The music stage needs its prefix (about 1,500 tokens) plus 9,000
   tokens of room: at 8192 every song fails with `prefix ... + budget 9000 + end exceeds context 8192`,
@@ -438,7 +460,7 @@ treat it as GPU VRAM from the table above. Start from these, and treat them as u
 
 | My Mac's memory | `settings.json` | `start.sh` |
 |---|---|---|
-| 8 GiB | `model` Q5_K_M, `keep_loaded` false, `max_seq` 12288, `vae_core` 256 (8192, the earlier advice, cannot fit a song; see above) | `--max-batch "${YUE2CPP_BATCH:-{{BATCH}}}"` → `:-1` |
+| 8 GiB | `model` Q5_K_M, `keep_loaded` false, `max_seq` 12288, `vae_core` 256 (8192, the earlier advice, cannot fit a song; see above) | `BATCH="${YUE2CPP_BATCH:-{{BATCH}}}"` → `:-1` |
 | 16 GiB | `model` Q5_K_M, `keep_loaded` false, `max_seq` 12288, `vae_core` 256 (untested) | `:-1` as above |
 | 24 GiB+ | `model` Q5_K_M, `keep_loaded` false, `vae_core` 512 (untested) | `:-1` as above |
 
@@ -448,8 +470,8 @@ treat it as GPU VRAM from the table above. Start from these, and treat them as u
 - `start.sh` starts the model `settings.json` picks. If that file is missing, it uses the first copy
   present, so an install with only Q5_K_M starts. `YUE2CPP_DRY_RUN=1 ./start.sh` shows the command
   without starting anything.
-- Edit JSON by changing only those keys; never rewrite the whole file. In `start.sh`, change the
-  one default in place.
+- Edit JSON by changing only those keys; never rewrite the whole file. In `start.sh`, change only the
+  `BATCH=` line: its stats block and the server command both read it.
 
 ## 8. Tests (CPU only; ask me before the longer ones)
 
@@ -462,7 +484,8 @@ treat it as GPU VRAM from the table above. Start from these, and treat them as u
 | `tmp/venv/bin/python tools/test_flac.py --no-song` | the built-in FLAC encoder, bit-exact against flac and ffmpeg | flac, ffmpeg | ~20 s |
 | `tools/test_downloaders.sh --online` | also the real pinned downloader on two include patterns (about 16 MB) | network | ~10 s |
 
-Run the first three without asking.
+Run the first three without asking. The page test makes its own test page from the committed one
+(`build/tools/public/index.html.gz`) when the page sources are unchanged: never run `./build-page.sh` for it.
 
 `tools/test-real.sh` works on a fresh install. It:
 - writes one clearly labelled **synthetic fixture** take (a 1-second tone, not model output) into an

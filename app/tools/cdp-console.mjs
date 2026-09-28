@@ -1,111 +1,39 @@
 // Headless checks of the console page against the mock server (tools/mock_server.py).
 // Starts its own mock on a free port with an empty library under tmp/, drives
-// headless Chrome over the DevTools protocol, and stops both by PID at the end.
+// headless Chrome over the DevTools protocol, and stops both by PID at the end
+// (also on a failure, a stalled DevTools command, Ctrl-C or the 240 s limit).
 //
-//   node tools/cdp-console.mjs                 # build the page first: ./build-page.sh
+//   node tools/cdp-console.mjs                 # the page is tmp/console.html: see ensurePage in cdp-common.mjs
 //   node tools/cdp-console.mjs http://127.0.0.1:41869/   # an already running mock instead
 //
 // Nothing is written outside the project: Chrome's HOME/XDG dirs and TMPDIR sit in
 // tmp/chrome-home, screenshots land in tmp/shots/console.
-import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, statSync, cpSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-import { chromeTmp, findChrome, freshProfile, makeSend, stopChrome } from "./cdp-common.mjs";
+import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, cpSync } from "node:fs";
+import { resolve } from "node:path";
+import { B, C, D, G, R, ROOT, TMP, X, Y, ensurePage, finish, guard, launchChrome, onReport, onStop, sleep, startMock } from "./cdp-common.mjs";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const TMP = ROOT + "/tmp", HOME = TMP + "/chrome-home", OUT = TMP + "/shots/console";
-const CHROME = findChrome();
-if (!CHROME) { console.log("\x1b[31mno Chrome or Chromium found\x1b[0m: install one, or set YUE2_CHROME=/path/to/chrome"); process.exit(2); }
-const PROFILE = freshProfile(HOME, "profile-console");   // new and empty every run
-const CHROME_TMP = chromeTmp(ROOT + "/tmp");
-const G = "\x1b[32m", R = "\x1b[31m", Y = "\x1b[33m", C = "\x1b[36m", D = "\x1b[2m", B = "\x1b[1m", X = "\x1b[0m";
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const OUT = TMP + "/shots/console";
 const t0 = Date.now();
+guard(240);
 mkdirSync(OUT, { recursive: true });
-mkdirSync(HOME, { recursive: true });
 
 // ---------------------------------------------------------------- preflight
-const page = TMP + "/console.html";
-if (!existsSync(page)) { console.log(`${R}tmp/console.html is missing${X}: run ./build-page.sh first`); process.exit(2); }
-const newest = Math.max(...["index.html", "app.css", "app.js"].map((f) => statSync(ROOT + "/build/tools/console/" + f).mtimeMs));
-if (statSync(page).mtimeMs < newest) { console.log(`${R}tmp/console.html is older than its sources${X}: run ./build-page.sh`); process.exit(2); }
-
-const env = { ...process.env, HOME, XDG_CONFIG_HOME: HOME + "/.config", XDG_CACHE_HOME: HOME + "/.cache",
-              XDG_DATA_HOME: HOME + "/.local/share", TMPDIR: TMP, PYTHONDONTWRITEBYTECODE: "1" };
+const pageNote = ensurePage();
+if (pageNote) console.log(`${Y}note${X}  ${pageNote}`);
 
 // ------------------------------------------------------------- mock server
-let mock = null, BASE = process.argv[2];
-if (!BASE) {
-  mock = spawn("nice", ["-n", "15", "python3", ROOT + "/tools/mock_server.py", "--port", "0", "--outputs", TMP + "/mock-outputs/cdp",
-                        "--reset", "--demo", "3", "--speed", "3", "--quiet"], { env, stdio: ["ignore", "pipe", "pipe"] });
-  // it prints its address once it listens; its errors go to the same text so a failure says why
-  try {
-    BASE = await new Promise((ok, fail) => {
-      let text = "";
-      const timer = setTimeout(() => fail(new Error("the mock server did not start within 90 s: " + text.slice(-600))), 90000);
-      const read = (d) => {
-        text += d;
-        const m = text.match(/http:\/\/127\.0\.0\.1:(\d+)/);
-        if (m) { clearTimeout(timer); ok(`http://127.0.0.1:${m[1]}/`); }
-      };
-      mock.stdout.on("data", read);
-      mock.stderr.on("data", read);
-      mock.on("exit", (code) => { clearTimeout(timer); fail(new Error("the mock server exited " + code + ": " + text.slice(-600))); });
-    });
-    // and it answers
-    for (let i = 0; ; i++) {
-      try { if ((await fetch(BASE + "props")).ok) break; } catch { /* not yet */ }
-      if (i > 120) throw new Error("the mock server printed its address but does not answer /props");
-      await sleep(250);
-    }
-  } catch (e) {
-    console.log(`\x1b[31m${e.message}\x1b[0m`);
-    try { mock.kill("SIGKILL"); } catch {}
-    process.exit(2);
-  }
-}
+// its own, on a free port with a fresh demo library; or the running one named on the command line
+const BASE = process.argv[2] ? process.argv[2].replace(/\/?$/, "/") : (await startMock(TMP + "/mock-outputs/cdp")).base;
 const mockGet = async (path) => (await fetch(BASE + path)).json();
 const mockClear = () => fetch(BASE + "mock/clear", { method: "POST" });
 
 // ------------------------------------------------------------------ chrome
-const chrome = spawn("nice", ["-n", "15", CHROME, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
-  "--disable-extensions", "--autoplay-policy=no-user-gesture-required", "--user-data-dir=" + PROFILE, "--remote-debugging-port=0",
-  "about:blank"], { env: { ...env, TMPDIR: CHROME_TMP }, stdio: ["ignore", "ignore", "pipe"] });
-let chromeErr = ""; chrome.stderr.on("data", (d) => { chromeErr = (chromeErr + d).slice(-2000); });
-const finish = async (code) => {
-  if (mock) { try { mock.kill("SIGTERM"); } catch {} }
-  await stopChrome(chrome, PROFILE, CHROME_TMP);
-  process.exit(code);
-};
-// a stalled DevTools command (or any other failure) still stops Chrome and the mock
-process.on("unhandledRejection", (e) => { console.log(`\x1b[31mstopped: ${e?.message || e}\x1b[0m`); finish(2); });
-setTimeout(() => { console.log(`${R}TIMEOUT${X} after 240 s`); report(); finish(2); }, 240000);
-
-let port;
-for (let i = 0; i < 300 && !port; i++) {     // up to 60 s: a first start on a slow machine can take a while
-  await sleep(200);
-  if (existsSync(PROFILE + "/DevToolsActivePort")) port = readFileSync(PROFILE + "/DevToolsActivePort", "utf8").split("\n")[0];
-}
-if (!port) { console.log(`${R}Chrome did not start within 60 s${X} (${CHROME})\n${chromeErr.split("\n").filter((l) => !/cpufreq|org\.freedesktop|dbus/.test(l)).slice(-20).join("\n")}`); await finish(2); }
-const target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find((x) => x.type === "page");
-const ws = new WebSocket(target.webSocketDebuggerUrl);
-await new Promise((r) => ws.addEventListener("open", r));
-let seq = 0;
-const pending = new Map(), errors = [];
-ws.addEventListener("message", (m) => {
-  const d = JSON.parse(m.data);
-  if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); }
-  if (d.method === "Runtime.exceptionThrown") errors.push((d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text).split("\n")[0]);
+const cdp = await launchChrome("profile-console", ["--autoplay-policy=no-user-gesture-required"]);
+const { send, ev, waitFor, click, errors } = cdp;
+cdp.on((d) => {
   if (d.method === "Runtime.consoleAPICalled" && d.params.type === "error") errors.push("console.error: " + d.params.args.map((a) => a.value ?? a.description).join(" "));
-  if (d.method === "Page.javascriptDialogOpening") ws.send(JSON.stringify({ id: ++seq, method: "Page.handleJavaScriptDialog", params: { accept: true } }));
+  if (d.method === "Page.javascriptDialogOpening") send("Page.handleJavaScriptDialog", { accept: true }).catch(() => {});
 });
-const send = makeSend(ws, pending, () => ++seq);   // every command gives up after 60 s, naming itself
-const ev = async (expr) => {
-  const r = await send("Runtime.evaluate", { expression: expr, returnByValue: true, awaitPromise: true });
-  if (r.result?.exceptionDetails) return "EVAL ERROR: " + (r.result.exceptionDetails.exception?.description || r.result.exceptionDetails.text).split("\n")[0];
-  return r.result?.result?.value;
-};
 // screenshots only on request (YUE2_SHOTS=1): the kit and the README take theirs from tools/screenshots.mjs
 const SHOTS_ON = process.env.YUE2_SHOTS === "1";
 let shots = 0;
@@ -115,63 +43,71 @@ const shot = async (name) => {
   writeFileSync(`${OUT}/${name}.png`, Buffer.from(r.result.data, "base64"));
   shots++;
 };
-const waitFor = async (expr, timeout = 10000, step = 100) => {
-  const until = Date.now() + timeout;
-  for (;;) {
-    const v = await ev(expr);
-    if (v && !(typeof v === "string" && v.startsWith("EVAL ERROR"))) return v;
-    if (Date.now() > until) return null;
-    await sleep(step);
-  }
-};
 const wheel = async (x, y, dy) => {
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
   await send("Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: 0, deltaY: dy });
-  await sleep(250);
+  await sleep(250);   // the wheel's scroll lands over the next frames
 };
 let lastHover = { x: 0, y: 0 };
+// the tip fades in: it counts as shown once it is on, visible and fully faded in (its text reads empty until then)
+const tipOn = `(() => { const t = document.querySelector(".tip"); if (!t || !t.classList.contains("is-on")) return false;
+  const c = getComputedStyle(t); return c.visibility === "visible" && c.opacity === "1"; })()`;
 const hoverOn = async (selector) => {
-  const box = await ev(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; e.scrollIntoView({ block: "center" });
+  let box = await ev(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; e.scrollIntoView({ block: "center" });
     const b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
   if (!box) return null;
-  await sleep(120);
+  await sleep(120);   // the scroll into view fires its scroll event a frame later, and a scroll closes a tip: let it pass first
+  // measured again now: anything that moved in the meantime (a late font, a reflow) would send the mouse elsewhere
+  const now = await ev(`(() => { const b = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+  if (now) box = now;
   lastHover = box;
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box.x, y: box.y });
-  await sleep(220);
+  await waitFor(tipOn, 1000, 50);
   return ev(`(() => { const t = document.querySelector(".tip"), b = t.getBoundingClientRect(), s = getComputedStyle(t);
     return { on: t.classList.contains("is-on") && s.visibility === "visible", text: t.innerText, left: b.left, right: b.right, top: b.top, bottom: b.bottom, w: innerWidth, h: innerHeight }; })()`);
 };
 const inView = (t) => t && t.left >= 0 && t.right <= t.w && t.top >= 0 && t.bottom <= t.h;
-const click = (selector) => ev(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return false; e.click(); return true; })()`);
-const setValue = (id, value) => ev(`(() => { const e = document.getElementById(${JSON.stringify(id)}); e.value = ${JSON.stringify(value)};
-  e.dispatchEvent(new Event("input", { bubbles: true })); e.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
 const synthBodies = async () => (await mockGet("mock/requests")).filter((r) => r.path === "/synth").map((r) => r.body);
+// the song page shows this take (its card is the active one)
+const showsTake = (name) => waitFor(`document.querySelector("#libList .take.is-active")?.dataset.name === ${JSON.stringify(name)}`, 4000, 50);
+const engineOpen = (open) => waitFor(`document.getElementById("view-engine").classList.contains("is-hidden") === ${!open}`, 4000, 50);
+const toastSays = (re, timeout = 5000) => waitFor(`[...document.querySelectorAll(".toast")].some(t => ${re}.test(t.textContent))`, timeout, 50);
 
 // ----------------------------------------------------------------- results
 const lines = [];
-let passed = 0, failed = 0;
+let passed = 0, failed = 0, skipped = 0;
 const section = (name) => lines.push(`${C}${B}${name}${X}`);
 const check = (name, ok, detail) => {
   ok ? passed++ : failed++;
   lines.push(`  ${ok ? G + "PASS" : R + "FAIL"}${X}  ${name}${detail !== undefined && detail !== "" ? D + "  (" + String(detail).slice(0, 220) + ")" + X : ""}`);
 };
+const skip = (name, why) => { skipped++; lines.push(`  ${Y}SKIP${X}  ${name}${D}  (${why})${X}`); };
 function report() {
   console.log(lines.join("\n"));
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
-  console.log(`\n${B}cdp-console${X}  ${failed ? R : G}${passed} passed, ${failed} failed${X}` +
-              `  ${D}${secs} s · ${SHOTS_ON ? shots + " screenshots in tmp/shots/console · " : ""}mock ${BASE}${X}`);
+  console.log(`\n${B}cdp-console${X}  ${failed ? R : G}${passed} passed, ${failed} failed${X}${skipped ? `, ${Y}${skipped} skipped${X}` : ""}` +
+              `  ${D}${secs} s · ${errors.length} page errors · ${SHOTS_ON ? shots + " screenshots in tmp/shots/console · " : ""}mock ${BASE}${X}`);
 }
+// from here on every ending prints the report; a run that stops early counts that as a failed check
+onReport(report);
+onStop((message) => check("the run stopped early: " + message, false));
 
 await send("Page.enable");
 await send("Runtime.enable");
 // the profile is new and empty for every run, so nothing is stored from an earlier one
 // Every load waits for the new document: the old one is marked first, so a
 // condition that was already true before the reload cannot pass for it.
+// The web fonts load beside the page and reflow the text when they land; positions measured before that
+// are stale by the time the mouse arrives. Wait for them (offline they never come: go on after 10 s).
+const fontsLanded = `(() => { const l = document.querySelector('link[href*="fonts.googleapis.com/css2"]');
+  return !l || (l.media === "all" && document.fonts.status === "loaded"); })()`;
 const navigate = async (libraryRows) => {
   await ev(`window.__stale = true`);
   await send("Page.navigate", { url: BASE });
-  return waitFor(`!window.__stale && document.readyState === "complete" && document.querySelectorAll("#decoders input").length === 3 &&
+  const ready = await waitFor(`!window.__stale && document.readyState === "complete" && document.querySelectorAll("#decoders input").length === 3 &&
     document.querySelectorAll("#libList .take").length >= ${libraryRows} && document.getElementById("logState").textContent === "live"`, 15000);
+  await waitFor(fontsLanded, 10000, 100);
+  return ready;
 };
 const boot = () => navigate(3);
 
@@ -202,7 +138,8 @@ for (const [w, h] of [[1536, 730], [1920, 960]]) {
   check("page height fits the window", closed.doc <= closed.vh && closed.wsBottom <= closed.pb + 1, `doc ${closed.doc} / window ${closed.vh}, workspace ends ${closed.wsBottom}, player at ${closed.pb}`);
   await shot(`${tag}-1-page`);
   await click("#engineToggle");
-  await sleep(400);
+  await engineOpen(true);
+  await sleep(200);   // the Engine button's lit background fades in (.13 s); the probe below compares its colour
   await shot(`${tag}-2-engine-open`);
   const engineProbe = `(() => { const ws = document.querySelector(".workspace"), head = document.querySelector(".engine-head").getBoundingClientRect();
     const probe = document.createElement("i"); probe.style.background = "var(--amber)"; document.body.append(probe);
@@ -242,7 +179,7 @@ for (const [w, h] of [[1536, 730], [1920, 960]]) {
   }
   await shot(`${tag}-3-engine-scrolled`);
   await click("#engineBack");
-  await sleep(200);
+  await engineOpen(false);
   const back = await ev(measure);
   check("Back to compose closes it: the workspace returns and the page fits the window", (await ev(`document.getElementById("view-engine").classList.contains("is-hidden")`)) === true &&
     back.doc <= back.vh && back.wsTop === 52 && back.wsBottom <= back.pb + 1, JSON.stringify(back));
@@ -261,7 +198,7 @@ const drag = async (from, dx) => {
   await send("Input.dispatchMouseEvent", { type: "mousePressed", x: from.x, y: from.y, button: "left", buttons: 1, clickCount: 1 });
   for (let i = 1; i <= 6; i++) await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: from.x + Math.round(dx * i / 6), y: from.y, button: "left", buttons: 1 });
   await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: from.x + dx, y: from.y, button: "left", buttons: 0, clickCount: 1 });
-  await sleep(100);
+  await sleep(100);   // the columns take their new widths on the next frame
 };
 const c0 = await ev(cols);
 check("two grips sit on the lines between the columns", c0.gl.shown && c0.gr.shown && Math.abs(c0.gl.x - c0.gapL) <= 1.5 && Math.abs(c0.gr.x - c0.gapR) <= 1.5 && c0.saved === null,
@@ -288,19 +225,19 @@ for (const clickCount of [1, 2]) {
   await send("Input.dispatchMouseEvent", { type: "mousePressed", x: c4.gl.x, y: c4.gl.y, button: "left", buttons: 1, clickCount });
   await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: c4.gl.x, y: c4.gl.y, button: "left", buttons: 0, clickCount });
 }
-await sleep(100);
+await sleep(100);   // as after a drag: the widths land on the next frame
 const c5 = await ev(cols);
 check("double-clicking the left grip gives the compose column its default width back", c5.left === c0.left && c5.right === c4.right && c5.saved?.left === undefined,
   JSON.stringify({ now: [c5.left, c5.right], defaults: [c0.left, c0.right], saved: c5.saved }));
 await ev(`document.getElementById("gripRight").focus(); true`);
 await send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 });
 await send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 });
-await sleep(50);
+await sleep(50);   // the next frame
 const c6 = await ev(cols);
 check("  the keyboard moves a focused grip (ArrowLeft widens the takes list 16px); Home resets it", c6.right === c5.right + 16, JSON.stringify({ before: c5.right, after: c6.right }));
 await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Home", code: "Home", windowsVirtualKeyCode: 36 });
 await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Home", code: "Home", windowsVirtualKeyCode: 36 });
-await sleep(50);
+await sleep(50);   // the next frame
 const c7 = await ev(cols);
 check("  both back to the defaults, nothing stored", c7.left === c0.left && c7.right === c0.right && c7.saved === null, JSON.stringify({ now: [c7.left, c7.right], saved: c7.saved }));
 // drawer headings in the narrowest compose column: the name on one line, its sentence under it (never beside it)
@@ -312,11 +249,11 @@ check("drawer headings: the name on one line with its sentence under it, even in
   heads.every(h => h.oneLine && h.under && h.say) && /^A local chat model writes the title, style and lyrics from one line\.$/.test(heads[0].say),
   JSON.stringify(heads.filter(h => !h.oneLine || !h.under).map(h => h.name)) + " " + heads[0].say);
 await send("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
-await sleep(200);
+await waitFor(`getComputedStyle(document.getElementById("gripLeft")).display === "none"`, 3000, 50);
 const gripsNarrow = await ev(`[getComputedStyle(document.getElementById("gripLeft")).display, getComputedStyle(document.getElementById("gripRight")).display].join()`);
 check("  a narrow window stacks the columns and hides the grips", gripsNarrow === "none,none", gripsNarrow);
 await send("Emulation.setDeviceMetricsOverride", { width: 1920, height: 960, deviceScaleFactor: 1, mobile: false });
-await sleep(200);
+await waitFor(`getComputedStyle(document.getElementById("gripLeft")).display !== "none"`, 3000, 50);
 
 // ================================================================== fonts
 section("fonts (Engine page)");
@@ -350,11 +287,11 @@ check("  Default fonts puts the app's own back and forgets the choice", f4.body.
 // ============================================================ tips vs the log
 section("tips stay while the server log scrolls");
 await click("#engineToggle");
-await sleep(300);
+await engineOpen(true);
 const logTip = await hoverOn('#computeCard .field:has(#setVaeCore) .info');
 await ev(`(() => { const b = document.getElementById("logBody"); for (let i = 0; i < 300; i++) { const d = document.createElement("div"); d.className = "probe-line"; d.textContent = "line " + i; b.appendChild(d); }
   b.scrollTop = b.scrollHeight; window.__feed = setInterval(() => { const d = document.createElement("div"); d.className = "probe-line"; d.textContent = "[AR] Semantic"; b.appendChild(d); b.scrollTop = b.scrollHeight; }, 200); return true; })()`);
-await sleep(1200);
+await sleep(1200);   // the test itself: the tip must outlive 1.2 s of new log lines (six, one per 200 ms)
 const stillOn = await ev(`document.querySelector(".tip").classList.contains("is-on")`);
 await ev(`clearInterval(window.__feed); document.querySelectorAll("#logBody .probe-line").forEach(d => d.remove()); true`);
 check("a tip stays open while the server log follows new lines (it closed within ~2 s before)", logTip?.on && stillOn === true && /tiles/.test(logTip.text), logTip?.text.slice(0, 60));
@@ -366,7 +303,7 @@ await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });
 // ============================================================ engine panel
 section("engine panel");
 await click("#engineToggle");
-await sleep(300);
+await engineOpen(true);
 const server = await ev(`[...document.querySelectorAll("#serverCard div")].map(d => d.innerText.replace(/\\s+/g, " "))`);
 check("server card shows /props (backbone, batch, transcriber, library)", server.some((s) => /YuE2-3B-BF16\.gguf/.test(s)) &&
   server.some((s) => /Songs per pass 4/.test(s)) && server.some((s) => /Transcriber loaded/.test(s)) && server.some((s) => /Library saved on disk/.test(s)), server.join(" | "));
@@ -394,12 +331,12 @@ check("server log card streams /logs", /\[Server\] Listening on/.test(logText) &
 check("no PyTorch-only settings (device, backend, quantization dtype, budget)", (await ev(`!document.getElementById("setBackend") && !document.getElementById("setQuant") && !document.getElementById("setBudget") && !document.getElementById("setDevice")`)) === true);
 let t;
 // the F32 option was removed on 2026-09-26 (unproven quality claim, about 60% slower): nothing of it is left
-check("no F32 option: no button by the model menu, no Precision setting, no tip", await ev(`!document.getElementById("f32Toggle") &&
-  !document.getElementById("setPrecision") && !document.querySelector('[data-tip-ref="tip-precision"]') && !document.getElementById("tip-precision")`));
+check("no F32 option: no button by the model menu, no Precision setting, no tip", (await ev(`!document.getElementById("f32Toggle") &&
+  !document.getElementById("setPrecision") && !document.querySelector('[data-tip-ref="tip-precision"]') && !document.getElementById("tip-precision")`)) === true);
 await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 700 });
 check("the engine panel is open before Escape", (await ev(`document.getElementById("view-engine").classList.contains("is-hidden")`)) === false);
 await ev(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
-check("Escape closes the engine panel", await ev(`document.getElementById("view-engine").classList.contains("is-hidden")`));
+check("Escape closes the engine panel", (await ev(`document.getElementById("view-engine").classList.contains("is-hidden")`)) === true);
 
 // ==================================================================== VAEs
 section("VAE choice");
@@ -408,7 +345,7 @@ check("VAE choices are one group of radios from /props", kinds.length === 3 && k
 const picks = [];
 for (const v of ["legacy", "blend", "standard", "legacy"]) {
   await click(`#decoders input[value="${v}"]`);
-  await sleep(60);
+  await waitFor(`document.querySelector('#decoders input[value="${v}"]').checked`, 2000, 20);
   picks.push(await ev(`[...document.querySelectorAll("#decoders input:checked")].map(i => i.value).join("+")`));
 }
 check("ticking one unticks the others", picks.join(",") === "legacy,blend,standard,legacy", picks.join(" -> "));
@@ -480,24 +417,24 @@ check("(i) beside Format explains WAV 24 and peak clip", t?.on && /WAV 24/.test(
 t = await hoverOn('[data-tip-ref="tip-versions"]');
 check("(i) beside Versions says the server's batch size", t?.on && /up to 4 side by side/.test(t.text.replace(/\s+/g, " ")), t?.text.replace(/\s+/g, " ").slice(0, 120));
 await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1100, y: 400 });
-await sleep(200);
-check("the tip hides when the pointer leaves", !(await ev(`document.querySelector(".tip").classList.contains("is-on")`)));
+await waitFor(`!(${tipOn})`, 2000, 50);
+check("the tip hides when the pointer leaves", (await ev(tipOn)) === false);
 await ev(`document.querySelector('[data-tip-ref="tip-vae"]').focus()`);
-await sleep(120);
-check("tabbing onto (i) shows the tip too", await ev(`document.querySelector(".tip").classList.contains("is-on")`));
+await waitFor(tipOn, 2000, 50);
+check("tabbing onto (i) shows the tip too", (await ev(tipOn)) === true);
 await ev(`document.activeElement.blur(); document.getElementById("coverDrawer").open = false; document.getElementById("outDrawer").open = false; true`);
 
 // ================================================================= sliders
 section("sliders");
 await click('#sliderChips [data-slider="metal"]');
-await sleep(80);
+await waitFor(`document.querySelectorAll("#sliderActive .slider-row").length === 1`, 2000, 50);
 check("tapping a chip adds a strength row", (await ev(`document.querySelectorAll("#sliderActive .slider-row").length`)) === 1 &&
-  (await ev(`document.querySelector('#sliderChips [data-slider="metal"]').classList.contains("is-on")`)));
+  (await ev(`document.querySelector('#sliderChips [data-slider="metal"]').classList.contains("is-on")`)) === true);
 await ev(`(() => { const r = document.querySelector('#sliderActive input[data-strength="metal"]'); r.value = "0.6"; r.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 check("strength moves 0..1 and shows its value", (await ev(`document.querySelector("#sliderActive output").textContent`)) === "0.60");
 await click('#sliderChips [data-slider="female"]');
 await click('#sliderChips [data-slider="male"]');
-await sleep(80);
+await waitFor(`document.querySelectorAll("#sliderActive .slider-row").length === 3`, 2000, 50);
 let hint = await ev(`document.getElementById("sliderHint").textContent`);
 check("sliders stack (three rows)", (await ev(`document.querySelectorAll("#sliderActive .slider-row").length`)) === 3);
 check("hint: Female and Male pull in opposite directions", /opposite directions/.test(hint), hint);
@@ -544,7 +481,7 @@ for (let i = 0; i < 80; i++) {
   if (s.clock && s.clock !== "0:00") sawClock = true;
   if (i === 12) await shot("run-progress");
   if (s.open) break;
-  await sleep(100);
+  await sleep(100);   // the run is sampled every 100 ms until its take opens
 }
 check("the run shows its stages as they run (score, tokens, sound, decode)", ["score", "tokens", "sound"].every((k) => seenStages.has(k)), [...seenStages].join(" -> "));
 check("progress bars and elapsed time move", sawMeter && sawClock);
@@ -552,7 +489,7 @@ check("  the player bar's status says Rendering while it runs, at the same size"
 check("the run shows both seeds", runSeedsText === "music seed 9223372036854775000 · sound seed 12345", runSeedsText);
 const opened = await waitFor(`!document.getElementById("takeBody").classList.contains("is-hidden") && document.getElementById("takeTitle").textContent === "CDP Song"`, 15000);
 check("when done, the new take opens", !!opened);
-await sleep(300);
+await waitFor(`!!document.querySelector('#metaGrid [data-field="VAE"]')`, 3000, 50);
 const meta = await ev(`Object.fromEntries([...document.querySelectorAll("#metaGrid [data-field]")].map(d => [d.dataset.field, d.dataset.value]))`);
 check("song info: VAE, both seeds, format", meta?.VAE === "Legacy" && meta?.["Music seed"] === "9223372036854775000" && meta?.["Sound seed"] === "12345" && meta?.Format === "WAV 24-bit", JSON.stringify(meta));
 const layout = await ev(`(() => { const h = document.getElementById("takeActions");
@@ -585,7 +522,7 @@ await ev(`document.getElementById("scorePanel").open = true; true`);
 await shot("take-open");
 // a narrower window: the details card folds its columns and nothing spills out of it
 await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-await sleep(400);
+await sleep(400);   // the take column re-lays out and redraws its waveform for the new width
 const narrow = await ev(`(() => { const c = document.getElementById("metaGrid"), t = document.getElementById("takeTools"), col = document.getElementById("view-take");
   const spill = [...c.querySelectorAll("dd, dt, h4")].filter(e => e.getBoundingClientRect().right > c.getBoundingClientRect().right + 1).length;
   return { card: Math.round(c.getBoundingClientRect().width), spill, cardScroll: c.scrollWidth - c.clientWidth, toolsScroll: t.scrollWidth - t.clientWidth,
@@ -593,7 +530,7 @@ const narrow = await ev(`(() => { const c = document.getElementById("metaGrid"),
 check("at 1280 px the details card and the buttons fit their column (nothing spills)", narrow.spill === 0 && narrow.cardScroll <= 0 && narrow.toolsScroll <= 0 && narrow.colScroll <= 0, JSON.stringify(narrow));
 await shot("take-open-1280");
 await send("Emulation.setDeviceMetricsOverride", { width: 1920, height: 960, deviceScaleFactor: 1, mobile: false });
-await sleep(300);
+await sleep(300);   // and back: the layout settles before the keyboard checks
 const cdpTake = await ev(`document.querySelector("#libList .take.is-active")?.dataset.name`);
 
 // playback + keyboard
@@ -655,11 +592,12 @@ check("  same music codes, score and both seeds", rep.semantic_tokens === par.se
   `seed ${rep.seed}/${par.seed}, codes ${String(rep.semantic_tokens).length}`);
 const switched = await waitFor(`document.querySelector('#metaGrid [data-field="VAE"]')?.dataset.value === "Standard"`, 10000);
 check("when it lands, the page switches to the Standard version", !!switched);
-await sleep(650);
-const hanging = await ev(`(() => { const t = document.querySelector(".tip");
+const tipState = `(() => { const t = document.querySelector(".tip");
   if (!t.classList.contains("is-on")) return "off";
   const under = document.elementFromPoint(${lastHover.x}, ${lastHover.y}), target = under && under.closest("[data-tip]");
-  return target && target.dataset.tip === t.innerText ? "matches " + target.textContent : "stale: " + t.innerText.split("\\n")[0]; })()`);
+  return target && target.dataset.tip === t.innerText ? "matches " + target.textContent : "stale: " + t.innerText.split("\\n")[0]; })()`;
+await waitFor(`/^(off|matches)/.test(${tipState})`, 2000, 100);   // the page's 500 ms ticker closes a tip whose button went away
+const hanging = await ev(tipState);
 check("no tip is left describing a button that was repainted away", /^(off|matches)/.test(hanging), hanging);
 const chips2 = await ev(`[...document.querySelectorAll("#decodeSwitch .chip")].map(c => c.textContent + (c.classList.contains("is-on") ? "*" : "") + (c.dataset.playTake ? "(play)" : ""))`);
 check("VAE row now plays Legacy from the family", JSON.stringify(chips2) === '["Standard*","Legacy(play)","+ Blend"]', JSON.stringify(chips2));
@@ -743,7 +681,7 @@ check("every library card has a download icon", dl.length > 0 && dl.every((d) =>
 check("  named after the take (date-time-title.wav), from the library",
   dl.every((d) => d.file === d.name + ".wav" && d.href === "/library/audio?name=" + encodeURIComponent(d.name)), dl[0] && dl[0].file);
 await click(`#libList .take[data-name="${cdpTake}"]`);
-await sleep(300);
+await showsTake(cdpTake);
 const dlOther = dl.map((d) => d.name).find((n) => n !== cdpTake);
 const stay = await ev(`(() => { const stop = (e) => e.preventDefault(); document.addEventListener("click", stop, { capture: true, once: true });
   document.querySelector('#libList .take[data-name="${dlOther}"] .take-dl').click();
@@ -807,12 +745,12 @@ const waveCols = `(() => { const c = document.getElementById("wave"), d = c.getC
 const wavedBefore = await ev(waveCols);
 await waitFor(`!!document.querySelector("#libList .is-running-row")`, 8000, 100);
 await click("#libList .is-running-row");
-await sleep(400);
+await waitFor(`!document.getElementById("chain").hidden`, 4000, 50);
 const wavedDuring = await ev(waveCols);
 check("  opening the running song leaves the player's waveform alone", wavedBefore > 0.5 && wavedDuring > 0.5 &&
   !(await ev(`document.getElementById("chain").hidden`)), `${(wavedBefore * 100).toFixed(0)}% -> ${(wavedDuring * 100).toFixed(0)}% of the bar drawn`);
 const landed = await waitFor(`fetch("/library").then(r => r.json()).then(l => l.takes.some(t => t.title === "Keep Playing"))`, 30000, 250);
-await sleep(1200);
+await toastSays("/Keep Playing.*keeps playing/");
 const after = await ev(`({ paused: document.getElementById("audio").paused, src: document.getElementById("audio").src,
   toasts: [...document.querySelectorAll(".toast")].map(t => t.textContent).join(" | ") })`);
 check("the new song finished and was saved", !!landed);
@@ -827,7 +765,7 @@ section("browsing while a song plays");
 const rows = await ev(`[...document.querySelectorAll("#libList .take:not(.is-running-row)")].map(e => e.dataset.name)`);
 const [songA, songB] = [rows[0], rows[1]];
 await click(`#libList .take[data-name="${songA}"]`);
-await sleep(300);
+await showsTake(songA);
 await ev(`document.activeElement && document.activeElement.blur(); document.body.focus(); true`);
 await send("Input.dispatchKeyEvent", { type: "keyDown", key: " ", code: "Space", windowsVirtualKeyCode: 32, text: " " });
 await send("Input.dispatchKeyEvent", { type: "keyUp", key: " ", code: "Space", windowsVirtualKeyCode: 32 });
@@ -838,7 +776,7 @@ check("the player shows just the song's name; its style prompt is on hover", (aw
   t.text === (await ev(`document.querySelector("#libList .take.is-playing .take-style")?.textContent || ""`)), t?.text);
 await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });
 await click(`#libList .take[data-name="${songB}"]`);
-await sleep(600);
+await showsTake(songB);
 const browse = await ev(`({ viewing: document.querySelector("#libList .take.is-active")?.dataset.name, playing: !document.getElementById("audio").paused,
   src: document.getElementById("audio").src, bar: document.getElementById("playbarTitle").textContent,
   playHere: !!document.getElementById("playHere") && !document.getElementById("playHere").classList.contains("is-hidden") })`);
@@ -851,16 +789,17 @@ await click("#playHere");
 const nowB = await waitFor(`!document.getElementById("audio").paused && document.getElementById("audio").src.includes(${JSON.stringify(encodeURIComponent(songB))})`, 4000);
 check("pressing it switches the player to song B", !!nowB);
 check("  the status says Playing", !!(await waitFor(`document.getElementById("statusText").textContent === "Playing"`, 2000, 100)));
-check("  and the button hides again", await ev(`document.getElementById("playHere").classList.contains("is-hidden")`));
+check("  and the button hides again", (await ev(`document.getElementById("playHere").classList.contains("is-hidden")`)) === true);
 check("  PLAYING moves to song B's card", JSON.stringify(await playingCards()) === JSON.stringify([songB]), JSON.stringify(await playingCards()));
 await click(`#libList .take[data-name="${songA}"]`);
-await sleep(600);
-check("browsing back to song A leaves song B playing", await ev(`!document.getElementById("audio").paused && document.getElementById("audio").src.includes(${JSON.stringify(encodeURIComponent(songB))})`));
+await showsTake(songA);
+check("browsing back to song A leaves song B playing", (await ev(`!document.getElementById("audio").paused && document.getElementById("audio").src.includes(${JSON.stringify(encodeURIComponent(songB))})`)) === true);
 // the status pill: Playing, and a click opens the song that plays; back to song A, song B keeps playing
 check("  the status says Playing; clicking it opens the playing song", (await ev(`document.getElementById("statusText").textContent`)) === "Playing" &&
   !!(await (async () => { await click("#statusPill"); return waitFor(`document.querySelector("#libList .take.is-active")?.dataset.name === ${JSON.stringify(songB)}`, 3000, 100); })()));
 await click(`#libList .take[data-name="${songA}"]`);
-await sleep(400);
+await showsTake(songA);
+await sleep(200);   // the cards' backgrounds fade (.13 s) before their colours are compared
 // the playing card is coloured (tinted card, solid badge), unlike the plain selected card beside it
 const looks = await ev(`(() => { const bg = (s) => { const c = document.querySelector(s); return c ? getComputedStyle(c).backgroundColor : ""; };
   return { playing: bg('#libList .take.is-playing'), selected: bg('#libList .take.is-active'), badge: bg('#libList .take.is-playing .playing-tag') }; })()`);
@@ -898,7 +837,7 @@ check("  its card says PLAYING, and the page shows it with no Play button", JSON
   JSON.stringify(await playingCards()));
 await ev(`document.getElementById("audio").pause(); true`);
 await click(`#libList .take[data-name="${songB}"]`);
-await sleep(300);
+await showsTake(songB);
 
 // ================================================================= plan
 section("plan score only");
@@ -1069,28 +1008,36 @@ const keepMeta = await ev(`Object.fromEntries([...document.querySelectorAll("#me
 check("a new song has no precision row", !("Precision" in (keepMeta || {})) && keepMeta?.Model === "BF16", JSON.stringify({ p: keepMeta?.Precision, m: keepMeta?.Model }));
 const hwLoaded = await ev(`[...document.querySelectorAll("#hwCard div")].map(d => d.innerText.replace(/\\s+/g, " ")).find(t => /^Loaded/.test(t))`);
 check("  the Hardware card shows the BF16 models loaded (about 7.5 GiB)", /^Loaded\s*[67]\.\d GiB/.test(hwLoaded || ""), hwLoaded);
-// a song made while the F32 option existed still says so: copy this song as an old F32 one
-const libDir = TMP + "/mock-outputs/cdp", keepDir = readdirSync(libDir).find((d) => /keep-song/.test(d));
-const oldDir = libDir + "/19990101-000000-old-f32-song";
-cpSync(libDir + "/" + keepDir, oldDir, { recursive: true });
-writeFileSync(oldDir + "/meta.json", JSON.stringify({ ...JSON.parse(readFileSync(oldDir + "/meta.json", "utf8")), title: "Old F32 Song", precision: "f32" }));
-// and a saved request with the sliders moved: Composition at "highest", Performance tuned by hand, guidance 1.15
-writeFileSync(oldDir + "/request.json", JSON.stringify({ ...JSON.parse(readFileSync(oldDir + "/request.json", "utf8")), cfg_scale: 1.15,
-  abc_sampling: { temperature: 1.0, top_p: 0.97, top_k: 64 }, semantic_sampling: { temperature: 0.97, top_p: 0.95, top_k: 100 } }));
-await ev(`document.getElementById("refreshLib").click(); true`);
-await waitFor(`!!document.querySelector('#libList .take[data-name="19990101-000000-old-f32-song"]')`, 5000);
-await click('#libList .take[data-name="19990101-000000-old-f32-song"]');
-await waitFor(`document.getElementById("takeTitle").textContent === "Old F32 Song"`, 5000);
-const oldMeta = await ev(`Object.fromEntries([...document.querySelectorAll("#metaGrid [data-field]")].map(d => [d.dataset.field, d.dataset.value]))`);
-check("  an older song made in F32 still says so (the option since removed)", oldMeta?.Precision === "F32 (option since removed)", JSON.stringify(oldMeta?.Precision));
-const oldShapes = await waitFor(`(() => { const m = Object.fromEntries([...document.querySelectorAll("#metaGrid [data-field]")].map(d => [d.dataset.field, d.dataset.value]));
-  return m.Composition && m.Composition !== "…" ? m : null; })()`, 5000, 100);
-check("  moved sliders: Composition highest, Performance custom with its values, Style influence highest", oldShapes?.Composition === "highest" &&
-  oldShapes?.Performance === "custom: temperature 0.97 · top-p 0.95 · top-k 100" && oldShapes?.["Style influence"] === "highest",
-  JSON.stringify({ c: oldShapes?.Composition, p: oldShapes?.Performance, s: oldShapes?.["Style influence"] }));
-rmSync(oldDir, { recursive: true, force: true });
-await ev(`document.getElementById("refreshLib").click(); true`);
-await waitFor(`!document.querySelector('#libList .take[data-name="19990101-000000-old-f32-song"]')`, 5000);
+// a song made while the F32 option existed still says so: copy this song as an old F32 one, in the mock's own
+// library folder (the mock says where it is: an already running one, named on the command line, may keep it elsewhere)
+const mockInfo = await fetch(BASE + "mock/info").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+const libDir = mockInfo?.outputs ? resolve(ROOT, mockInfo.outputs) : null;
+const keepDir = (await mockGet("library")).takes.map((e) => e.name).find((n) => /keep-song/.test(n));
+if (!libDir || !keepDir || !existsSync(libDir + "/" + keepDir + "/meta.json")) {
+  skip("an older song made in F32 still says so, and its moved sliders read back", libDir ? `no Keep Song take in ${mockInfo.outputs}` :
+    "the mock does not say where its library is (GET /mock/info)");
+} else {
+  const oldDir = libDir + "/19990101-000000-old-f32-song";
+  cpSync(libDir + "/" + keepDir, oldDir, { recursive: true });
+  writeFileSync(oldDir + "/meta.json", JSON.stringify({ ...JSON.parse(readFileSync(oldDir + "/meta.json", "utf8")), title: "Old F32 Song", precision: "f32" }));
+  // and a saved request with the sliders moved: Composition at "highest", Performance tuned by hand, guidance 1.15
+  writeFileSync(oldDir + "/request.json", JSON.stringify({ ...JSON.parse(readFileSync(oldDir + "/request.json", "utf8")), cfg_scale: 1.15,
+    abc_sampling: { temperature: 1.0, top_p: 0.97, top_k: 64 }, semantic_sampling: { temperature: 0.97, top_p: 0.95, top_k: 100 } }));
+  await ev(`document.getElementById("refreshLib").click(); true`);
+  await waitFor(`!!document.querySelector('#libList .take[data-name="19990101-000000-old-f32-song"]')`, 5000);
+  await click('#libList .take[data-name="19990101-000000-old-f32-song"]');
+  await waitFor(`document.getElementById("takeTitle").textContent === "Old F32 Song"`, 5000);
+  const oldMeta = await ev(`Object.fromEntries([...document.querySelectorAll("#metaGrid [data-field]")].map(d => [d.dataset.field, d.dataset.value]))`);
+  check("  an older song made in F32 still says so (the option since removed)", oldMeta?.Precision === "F32 (option since removed)", JSON.stringify(oldMeta?.Precision));
+  const oldShapes = await waitFor(`(() => { const m = Object.fromEntries([...document.querySelectorAll("#metaGrid [data-field]")].map(d => [d.dataset.field, d.dataset.value]));
+    return m.Composition && m.Composition !== "…" ? m : null; })()`, 5000, 100);
+  check("  moved sliders: Composition highest, Performance custom with its values, Style influence highest", oldShapes?.Composition === "highest" &&
+    oldShapes?.Performance === "custom: temperature 0.97 · top-p 0.95 · top-k 100" && oldShapes?.["Style influence"] === "highest",
+    JSON.stringify({ c: oldShapes?.Composition, p: oldShapes?.Performance, s: oldShapes?.["Style influence"] }));
+  rmSync(oldDir, { recursive: true, force: true });
+  await ev(`document.getElementById("refreshLib").click(); true`);
+  await waitFor(`!document.querySelector('#libList .take[data-name="19990101-000000-old-f32-song"]')`, 5000);
+}
 await mockClear();
 await click("#unloadModel");
 const unloaded = await waitFor(`/Model unloaded — [\\d,]+ MB freed/.test([...document.querySelectorAll(".toast")].map(t => t.textContent).join())`, 6000);
@@ -1184,7 +1131,7 @@ check("nothing loaded: writer refuses; the button's tip asks you to load one", (
   chatNone.s === "on" && /no model loaded: load one there first/.test(chatNone.tip) &&
   /none yet · load a model/.test(await ev(`document.getElementById("museModel").textContent`)), JSON.stringify(chatNone));
 await ev(`document.getElementById("museBtn").disabled = false; document.getElementById("museBtn").click(); true`);
-await sleep(600);
+await sleep(600);   // a check that nothing happens: give a request the time it would take to show
 check("  and sends no completion request", (await mockGet("mock/requests")).filter((r) => /fakechat/.test(r.path)).length === 0);
 await ev(`(() => { const u = document.getElementById("chatUrl"); u.value = "http://127.0.0.1:9/v1"; u.dispatchEvent(new Event("change")); return true; })()`);
 await waitFor(`document.getElementById("chatState").textContent === "not answering"`, 6000);
@@ -1194,11 +1141,10 @@ check("  the button turns red, Chat Server Offline; the old line of text is now 
   chatOff.tip.startsWith("The chat server is not answering — check its address under Engine") && chatOff.status === "", JSON.stringify(chatOff));
 check("  and it keeps its size between the two states", chatOff.w === chatOn.w && chatOff.h === chatOn.h, `connected ${chatOn.w}x${chatOn.h}, offline ${chatOff.w}x${chatOff.h}`);
 await ev(`document.getElementById("chatLink").scrollIntoView({ block: "center", behavior: "instant" }); true`);
-await sleep(200);
+await sleep(200);   // the scroll's event passes before the hover (a scroll closes a tip)
 const chatAt = await ev(`(() => { const r = document.getElementById("chatLink").getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
 await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: chatAt.x, y: chatAt.y });
-await sleep(250);
-const chatTip = await ev(`(() => { const t = document.querySelector(".tip.is-on"); return t ? t.textContent : ""; })()`);
+const chatTip = (await waitFor(`(() => { const t = document.querySelector(".tip.is-on"); return t ? t.textContent : ""; })()`, 2000, 50)) || "";
 check("  hovering it pops the text up", chatTip.startsWith("The chat server is not answering — check its address under Engine"), chatTip);
 await shot("chat-offline");
 await ev(`document.getElementById("chatUrl").value = location.origin + "/fakechat-loaded/v1"; true`);
@@ -1243,8 +1189,11 @@ const exampleRuns = await ev(`(() => { const n = (window.YUE2_EXAMPLES || []).le
   return { n, bad }; })()`);
 check("Load example fills an official demo prompt and starts from a fresh sound seed (every demo)",
   exampleRuns.n > 0 && exampleRuns.bad.length === 0, JSON.stringify(exampleRuns).slice(0, 300));
+const lyricsTake = await ev(`document.querySelector("#libList .take:not(.is-running-row)")?.dataset.name`);
 await click(`#libList .take:not(.is-running-row)`);
-await sleep(500);
+await showsTake(lyricsTake);
+await waitFor(`(() => { const r = document.querySelector("#libList .take.is-active"), m = document.querySelector('#metaGrid [data-field="Composition"]');
+  return !!r && document.getElementById("takeTitle").textContent === r.querySelector(".take-title").textContent && !!m && m.dataset.value !== "…"; })()`, 4000, 50);
 await ev(`window.__downloads = []; document.getElementById("lyricsTxt").click(); document.getElementById("lyricsJson").click(); true`);
 const lyr = await ev(`(async () => { const d = window.__downloads; if (d.length !== 2) return { n: d.length }; const txt = await d[0].blob.text(), json = JSON.parse(await d[1].blob.text());
   return { names: d.map(x => x.name), same: json.sections.map(s => s.text).join("") === json.lyrics && txt === json.lyrics, schema: json.schema, timing: json.timing }; })()`);
@@ -1284,7 +1233,7 @@ check("the theme choice is remembered", (await ev(`localStorage.getItem("yue2.th
 await ev(`YueThemes.set("studio"); localStorage.removeItem("yue2.themeFavorites"); localStorage.setItem("yue2.themeFamily", "all"); true`);
 await click("#themeButton");
 const tiles = () => ev(`[...document.querySelectorAll(".theme-popup .theme-choice")].map(b => b.dataset.themeId)`);
-check("the theme button opens a swatch grid of every theme", (await ev(`YueThemes.isOpen()`)) && (await tiles()).length === 50);
+check("the theme button opens a swatch grid of every theme", (await ev(`YueThemes.isOpen()`)) === true && (await tiles()).length === 50);
 await click('.theme-popup [data-family="bold"]');
 const bold = await tiles();
 await click('.theme-popup [data-family="soft"]');
@@ -1296,14 +1245,14 @@ await ev(`(() => { const q = document.querySelector(".theme-popup .theme-search"
 await click('.theme-popup [data-family="all"]');
 const box = await ev(`(() => { const b = document.querySelector('.theme-popup .theme-choice[data-theme-id="bold-crimson"]'); b.scrollIntoView({ block: "center" });
   const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
-await sleep(150);
+await sleep(150);   // the scroll into view settles before the pointer lands
 await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box.x, y: box.y });
-await sleep(150);
+await waitFor(`document.documentElement.dataset.theme === "bold-crimson"`, 2000, 50);
 check("  hovering a theme previews it on the page, without keeping it",
   (await ev(`document.documentElement.dataset.theme`)) === "bold-crimson" && (await ev(`YueThemes.current()`)) === "studio");
 await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
 await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-await sleep(100);
+await waitFor(`!YueThemes.isOpen()`, 2000, 50);
 check("  Esc goes back to the kept theme and closes the picker", (await ev(`document.documentElement.dataset.theme`)) === "studio" && !(await ev(`YueThemes.isOpen()`)));
 await click("#themeButton");
 await click('.theme-popup .theme-star[data-star="jade"]');
@@ -1313,7 +1262,7 @@ await click('.theme-popup [data-family="all"]');
 await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });   // a resting pointer would preview what is under it
 await ev(`document.querySelector('.theme-popup .theme-choice[data-theme-id="studio"]').focus(); true`);
 await send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
-await sleep(80);
+await waitFor(`(() => { const f = document.activeElement?.dataset.themeId; return !!f && f !== "studio" && document.documentElement.dataset.theme === f; })()`, 2000, 50);
 const moved = await ev(`({ focus: document.activeElement.dataset.themeId, shown: document.documentElement.dataset.theme })`);
 check("  arrow keys move through the grid and preview as they go", !!moved.focus && moved.focus !== "studio" && moved.shown === moved.focus, JSON.stringify(moved));
 await shot("theme-picker");
@@ -1341,7 +1290,7 @@ await ev(`(() => { const set = (id, v) => { document.getElementById(id).value = 
   document.getElementById("versions").value = 3; YueLoras.set([{ id: "yue2-jpop-t4-lora/yue2_jpop_t4.safetensors", ar: 0, nar: 1 }]);
   const k = document.querySelector('input[data-group="semantic"][data-key="temperature"]'); k.value = "0.5"; return true; })()`);
 await ev(`document.getElementById("newSong").click(); true`);
-await sleep(300);
+await toastSays("/New song: the form is back to its defaults/", 3000);
 const blank = await ev(`({ fields: ["title", "style", "lyrics", "abc", "lmSeed"].map(id => document.getElementById(id).value).join(""),
   cot: document.querySelector('input[name="cot"]:checked').value, inst: document.getElementById("instrumental").checked,
   versions: document.getElementById("versions").value, loras: document.querySelectorAll("#loraPicker .lora-row").length,
@@ -1354,30 +1303,31 @@ check("＋ New song empties the form: fields, seed, score, mode, Instrumental, v
 section("style prompt size");
 const styleBox = async () => ev(`({ h: document.getElementById("style").offsetHeight, meter: document.getElementById("styleMeter").textContent,
   over: document.getElementById("styleMeter").classList.contains("is-over"), warn: document.getElementById("styleMeter").classList.contains("is-warn") })`);
+const meterSays = (cond) => waitFor(`(() => { const m = document.getElementById("styleMeter"); return ${cond}; })()`, 3000, 50);   // repainted every 700 ms
 await ev(`document.getElementById("style").value = "pop"; document.getElementById("lyrics").value = "[Verse]\\nla"; true`);
-await sleep(900);
+await meterSays(`/^3 characters,/.test(m.textContent)`);
 const small = await styleBox();
 await ev(`document.getElementById("style").value = Array(60).fill("dark cinematic synthwave with a slow build, analog pads, gated drums").join(", "); true`);
-await sleep(900);
+await meterSays(`/^4,198 characters,/.test(m.textContent)`);
 const big = await styleBox();
 check("the style box grows with a long prompt set by the page", big.h > small.h + 60, `${small.h}px -> ${big.h}px`);
 check("  the counter under it shows its size and the shared budget", /^4,198 characters, about 1,167 tokens\. Style and lyrics together: about 1,170 of 11,400 tokens\.$/.test(big.meter), big.meter);
 await ev(`document.getElementById("lyrics").value = "la la la ".repeat(5000); true`);
-await sleep(900);
+await meterSays(`m.classList.contains("is-over")`);
 const over = await styleBox();
 check("  past the budget it turns red and says so", over.over && /too long for a full-length song and score/.test(over.meter), over.meter.slice(-80));
 await ev(`document.getElementById("lyrics").value = "la la la ".repeat(3000); true`);
-await sleep(900);
-check("  near it, amber", (await styleBox()).warn);
+await meterSays(`m.classList.contains("is-warn")`);
+check("  near it, amber", (await styleBox()).warn === true);
 check("  the style (i) gives the limit", /24,576/.test(await ev(`YueHelp.text.style`)) && /11,400 tokens/.test(await ev(`YueHelp.text.style`)));
 await ev(`document.getElementById("style").value = ""; document.getElementById("lyrics").value = ""; true`);
 
 section("copy the prompt");
 await click(`#libList .take[data-name="${cdpTake}"]`);
-await sleep(300);
+await showsTake(cdpTake);
 await ev(`window.__clip = null; navigator.clipboard.writeText = (t) => { window.__clip = t; return Promise.resolve(); }; true`);
 await click("#copyPrompt");
-await sleep(300);
+await waitFor(`window.__clip !== null && [...document.querySelectorAll(".toast")].some(t => /Prompt copied/.test(t.textContent))`, 3000, 50);
 const clip = await ev(`({ clip: window.__clip, shown: document.getElementById("metaStyle").textContent,
   toasts: [...document.querySelectorAll(".toast")].map(t => t.textContent).join(" | ") })`);
 check("the copy icon in the Prompt card copies the prompt as shown", !!clip.shown && clip.clip === clip.shown && /Prompt copied/.test(clip.toasts),
@@ -1496,7 +1446,7 @@ check("  one row per LoRA, its halves together, strengths in their own column", 
 await click("#clearForm");
 check("Clear empties the picker", (await ev(`document.querySelectorAll("#loraPicker .lora-row").length`)) === 0);
 await click("#reuseTake");
-await sleep(400);
+await waitFor(`document.querySelectorAll("#loraPicker .lora-row .lora-name").length >= 2`, 3000, 50);
 const loraReused = await ev(`[...document.querySelectorAll("#loraPicker .lora-row .lora-name")].map(n => n.textContent)`);
 check("Reuse this take brings its LoRAs back", JSON.stringify(loraReused) === '["yue2_jpop_t4","sv-billie"]', JSON.stringify(loraReused));
 const badLora = async (loras) => { const r = await fetch(BASE + "synth", { method: "POST", body: JSON.stringify({ style: "pop", lyrics: "[Verse]\nla", loras }) });
@@ -1538,7 +1488,7 @@ await ev(`(() => { const set = (id, v) => { document.getElementById(id).value = 
   document.querySelector('input[name="cot"][value="off"]').click(); return true; })()`);
 await click("#generateBtn");
 const direct = await synthAfter(1, 6000);
-await sleep(500);
+await sleep(500);   // a check that no second request (a plan) follows: give it the time it would take
 const directAll = (await mockGet("mock/requests")).filter((r) => r.path === "/synth").map((r) => JSON.parse(r.body));
 check("with a score present it renders straight away, even from Direct mode (the score sets the mode)", !!direct && directAll.length === 1 &&
   !directAll[0].plan_only && directAll[0].cot === "full" && /^Instrumental, /.test(directAll[0].style), JSON.stringify(directAll.map((b) => ({ plan: !!b.plan_only, cot: b.cot }))));
@@ -1564,7 +1514,8 @@ check("Make instrumental converts the score in the field and ticks Instrumental"
 await mockClear();
 await ev(`document.getElementById("abc").value = "X:1\\nnot a native score"; true`);
 await click("#generateBtn");
-await sleep(600);
+// the refusal is a toast, not a request: wait for it rather than a fixed pause
+await toastSays("/Cannot make this score instrumental/", 3000);
 const refusedInst = await ev(`[...document.querySelectorAll(".toast")].map(t => t.textContent).join(" | ")`);
 check("a score outside the native dialect is refused with the reason, nothing is sent",
   /Cannot make this score instrumental: Incomplete native two-voice ABC/.test(refusedInst) &&
@@ -1632,5 +1583,4 @@ await fetch(BASE + "mock/flags", { method: "POST", body: JSON.stringify({ transc
 
 section("page health");
 check("no script errors during the whole run", errors.length === 0, errors.slice(0, 3).join(" | ") || "none");
-report();
-finish(failed ? 1 : 0);
+await finish(failed ? 1 : 0);   // prints the report, stops Chrome and the mock

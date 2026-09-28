@@ -4,12 +4,16 @@
 # It finds tools that are installed but not on PATH (WSL: nvcc in /usr/local/cuda/bin, nvidia-smi in
 # /usr/lib/wsl/lib; macOS: the Chrome app, a project-local cmake/ninja): check here BEFORE installing.
 #
-#   tools/check-machine.sh [INSTALL_FOLDER]   (the folder is used for the free-disk check and tmp/build-venv)
+#   tools/check-machine.sh [INSTALL_FOLDER]   (the folder is used for the free-disk check and tmp/build-venv;
+#                                              default: the install this script is in)
 #
 # Exit status 0 when the build can go ahead, 1 otherwise.
 set -uo pipefail
 G=$'\e[32m' Y=$'\e[33m' R=$'\e[31m' D=$'\e[2m' B=$'\e[1m' X=$'\e[0m'
-TARGET="${1:-$PWD}"; [ -d "$TARGET" ] || TARGET="$(dirname "$TARGET")"
+# plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then G="" Y="" R="" D="" B="" X=""; fi
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TARGET="${1:-$ROOT}"; [ -d "$TARGET" ] || TARGET="$(dirname "$TARGET")"
 OS=$(uname -s); ARCH=$(uname -m)
 core_missing=(); opt_missing=(); font_missing=(); path_add=(); blockers=0
 
@@ -146,7 +150,9 @@ else
       if [ -n "$fam" ]; then row "$G" ok "U+$cp" "$what: ${fam%%,*}"
       else row "$Y" missing "U+$cp" "$what: no font has it (apt: $pkg)"; font_missing+=("$pkg"); fi
     done
-    fc-list 2>/dev/null | command grep -qi 'Noto Color Emoji' && row "$G" ok emoji "Noto Color Emoji" || { row "$Y" missing emoji "apt: fonts-noto-color-emoji"; font_missing+=(fonts-noto-color-emoji); }
+    # fontconfig's own family match (not "fc-list | grep -q": under pipefail grep's early exit can fail fc-list)
+    if [ -n "$(fc-list 'Noto Color Emoji' family 2>/dev/null)" ]; then row "$G" ok emoji "Noto Color Emoji"
+    else row "$Y" missing emoji "apt: fonts-noto-color-emoji"; font_missing+=(fonts-noto-color-emoji); fi
   else
     row "$Y" missing fc-list "apt: fontconfig (cannot check fonts)"; font_missing+=(fontconfig fonts-noto-core fonts-noto-color-emoji fonts-noto-cjk)
   fi

@@ -21,6 +21,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD="$ROOT/build" DIST="$ROOT/repo"
 G=$'\e[32m' Y=$'\e[33m' R=$'\e[31m' C=$'\e[36m' D=$'\e[2m' B=$'\e[1m' X=$'\e[0m'
+# plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then G="" Y="" R="" C="" D="" B="" X=""; fi
 t0=$(date +%s); DATE=$(date +%F); OUTDIR="$ROOT/kits"; VERIFY=0; RELEASE=0; warn=0; KITVER=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -35,7 +37,7 @@ done
 fail() { echo "${R}stop${X}  $*"; exit 1; }
 note() { echo "${Y}note${X}  $*"; warn=$((warn + 1)); }
 git() { command git -C "$BUILD" "$@"; }
-export TMPDIR="$ROOT/tmp"
+export TMPDIR="$ROOT/tmp" PYTHONDONTWRITEBYTECODE=1    # the tools/ modules imported below leave no __pycache__
 
 # --- 1. the code must be committed, built and free of anything the patches would not carry
 [ -d "$DIST/.git" ] || fail "no repo/ (the distribution repo): git init it first"
@@ -66,7 +68,7 @@ fi
 [[ "$KITVER" =~ ^[0-9]+$ ]] || fail "the kit version must be a number, not $KITVER"
 ZIP="$OUTDIR/yue2-install-$DATE-v$KITVER.zip"   # his name for the kits: yue2-install-<date>-v<N>.zip
 if [ "$RELEASE" = 1 ]; then
-  [ -e "$ZIP" ] && fail "${ZIP#$ROOT/} already exists: pick another --version"
+  [ -e "$ZIP" ] && fail "${ZIP#"$ROOT"/} already exists: pick another --version"
   command git -C "$DIST" rev-parse -q --verify "refs/tags/v$KITVER" >/dev/null && fail "repo/ already has a tag v$KITVER: pick another --version"
 fi
 echo "${B}kit v$KITVER${X}  upstream ${C}$BASE7${X} + ${G}$NPATCH${X} patches, tree ${D}${TREE:0:12}${X}"
@@ -74,7 +76,7 @@ echo "${B}kit v$KITVER${X}  upstream ${C}$BASE7${X} + ${G}$NPATCH${X} patches, t
 # the download scripts' regression checks (offline, seconds): a kit is never built on a broken downloader
 "$ROOT/tools/test_downloaders.sh" > "$ROOT/tmp/kit-test-downloaders.txt" 2>&1 \
   || { tail -5 "$ROOT/tmp/kit-test-downloaders.txt"; fail "tools/test_downloaders.sh failed (full output: tmp/kit-test-downloaders.txt)"; }
-echo "${G}tested${X}  $(tail -1 "$ROOT/tmp/kit-test-downloaders.txt" | sed 's/\x1b\[[0-9;]*m//g')"
+echo "${G}tested${X}  $(tail -1 "$ROOT/tmp/kit-test-downloaders.txt")"   # written to a file: plain text
 rm -f "$ROOT/tmp/kit-test-downloaders.txt"
 
 # --- 2. what is published, by name: an explicit list, so nothing private rides along (a key, a log, a note).
@@ -179,10 +181,10 @@ def local_dirs(kind, name, repo, folder):
     if kind == "ckpt":
         return [os.path.join(ckpt, name), os.path.join(ckpt, "..", owner, rname)]
     return [os.path.realpath(os.path.join(root, "loras", folder))]
-def recorded(dirs):
+def recorded(dirs, levels=4):
     for d in dirs:
         d = os.path.realpath(d)
-        for _ in range(4):
+        for _ in range(levels):
             meta = os.path.join(d, ".cache", "huggingface", "download")
             if os.path.isdir(meta):
                 shas = collections.Counter()
@@ -203,9 +205,15 @@ for name, repo, only in entries("download-checkpoints.sh", "REPOS"):
     repos.setdefault(repo, local_dirs("ckpt", name, repo, None))
 for folder, repo, sub, files in lora_entries:
     repos.setdefault(repo, local_dirs("lora", None, repo, folder))
+# the GGUF download (download-models.sh, the alternative to converting): its one repo, into models/, where
+# the downloader keeps its records (models/.cache; no walking up: that folder may be in a shared library)
+with open(os.path.join(root, "download-models.sh"), encoding="utf-8") as f:
+    gguf_repo = re.search(r'^REPO="([^"]+)"', f.read(), re.M).group(1)
+repos.setdefault(gguf_repo, [os.path.join(root, "models")])
+levels = {gguf_repo: 1}
 pins, table = [], []
 for repo, dirs in repos.items():
-    shas, now = recorded(dirs), main_sha(repo)
+    shas, now = recorded(dirs, levels.get(repo, 4)), main_sha(repo)
     if shas:
         sha = shas.most_common(1)[0][0]
         if len(shas) > 1:
@@ -219,8 +227,10 @@ for repo, dirs in repos.items():
         continue
     pins.append(f"{repo} {sha}")
     table.append((repo, sha[:12], how, "" if not now or now == sha else f"main is now {now[:12]}"))
-# how the friend's files compare with his: converted files byte for byte (SHA-256), quantized copies by
-# structure (quantizing can round differently on another platform or compiler)
+# how the friend's files compare with his: converted files byte for byte (SHA-256); quantized copies and
+# the transcriber by structure (quantizing, and the transcriber's conversion-time merge of its adapter
+# weights in floating point, can round differently on another CPU, platform or compiler)
+by_structure = {"SheetSage2-F32.gguf"}
 sys.path.insert(0, os.path.join(root, "tools"))
 import gguf_check
 cache_path = os.path.join(root, "tmp", "kit-hash-cache.json")
@@ -236,7 +246,7 @@ def cached_sha(path):
 exact, struct_ = {}, {}
 for m in models:
     full = os.path.join(root, "models", m)
-    if m in converted:
+    if m in converted and m not in by_structure:
         exact["models/" + m] = cached_sha(full)
     else:
         struct_["models/" + m] = gguf_check.structure(full)
@@ -254,8 +264,9 @@ json.dump({"problems": problems, "notes": notes, "quantize": quantize, "models":
            "loras": len(on_disk), "lora_repos": len({r for _, r, _, _ in lora_entries}), "pins": table},
           open(out, "w"), indent=1)
 PY
-while IFS= read -r line; do [ -n "$line" ] && note "$line"; done < <(python3 -c "import json; print('\n'.join(json.load(open('$FACTS'))['notes']))")
-probs=$(python3 -c "import json; print('\n'.join(json.load(open('$FACTS'))['problems']))")
+facts() { python3 -c 'import json, sys; print("\n".join(json.load(open(sys.argv[1]))[sys.argv[2]]))' "$FACTS" "$1"; }
+while IFS= read -r line; do [ -n "$line" ] && note "$line"; done < <(facts notes)
+probs=$(facts problems)
 [ -z "$probs" ] || { echo "$probs" | sed "s/^/${R}gap${X}   /"; fail "the kit could not rebuild everything above"; }
 
 # the converter's exact packages (the friend's convert-models.sh installs these)
@@ -292,7 +303,9 @@ if [ "$(stat -c %Y "$ROOT/tools/kit/INSTALL-PROMPT.md")" -lt "$page_changed" ]; 
 fi
 
 # --- 6. the prompt and README, filled in from this install
-BATCH=$(command grep -o 'YUE2CPP_BATCH:-[0-9]*' "$ROOT/start.sh" | head -1 | cut -d- -f2)
+# start.sh's default batch (BATCH="${YUE2CPP_BATCH:-N}"): one awk over the file, no "| head" under pipefail
+BATCH=$(awk 'match($0, /YUE2CPP_BATCH:-[0-9]+/) {print substr($0, RSTART + 15, RLENGTH - 15); exit}' "$ROOT/start.sh")
+[ -n "$BATCH" ] || fail "start.sh has no YUE2CPP_BATCH default for the install guide"
 CDP=$(command grep -o '[0-9]* passed' "$ROOT/tmp/cdp-console.log" 2>/dev/null | tail -1 | cut -d' ' -f1 || true)
 [ -n "$CDP" ] || { CDP="all"; note "no page-test log: run node tools/cdp-console.mjs first for the check count"; }
 # the README's download list: every model, VAE, slider set and LoRA with its link, pin and size
@@ -308,7 +321,7 @@ import json, sys
 s = open(sys.argv[1], encoding="utf-8").read()
 st = json.load(open(sys.argv[3])); facts = json.load(open(sys.argv[4]))
 ctx = "the whole context (\`max_seq\` 0 = 24,576)" if not st.get("max_seq") else f"\`max_seq\` {st['max_seq']}"
-settings = (f"model **{st.get('model', 'BF16')}**, precision **{str(st.get('precision', 'bf16')).upper()}**, "
+settings = (f"model **{st.get('model', 'BF16')}**, "
             f"{'**keep models loaded** between songs' if st.get('keep_loaded') else 'models unloaded after each song'}, "
             f"{ctx}, VAE tiles **{st.get('vae_core', 512)}** frames")
 quant = "\n".join(facts["quantize"]) or "# (no smaller copies in the original install)"
@@ -363,11 +376,15 @@ find "$STAGE" -path "$STAGE/.git" -prune -o -name __pycache__ -type d -prune -ex
 # --- 9. optional: the patches rebuild this exact tree on a fresh clone of upstream
 if [ "$VERIFY" = 1 ]; then
   V="$ROOT/tmp/kit-verify"; rm -rf "$V"
-  command git clone --quiet --filter=blob:none "$UPSTREAM" "$V"
-  command git -C "$V" checkout --quiet -B master "$BASE"
-  (cd "$V" && command git -c user.name=kit -c user.email=kit@localhost am --quiet "$DIST"/engines/cpp/patches/*.patch 2>/dev/null)
+  command git clone --quiet --filter=blob:none "$UPSTREAM" "$V" 2>/dev/null || fail "--verify: could not clone $UPSTREAM (offline?)"
+  command git -C "$V" checkout --quiet -B master "$BASE" 2>/dev/null || fail "--verify: the fresh clone has no commit $BASE7"
+  # a patch that does not apply stops here with git's own reason (not a bare exit status from set -e)
+  if ! am_out=$(cd "$V" && command git -c user.name=kit -c user.email=kit@localhost am --quiet "$DIST"/engines/cpp/patches/*.patch 2>&1); then
+    fail "--verify: the patches do not apply to a fresh clone of upstream $BASE7: $(printf '%s\n' "$am_out" | awk 'NF && n++ < 3' | tr '\n' ' ')(the clone is kept in tmp/kit-verify)"
+  fi
   cp "$DIST/engines/cpp/page/index.html.gz" "$V/tools/public/index.html.gz"
-  command git -C "$V" -c user.name=kit -c user.email=kit@localhost commit --quiet -am "Add the built page"
+  command git -C "$V" -c user.name=kit -c user.email=kit@localhost commit --quiet -am "Add the built page" \
+    || fail "--verify: could not commit the built page in tmp/kit-verify"
   got=$(command git -C "$V" rev-parse 'HEAD^{tree}'); rm -rf "$V"
   [ "$got" = "$TREE" ] && echo "${G}verified${X}  a fresh clone + the patches + the page gives this exact tree" || fail "the patches give tree $got, not $TREE"
 fi
@@ -420,7 +437,7 @@ SECRETS="$SECRETS|-----BEGIN [A-Z ]*PRIV""ATE KEY-----"
 leaks=$( { command grep -r -l -F "$HOME" "$STAGE" --exclude-dir=.git || true
            [ -z "$VENDORS" ] || command grep -r -l -i -E "$VENDORS" "$STAGE" --exclude-dir=.git || true
            command grep -r -l -I -E "$SECRETS" "$STAGE" --exclude-dir=.git || true; } 2>/dev/null |
-         sed "s|^$STAGE/||" | sort -u | head -5 | tr '\n' ' ')
+         sed "s|^$STAGE/||" | sort -u | awk 'NR <= 5' | tr '\n' ' ')   # awk reads it all: no early exit under pipefail
 # a sync stops too: nothing like this may even reach a commit
 [ -z "$leaks" ] || fail "published files name the home folder, a denied name or something shaped like a secret: $leaks"
 command git -C "$DIST" add -A
@@ -438,7 +455,7 @@ if [ "$RELEASE" = 1 ]; then
   mkdir -p "$OUTDIR"
   command git -C "$DIST" archive --format=zip --prefix="yue2-install-$DATE-v$KITVER/" -o "$ZIP" "v$KITVER"
   unzip -tq "$ZIP" >/dev/null || fail "the zip does not test clean"
-  echo "${B}stats${X}  ${G}${ZIP#$ROOT/}${X}  kit v$KITVER (tag v$KITVER), $(du -h "$ZIP" | cut -f1), $files files, $NPATCH patches, $pins repos pinned, $( [ "$VERIFY" = 1 ] && echo "tree verified" || echo "tree not re-verified (--verify)"), $state, notes $warn, $(( $(date +%s) - t0 ))s"
+  echo "${B}stats${X}  ${G}${ZIP#"$ROOT"/}${X}  kit v$KITVER (tag v$KITVER), $(du -h "$ZIP" | cut -f1), $files files, $NPATCH patches, $pins repos pinned, $( [ "$VERIFY" = 1 ] && echo "tree verified" || echo "tree not re-verified (--verify)"), $state, notes $warn, $(( $(date +%s) - t0 ))s"
 else
   echo "${B}stats${X}  repo/ synced for kit v$KITVER (not released: --release tags it and zips it), $files files, $NPATCH patches, $pins repos pinned, $state, notes $warn, $(( $(date +%s) - t0 ))s"
 fi

@@ -1,6 +1,6 @@
 {
- "kit": "v10",
- "tree": "0c1ff5bd25a9e13a687290796cc841de56912ba7",
+ "kit": "v11",
+ "tree": "10b2ed565bc7fe787eaf654989198819bc4c421d",
  "models": [
   "SheetSage2-F32.gguf",
   "YuE2-3B-BF16.gguf",
@@ -12,7 +12,6 @@
  "sliders": 16,
  "loras": 11,
  "exact_sha256": {
-  "models/SheetSage2-F32.gguf": "f324d213e78a1522bbc56ebb819584af11a34336ab55084b1d8145f1bcf15e58",
   "models/YuE2-3B-BF16.gguf": "0c8beac07fd2c13d95ca6f1c95b1e0d3ac816316c410ede88cb85826fe38c5c8",
   "models/YuE2-Vae-F32.gguf": "93e49dfb1970e89ad64cacb17cf13b5d05f6bb30ef7ed3adae3050bcb728638a",
   "models/YuE2-Vae-blend-F32.gguf": "157b07f1487e6c58d4f9cf7589a9c75be88af7ecd1b63ef5f96cb6987043bc4d",
@@ -35,6 +34,13 @@
   "sliders/rnb.gguf": "44e32fb965dfbeefae3220a080a43401ff0469a51da7a3233e71019042236930"
  },
  "quantized_structure": {
+  "models/SheetSage2-F32.gguf": {
+   "tensors": 1039,
+   "types": {
+    "F32": 1039
+   },
+   "digest": "aade1d2ba9409e6c43d107e414374b75bf52b2625d295150b0a30218cb79d375"
+  },
   "models/YuE2-3B-Q5_K_M.gguf": {
    "tensors": 627,
    "types": {

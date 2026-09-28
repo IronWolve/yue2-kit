@@ -17,6 +17,8 @@
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 G=$'\e[32m' Y=$'\e[33m' R=$'\e[31m' D=$'\e[2m' B=$'\e[1m' X=$'\e[0m'
+# plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then G="" Y="" R="" D="" B="" X=""; fi
 KEEP=0; GPU=0
 for a in "$@"; do case "$a" in --keep) KEEP=1 ;; --gpu) GPU=1 ;; *) echo "unknown option: $a"; exit 2 ;; esac; done
 T="$ROOT/tmp/test-real"; BIN="$ROOT/build/build/yue-server"

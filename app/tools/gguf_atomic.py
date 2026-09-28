@@ -5,17 +5,26 @@ code and its output bytes alone:
 - every output is written as <name>.partial and renamed into place only once it is complete, so an
   interrupted run never leaves a file that looks finished (the converters skip outputs that exist);
 - with --low-memory (or YUE2_LOWMEM=1), gguf's own use_temp_file=True: the tensors wait in a temporary
-  file under TMPDIR (the project's tmp/) instead of in RAM, which an 8 GiB machine needs for the 7.2 GB
-  backbone. It costs about the size of the largest output in free disk while it runs.
+  file in the install's tmp/ instead of in RAM, which an 8 GiB machine needs for the 7.2 GB backbone.
+  It costs about the size of the largest output in free disk while it runs. Every temporary file goes
+  to the install's tmp/ (found from this file's place), whatever TMPDIR says.
 
     python gguf_atomic.py [--low-memory] SCRIPT [ARGS...]
 """
 import os
 import runpy
 import sys
+import tempfile
 
-import gguf
-import gguf.gguf_writer
+# temporary files (gguf's spooled tensors, anything the converter makes) stay in the install's tmp/:
+# never the system temporary folder, even when TMPDIR is unset
+TMP = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tmp")
+os.makedirs(TMP, exist_ok=True)
+os.environ["TMPDIR"] = TMP
+tempfile.tempdir = TMP
+
+import gguf  # noqa: E402
+import gguf.gguf_writer  # noqa: E402
 
 args = sys.argv[1:]
 LOW = os.environ.get("YUE2_LOWMEM") == "1"

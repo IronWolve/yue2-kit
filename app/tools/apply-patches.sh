@@ -63,7 +63,7 @@ if [ "$got" = "$(info tree)" ]; then
 else
   echo "${G}applied${X}  on upstream ${C}$(git -C "$BUILD" rev-parse --short "HEAD~$(( $(ls "$ENG"/patches/*.patch | wc -l) + 1 ))" 2>/dev/null || echo '?')${X}: new code, so build and test it:"
   echo "  ${D}./build-page.sh   (if the page sources changed)${X}"
-  echo "  ${D}TMPDIR=\$PWD/tmp nice -n 15 cmake --build build/build -j 7${X}"
+  echo "  ${D}TMPDIR=\$PWD/tmp CCACHE_DIR=\$PWD/tmp/ccache CCACHE_BASEDIR=\$PWD nice -n 15 cmake --build build/build -j 7${X}"
   echo "  ${D}node tools/cdp-console.mjs, tools/test-real.sh, then tools/export-patches.sh${X}"
 fi
 echo "${B}stats${X}  $(git -C "$BUILD" rev-list --count "$(info base)..HEAD" 2>/dev/null || echo '?') commits on top of the base, $(( $(date +%s) - t0 )) s"

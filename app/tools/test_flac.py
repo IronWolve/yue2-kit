@@ -30,12 +30,28 @@ ROOT = Path(__file__).resolve().parent.parent
 TMP = ROOT / "tmp"
 WORK = TMP / "flac-test"
 BIN = TMP / "flac-check"
-G, R, Y, C, D, B, X = "\033[32m", "\033[31m", "\033[33m", "\033[36m", "\033[2m", "\033[1m", "\033[0m"
+# plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
+COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+G, R, Y, C, D, B, X = ("\033[32m", "\033[31m", "\033[33m", "\033[36m", "\033[2m", "\033[1m", "\033[0m") if COLOR else ("",) * 7
 NICE = ["nice", "-n", "15"] + (["taskset", "-c", "0"] if shutil.which("taskset") else [])   # no taskset on macOS
+TIMEOUT = 300    # seconds for any one tool run (the compile, an encode, a decode): a hung tool fails its case
 
 
-def run(cmd, **kw):
-    return subprocess.run(NICE + [str(c) for c in cmd], capture_output=True, text=True, **kw)
+def run(cmd, timeout=TIMEOUT, **kw):
+    cmd = [str(c) for c in cmd]
+    try:
+        return subprocess.run(NICE + cmd, capture_output=True, text=True, timeout=timeout, **kw)
+    except subprocess.TimeoutExpired as e:
+        out = e.stdout.decode(errors="replace") if isinstance(e.stdout, bytes) else (e.stdout or "")
+        return subprocess.CompletedProcess(cmd, 124, out, f"timed out after {timeout} s: {os.path.basename(cmd[0])}")
+
+
+def needs_build(binary, sources):
+    """The checker binary is rebuilt only when it is missing or older than one of its sources."""
+    if not binary.exists():
+        return True
+    built = binary.stat().st_mtime
+    return any(src.stat().st_mtime > built for src in sources)
 
 
 def write_wav(path, ints, rate, bits, floats=None):
@@ -107,15 +123,18 @@ def main():
     WORK.mkdir(parents=True, exist_ok=True)
     src = ROOT / "tools" / "flac_check.cpp"
     t0 = time.time()
-    p = run(["g++", "-O2", "-std=c++17", "-Wall", "-Wextra", "-I", ROOT / "build" / "src", src, "-o", BIN])
-    warnings = [line for line in p.stderr.splitlines() if "warning" in line]
-    if p.returncode != 0:
-        print(f"{R}build failed{X}\n{p.stderr}")
-        return 1
-    print(f"{B}flac-enc{X}  built {C}{BIN.relative_to(ROOT)}{X} {D}in {time.time() - t0:.1f} s, "
-          f"{len(warnings)} warnings{X}")
-    for w in warnings[:5]:
-        print(f"  {Y}{w}{X}")
+    if needs_build(BIN, [src, ROOT / "build" / "src" / "flac-enc.h"]):
+        p = run(["g++", "-O2", "-std=c++17", "-Wall", "-Wextra", "-I", ROOT / "build" / "src", src, "-o", BIN])
+        warnings = [line for line in p.stderr.splitlines() if "warning" in line]
+        if p.returncode != 0:
+            print(f"{R}build failed{X}\n{p.stderr}")
+            return 1
+        print(f"{B}flac-enc{X}  built {C}{BIN.relative_to(ROOT)}{X} {D}in {time.time() - t0:.1f} s, "
+              f"{len(warnings)} warnings{X}")
+        for w in warnings[:5]:
+            print(f"  {Y}{w}{X}")
+    else:
+        print(f"{B}flac-enc{X}  {C}{BIN.relative_to(ROOT)}{X} {D}is newer than its sources: not rebuilt{X}")
 
     passed = failed = 0
 

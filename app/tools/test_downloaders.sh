@@ -14,7 +14,10 @@
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 G=$'\e[32m' R=$'\e[31m' D=$'\e[2m' B=$'\e[1m' X=$'\e[0m'
+# plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then G="" R="" D="" B="" X=""; fi
 ONLINE=0; [ "${1:-}" = "--online" ] && ONLINE=1
+export TMPDIR="$ROOT/tmp"      # the shell's own temporary files (here-strings on an older bash) stay in tmp/ too
 T="$ROOT/tmp/test-downloaders"; rm -rf "$T"; mkdir -p "$T"
 t0=$(date +%s); pass=0; fail=0
 check() { if [ "$2" = 0 ]; then pass=$((pass + 1)); echo "  ${G}PASS${X}  $1"; else fail=$((fail + 1)); echo "  ${R}FAIL${X}  $1${3:+ ${D}($3)${X}}"; fi; }
@@ -87,8 +90,10 @@ export HF_STUB_LOG="$T/hf-argv.txt"; : > "$HF_STUB_LOG"
 call=$(awk '/^--end--$/ {if (keep) {print buf; exit} buf=""; keep=0; next} {buf = buf $0 "\n"; if ($0 == "ntc-ai/yue2-particle-sliders") keep=1}' "$HF_STUB_LOG")
 got=$(printf '%s' "$call" | awk '/^--include$/ {on=1; next} /^--/ {on=0} on' | tr '\n' ' ' | sed 's/ $//')
 [ "$got" = "$PATS" ]; check "the slider call passes exactly the 7 patterns after --include, unexpanded" $? "got: $got"
-printf '%s' "$call" | head -3 | tr '\n' ' ' | command grep -q '^download --quiet ntc-ai/yue2-particle-sliders $'; check "  and no file names before them (the repo is the only positional argument)" $?
-printf '%s' "$call" | command grep -q '^33cf42fb0a54f60d8264d64cf6c20f038c4d172b$'; check "  at the pinned revision" $?
+# (compared as whole strings: a "| head" or "| grep -q" can end early and fail the pipeline under pipefail)
+first3=$(printf '%s\n' "$call" | awk 'NR <= 3' | tr '\n' ' ')
+[ "$first3" = "download --quiet ntc-ai/yue2-particle-sliders " ]; check "  and no file names before them (the repo is the only positional argument)" $? "got: $first3"
+printf '%s\n' "$call" | awk '$0 == "33cf42fb0a54f60d8264d64cf6c20f038c4d172b" {f = 1} END {exit !f}'; check "  at the pinned revision" $?
 [ $r != 0 ] && command grep -q 'failed.*particle-sliders' "$T/run.txt"
 check "a downloader that exits 0 but fetches nothing is reported as failed, not done" $? "exit $r"
 command grep -q 'done.*particle-sliders' "$T/run.txt"; [ $? != 0 ]; check "  and particle-sliders is never called done" $?
@@ -97,7 +102,9 @@ echo "${B}the LoRA downloader too${X}"
 : > "$HF_STUB_LOG"
 (cd "$DECOY" && YUE2_HF="$T/hf-stub" YUE2_HF_EXPECTED="$T/expected" "$S/tools/download-loras.sh" > "$T/run.txt" 2>&1); r=$?
 [ $r != 0 ] && ! command grep -q ' done ' "$T/run.txt"; check "exit 0 with nothing fetched is a failure for every LoRA file" $? "exit $r"
-command grep -c '^--revision$' "$HF_STUB_LOG" | command grep -q -v '^0$'; check "  every LoRA call carries --revision" $?
+# per call (the stub ends each with --end--): the calls without --revision, out of all calls
+read -r norev ncalls < <(awk '/^--end--$/ {calls++; if (!rev) bad++; rev = 0; next} $0 == "--revision" {rev = 1} END {print bad + 0, calls + 0}' "$HF_STUB_LOG")
+[ "$ncalls" -gt 0 ] && [ "$norev" = 0 ]; check "  every LoRA call carries --revision" $? "$norev of $ncalls calls without it"
 
 if [ "$ONLINE" = 1 ]; then
   echo "${B}the real pinned downloader (network, about 16 MB)${X}"

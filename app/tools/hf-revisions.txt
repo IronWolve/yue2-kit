@@ -14,3 +14,4 @@ monsterovich/yue2-industrial-rock-lora a71706d59e2874f1e6db9aa10e8da5cc19e6c924
 storagejuju/yue2-jpop-t4-lora 16c181c15cf7d06b1b570a149624b1e78724baa6
 Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4 e2e63d859f3af879baf1b4d4e9f22d1eeda6fde5
 monsterovich/yue2-steps-from-hell bc84ad1867158e1112ab9601c74b338847d9dff2
+Serveurperso/YuE2-GGUF 64b030e3deb6e8150d2b7c0db641ef5a17eca8a3

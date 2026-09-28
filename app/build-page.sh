@@ -15,6 +15,8 @@ export TMPDIR="$ROOT/tmp"
 mkdir -p "$TMPDIR"
 
 G=$'\e[32m' Y=$'\e[33m' R=$'\e[31m' C=$'\e[36m' D=$'\e[2m' B=$'\e[1m' X=$'\e[0m'
+# plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then G="" Y="" R="" C="" D="" B="" X=""; fi
 
 SRC="$ROOT/build/tools/console"
 EXAMPLES="$ROOT/build/tools/webui/example"
@@ -24,7 +26,7 @@ t0=$(python3 -c 'import time; print(time.time_ns())')      # portable: macOS dat
 
 for f in index.html app.css themes.css instrumental.js help.js loras.js vaes.js themes.js app.js; do
     if [ ! -f "$SRC/$f" ]; then
-        echo "${R}missing${X} ${SRC#$ROOT/}/$f"
+        echo "${R}missing${X} ${SRC#"$ROOT"/}/$f"
         exit 1
     fi
 done
@@ -99,13 +101,16 @@ for bad in (folder, "/home/"):
         sys.exit(f"the page contains {bad!r}; paths and the folder name must not be baked in")
 
 page.write_text(result, encoding="utf-8")
-sizes = [len(t.encode("utf-8")) for t in (html, css + themecss, js + ins + helps + lorajs + themejs, examples_js, result)]
-lines = [t.count("\n") for t in (html, css + themecss, js + ins + helps + lorajs + themejs)]
-print("\t".join(str(v) for v in sizes + lines + [len(prompts)]))
+# the stats groups: every stylesheet and every script that was inlined
+styles = (css, themecss)
+scripts = (js, ins, helps, lorajs, vaejs, themejs)
+sizes = [len(t.encode("utf-8")) for t in (html, "".join(styles), "".join(scripts), examples_js, result)]
+lines = [t.count("\n") for t in (html, "".join(styles), "".join(scripts))]
+print("\t".join(str(v) for v in sizes + lines + [len(prompts), len(styles), len(scripts)]))
 PY
 ) || { echo "${R}build failed${X}"; exit 1; }
 
-IFS=$'\t' read -r s_html s_css s_js s_ex s_page l_html l_css l_js n_ex <<<"$stats"
+IFS=$'\t' read -r s_html s_css s_js s_ex s_page l_html l_css l_js n_ex n_css n_js <<<"$stats"
 
 gzip -9 -n -c "$PAGE" > "$GZ.part"
 gzip -t "$GZ.part"
@@ -119,9 +124,10 @@ ratio=$(awk -v a="$s_gz" -v b="$s_page" 'BEGIN { printf "%.1f%%", 100 * a / b }'
 
 echo "${B}console page${X}  ${G}built${X} in ${ms} ms"
 printf "  %-9s %-11s %6s lines  %10s\n" sources index.html "$l_html" "$(kb "$s_html")"
-printf "  %-9s %-11s %6s lines  %10s\n" "" app.css "$l_css" "$(kb "$s_css")"
-printf "  %-9s %-11s %6s lines  %10s\n" "" "app.js+4" "$l_js" "$(kb "$s_js")"
+printf "  %-9s %-11s %6s lines  %10s\n" "" "app.css+$((n_css - 1))" "$l_css" "$(kb "$s_css")"
+printf "  %-9s %-11s %6s lines  %10s\n" "" "app.js+$((n_js - 1))" "$l_js" "$(kb "$s_js")"
 printf "  %-9s %-11s %6s prompts%10s\n" "" examples "$n_ex" "$(kb "$s_ex")"
-printf "  %-9s ${C}%-40s${X} %10s\n" page "${PAGE#$ROOT/}" "$(kb "$s_page")"
-printf "  %-9s ${C}%-40s${X} %10s  ${D}(%s of the page)${X}\n" "gzip -9" "${GZ#$ROOT/}" "$(kb "$s_gz")" "$ratio"
+printf "  %-9s ${C}%-40s${X} %10s\n" page "${PAGE#"$ROOT"/}" "$(kb "$s_page")"
+printf "  %-9s ${C}%-40s${X} %10s  ${D}(%s of the page)${X}\n" "gzip -9" "${GZ#"$ROOT"/}" "$(kb "$s_gz")" "$ratio"
+echo "${B}stats${X}  $((1 + n_css + n_js)) source files ($n_css stylesheets, $n_js scripts) + $n_ex example prompts inlined, page $(kb "$s_page") -> gzip $(kb "$s_gz") ($ratio), ${ms} ms"
 echo "  ${D}next: rebuild yue-server to embed it (this script never runs cmake); test with tools/mock_server.py${X}"

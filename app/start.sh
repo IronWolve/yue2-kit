@@ -5,6 +5,7 @@
 #   ./start.sh                      the backbone settings.json picks (else the first one present)
 #   YUE2CPP_QUANT=Q8_0 ./start.sh   a given backbone copy, if present
 #   YUE2CPP_PORT=41868 ./start.sh   another port
+#   YUE2CPP_BATCH=1 ./start.sh      one song per pass instead of 2 (a GPU with 12 GB or less)
 #   YUE2CPP_DRY_RUN=1 ./start.sh    only print the server command it would run
 #   YUE2CPP_FP16_MATMUL=0 ./start.sh   keep BF16 maths on an RTX 20 / Volta card (the matmul block below)
 #
@@ -19,6 +20,8 @@ G=$'\e[32m' Y=$'\e[33m' R=$'\e[31m' D=$'\e[2m' B=$'\e[1m' X=$'\e[0m' C=$'\e[36m'
 if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then G="" Y="" R="" D="" B="" X="" C=""; fi
 
 PORT="${YUE2CPP_PORT:-41867}"
+# songs the server renders together in one pass (YUE2CPP_BATCH): 1 on a small GPU
+BATCH="${YUE2CPP_BATCH:-2}"
 # The backbone: YUE2CPP_QUANT, else the one settings.json picks (the page saves it there), else the
 # first copy present. Resolved before any file is required, so a Q5_K_M-only install starts.
 QUANT="${YUE2CPP_QUANT:-}"
@@ -42,7 +45,7 @@ TRANSCRIBER="$ROOT/models/SheetSage2-Q8_0.gguf"     # downloaded; convert-models
 missing=0
 for f in "$BIN" "$MODEL" "$VAE"; do
     if [ ! -f "$f" ]; then
-        echo "${R}missing${X} ${f#$ROOT/}"
+        echo "${R}missing${X} ${f#"$ROOT"/}"
         missing=1
     fi
 done
@@ -53,9 +56,10 @@ fi
 
 size() { du -h "$1" 2>/dev/null | cut -f1 | tr -d ' '; }
 count() { wc -l | tr -d ' '; }          # macOS pads wc's number with spaces
+plural() { if [ "$1" = 1 ]; then printf '%s %s' "$1" "$2"; else printf '%s %ss' "$1" "$2"; fi; }   # plural 2 song -> 2 songs
 row() { printf '  %s%-12s%s %s\n' "$C" "$1" "$X" "$2"; }
 args=(--host 127.0.0.1 --port "$PORT" --model "$QUANT=$MODEL" --vae "standard=$VAE" --outputs "$OUTPUTS"
-      --max-batch "${YUE2CPP_BATCH:-2}" --settings "$ROOT/settings.json")
+      --max-batch "$BATCH" --settings "$ROOT/settings.json")
 # every other backbone that is present can be picked in the page (Engine -> Model)
 models="${B}$QUANT${X} $(size "$MODEL") ${G}starts${X}"
 for q in BF16 Q8_0 Q6_K Q5_K_M; do
@@ -104,7 +108,7 @@ fi
 URL="http://127.0.0.1:$PORT"
 TTY=0; [ -t 1 ] && TTY=1      # tested here: inside $(...) stdout is a pipe
 link() { if [ "$TTY" = 1 ]; then printf '\e]8;;%s\e\\%s\e]8;;\e\\' "$1" "$1"; else printf '%s' "$1"; fi; }
-echo "${B}yue2.cpp${X}  ${G}$(link "$URL")${X}"
+echo "${B}$(basename "$ROOT")${X}  ${G}$(link "$URL")${X}"
 if [ -n "$GPU_NAME" ] && [ "$ON_GPU" = 1 ]; then
     row gpu "${B}$(printf '%s' "$GPU_NAME" | sed 's/^ *//')${X} ${D}·${X} $(awk -v u="$GPU_USED" -v t="$GPU_TOTAL" 'BEGIN { printf "%.1f of %.1f GiB in use", u / 1024, t / 1024 }') ${D}· compute $CC${X}"
 elif [ -n "$GPU_NAME" ]; then
@@ -130,7 +134,8 @@ if [ -f "$SLIDERS/catalog.json" ]; then
 else
     row sliders "${Y}not converted${X} ${D}(./convert-models.sh)${X}"
 fi
-row library "${B}$(find "$OUTPUTS" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | count)${X} songs ${D}· $(du -sh "$OUTPUTS" 2>/dev/null | cut -f1 | tr -d ' ') in ${OUTPUTS#$ROOT/}/${X}"
+nsongs=$(find "$OUTPUTS" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | count)
+row library "${B}$nsongs${X} $([ "$nsongs" = 1 ] && echo song || echo songs) ${D}· $(du -sh "$OUTPUTS" 2>/dev/null | cut -f1 | tr -d ' ') in ${OUTPUTS#"$ROOT"/}/${X}"
 if [ -f "$TRANSCRIBER" ]; then
     args+=(--transcriber "$TRANSCRIBER")
     row transcriber "$(basename "$TRANSCRIBER") ${D}· $(size "$TRANSCRIBER") · covers from a recording${X}"
@@ -144,9 +149,9 @@ s = json.load(open(sys.argv[1]))
 seq = s.get("max_seq") or 0
 print("models " + ("kept loaded" if s.get("keep_loaded") else "unloaded after each song"),
       "context " + ("whole" if not seq else f"{seq:,}"), "VAE tiles " + str(s.get("vae_core", 512)), sep=" · ")' "$ROOT/settings.json" 2>/dev/null || true)
-    row engine "${engine:-${Y}settings.json unreadable${X}} ${D}· up to ${YUE2CPP_BATCH:-2} songs per pass${X}"
+    row engine "${engine:-${Y}settings.json unreadable${X}} ${D}· up to $(plural "$BATCH" song) per pass${X}"
 else
-    row engine "defaults ${D}(no settings.json yet: the Engine page saves one) · up to ${YUE2CPP_BATCH:-2} songs per pass${X}"
+    row engine "defaults ${D}(no settings.json yet: the Engine page saves one) · up to $(plural "$BATCH" song) per pass${X}"
 fi
 echo "  ${D}Ctrl-C to stop · NO_COLOR=1 for a plain log${X}"
 

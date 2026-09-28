@@ -8,8 +8,13 @@
    adapters on the 112 AR attention projections) as one GGUF each plus a
    catalog.json the server reads with --sliders.
 
-Existing outputs are skipped. Every source is checked against its published
-checksum before conversion.
+Existing outputs are skipped, and a source folder is only looked up when an
+output needs it. Every source is checked against its published checksum
+before conversion.
+
+    convert-extras.py                  make what is missing
+    convert-extras.py --list-outputs   print the files it makes (relative to the
+                                       install folder), one per line; nothing else
 """
 import hashlib
 import importlib.util
@@ -39,13 +44,19 @@ def first_dir(*candidates):
     raise SystemExit("none of these exist: " + ", ".join(candidates))
 
 
-LEGACY_SRC = os.path.join(CKPT, "YuE2-Vae-legacy")
-BLEND_SRC = first_dir(os.path.join(CKPT, "YuE2-Vae-merge-0.666"),
-                      os.path.join(CKPT, "..", "Mothersuperior", "YuE2-Vae-merge-0.666"))
-SLIDER_SRC = first_dir(os.path.join(CKPT, "particle-sliders"),
-                       os.path.join(CKPT, "..", "ntc-ai", "yue2-particle-sliders"))
+# Where each source may be; looked up only when an output is missing (first_dir), so a run with every
+# output present never needs the checkpoints.
+VAE_SOURCES = {
+    "legacy": (os.path.join(CKPT, "YuE2-Vae-legacy"),),
+    "blend": (os.path.join(CKPT, "YuE2-Vae-merge-0.666"),
+              os.path.join(CKPT, "..", "Mothersuperior", "YuE2-Vae-merge-0.666")),
+}
+SLIDER_SOURCES = (os.path.join(CKPT, "particle-sliders"),
+                  os.path.join(CKPT, "..", "ntc-ai", "yue2-particle-sliders"))
 
-G, Y, R, D, X = "\033[32m", "\033[33m", "\033[31m", "\033[2m", "\033[0m"
+# plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
+COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+G, Y, R, D, X = ("\033[32m", "\033[33m", "\033[31m", "\033[2m", "\033[0m") if COLOR else ("",) * 5
 PROJ = ("q_proj", "k_proj", "v_proj", "o_proj")
 MLP_INDEX = (0, 2, 4, 6)   # the Linear layers of nn.Sequential(Linear, LeakyReLU, ...)
 
@@ -67,13 +78,44 @@ def load_upstream_converter():
     return module
 
 
-def convert_vae_variant(conv, source_dir, name):
-    out = os.path.join(VAE_OUT, "YuE2-Vae-%s-F32.gguf" % name)
+def vae_out(name):
+    return os.path.join(VAE_OUT, "YuE2-Vae-%s-F32.gguf" % name)
+
+
+def load_json(path):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def slider_catalog():
+    """(source folder, its catalog.json), or (None, None) when the slider source is not on this disk."""
+    for c in SLIDER_SOURCES:
+        if os.path.isfile(os.path.join(c, "catalog.json")):
+            return c, load_json(os.path.join(c, "catalog.json"))
+    return None, None
+
+
+def list_outputs():
+    """Every file this script makes, relative to ROOT: the two VAEs, then one GGUF per slider (from the
+    slider source's catalog, else from the catalog an earlier run wrote)."""
+    outs = [vae_out(name) for name in VAE_SOURCES]
+    _, catalog = slider_catalog()
+    if catalog is not None:
+        outs += [os.path.join(SLIDER_OUT, e["id"] + ".gguf") for e in catalog.get("sliders", [])]
+    elif os.path.isfile(os.path.join(SLIDER_OUT, "catalog.json")):
+        outs += [os.path.join(SLIDER_OUT, e["file"]) for e in load_json(os.path.join(SLIDER_OUT, "catalog.json")).get("sliders", [])]
+    return [os.path.relpath(o, ROOT) for o in outs]
+
+
+def convert_vae_variant(get_conv, name):
+    out = vae_out(name)
     if os.path.exists(out):
         print(f"{G}have{X}      {os.path.basename(out)}")
         stats["skipped"] += 1
         return
-    manifest = json.load(open(os.path.join(source_dir, "weights_manifest.json")))
+    source_dir = os.path.realpath(first_dir(*VAE_SOURCES[name]))
+    conv = get_conv()
+    manifest = load_json(os.path.join(source_dir, "weights_manifest.json"))
     expected = manifest["files"]["model.safetensors"]["sha256"]
     if sha256(os.path.join(source_dir, "model.safetensors")) != expected:
         print(f"{R}checksum{X}  {source_dir} does not match its manifest; skipped")
@@ -91,8 +133,8 @@ def convert_vae_variant(conv, source_dir, name):
     stats["made"] += 1
 
 
-def convert_slider(entry):
-    source = os.path.join(SLIDER_SRC, entry["weights"])
+def convert_slider(slider_src, entry):
+    source = os.path.join(slider_src, entry["weights"])
     out = os.path.join(SLIDER_OUT, entry["id"] + ".gguf")
     if os.path.exists(out):
         stats["skipped"] += 1
@@ -143,23 +185,44 @@ def convert_slider(entry):
 
 
 def main():
+    if "--list-outputs" in sys.argv[1:]:
+        print("\n".join(list_outputs()))
+        return 0
     start = time.time()
     os.makedirs(VAE_OUT, exist_ok=True)
     os.makedirs(SLIDER_OUT, exist_ok=True)
-    conv = load_upstream_converter()
-    convert_vae_variant(conv, LEGACY_SRC, "legacy")
-    convert_vae_variant(conv, os.path.realpath(BLEND_SRC), "blend")
+    loaded = []
 
-    catalog = json.load(open(os.path.join(SLIDER_SRC, "catalog.json")))
-    entries = []
-    for entry in catalog["sliders"]:
-        if convert_slider(entry):
-            entries.append({"id": entry["id"], "label": entry["label"], "description": entry.get("description", ""),
-                            "file": entry["id"] + ".gguf", "source_sha256": entry["sha256"]})
-    with open(os.path.join(SLIDER_OUT, "catalog.json"), "w") as f:
-        json.dump({"source": "ntc-ai/yue2-particle-sliders", "release": catalog.get("release"),
-                   "experimental": catalog.get("experimental"), "recommended_range": catalog.get("recommended_range"),
-                   "sliders": entries}, f, indent=2)
+    def get_conv():   # upstream convert.py, loaded once and only when a VAE is made
+        if not loaded:
+            loaded.append(load_upstream_converter())
+        return loaded[0]
+
+    for name in VAE_SOURCES:
+        convert_vae_variant(get_conv, name)
+
+    slider_src, catalog = slider_catalog()
+    out_catalog = os.path.join(SLIDER_OUT, "catalog.json")
+    if catalog is None:
+        # no source on this disk: fine when an earlier run made every slider its catalog lists
+        if not os.path.isfile(out_catalog):
+            raise SystemExit("no slider source (catalog.json) in any of: " + ", ".join(SLIDER_SOURCES))
+        entries = load_json(out_catalog).get("sliders", [])
+        have = [e for e in entries if os.path.isfile(os.path.join(SLIDER_OUT, e["file"]))]
+        stats["skipped"] += len(have)
+        if len(have) != len(entries):
+            raise SystemExit(f"{len(entries) - len(have)} sliders are missing and their source is not on this disk: "
+                             + ", ".join(SLIDER_SOURCES))
+    else:
+        entries = []
+        for entry in catalog["sliders"]:
+            if convert_slider(slider_src, entry):
+                entries.append({"id": entry["id"], "label": entry["label"], "description": entry.get("description", ""),
+                                "file": entry["id"] + ".gguf", "source_sha256": entry["sha256"]})
+        with open(out_catalog, "w", encoding="utf-8") as f:
+            json.dump({"source": "ntc-ai/yue2-particle-sliders", "release": catalog.get("release"),
+                       "experimental": catalog.get("experimental"), "recommended_range": catalog.get("recommended_range"),
+                       "sliders": entries}, f, indent=2)
     size = sum(os.path.getsize(os.path.join(SLIDER_OUT, e["file"])) for e in entries) / 1e6
     print(f"{G}sliders{X}   {len(entries)} in {os.path.realpath(SLIDER_OUT)}  {D}{size:.0f} MB{X}")
     print(f"\nextras: made {G}{stats['made']}{X}, already here {stats['skipped']}, "

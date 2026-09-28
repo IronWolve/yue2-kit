@@ -11,6 +11,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 G=$'\e[32m' Y=$'\e[33m' R=$'\e[31m' C=$'\e[36m' D=$'\e[2m' B=$'\e[1m' X=$'\e[0m'
+# plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then G="" Y="" R="" C="" D="" B="" X=""; fi
 # shellcheck source=hf-env.sh
 source "$ROOT/tools/hf-env.sh"
 
@@ -29,8 +31,15 @@ LORAS=(
 MODE="download"
 case "${1:-}" in --check) MODE="check" ;; --verify) MODE="verify" ;; "") ;; *) echo "unknown option: $1"; exit 2 ;; esac
 start=$(date +%s); got=0; have=0; failed=0; bytes=0
-mkdir -p "$ROOT/loras" "$ROOT/tmp"
-[ "$MODE" = "download" ] && { hf_ready || exit 1; }
+# only a download writes into the install; --check and --verify write nothing (not even hf_expect.py's
+# file-list cache)
+if [ "$MODE" = "download" ]; then
+  mkdir -p "$ROOT/loras" "$ROOT/tmp"
+  hf_ready || exit 1
+else
+  export YUE2_HF_CACHE_READONLY=1
+fi
+red_if() { [ "$1" -gt 0 ] && printf '%s' "$R"; }   # a count that is bad only when it is not 0
 
 for entry in "${LORAS[@]}"; do
   IFS='|' read -r folder repo sub files <<< "$entry"
@@ -46,7 +55,8 @@ for entry in "${LORAS[@]}"; do
       head=$(curl -sI "https://huggingface.co/$repo/resolve/$rev/$path" || true)
       code=$(printf '%s' "$head" | awk 'NR==1 {print $2}')
       # big files report their size in x-linked-size; small text files are just "small"
-      size=$(printf '%s' "$head" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-linked-size" {print $2}' | head -1)
+      # the first x-linked-size, in awk itself: "| head -1" could fail the pipeline under pipefail
+      size=$(printf '%s' "$head" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-linked-size" && !n++ {print $2}')
       ok_codes='^(200|302|307)$'    # in a variable: bash 3.2 (macOS /bin/bash) cannot parse ( ) inline here
       if [[ "$code" =~ $ok_codes ]]; then
         printf '  %sok%s      %-52s %s\n' "$G" "$X" "$f" "${D}$([ -n "$size" ] && human "$size" || echo small)${X}"
@@ -90,16 +100,16 @@ for entry in "${LORAS[@]}"; do
     fi
   done
 done
-rm -rf "$ROOT/tmp/lora-download"
+[ "$MODE" = "download" ] && rm -rf "$ROOT/tmp/lora-download"
 
 secs=$(( $(date +%s) - start ))
 echo
 case "$MODE" in
-  check)  echo "${B}loras${X}  on Hugging Face: ${G}$got${X} files found, ${R}$failed${X} missing  ${D}($(human $bytes) in all, ${secs}s)${X}" ;;
-  verify) echo "${B}loras${X}  complete files ${G}$have${X}, folders not complete ${R}$failed${X}  ${D}(${secs}s)${X}" ;;
+  check)  echo "${B}loras${X}  on Hugging Face: ${G}$got${X} files found, $(red_if "$failed")$failed${X} missing  ${D}($(human $bytes) in all, ${secs}s)${X}" ;;
+  verify) echo "${B}loras${X}  complete files ${G}$have${X}, folders not complete $(red_if "$failed")$failed${X}  ${D}(${secs}s)${X}" ;;
   *)
-    echo "${B}loras${X}  downloaded ${G}$got${X} ($(human $bytes))  already complete $have  failed ${R}$failed${X}  in ${secs}s"
-    echo "       $(find -L "$ROOT/loras" -name '*.safetensors' -not -path '*/.*' | wc -l) LoRA files, folder $(du -shL "$ROOT/loras" | cut -f1), disk free $(df -h "$ROOT" | awk 'NR==2 {print $4}')"
+    echo "${B}loras${X}  downloaded ${G}$got${X} ($(human $bytes))  already complete $have  failed $(red_if "$failed")$failed${X}  in ${secs}s"
+    echo "       $(find -L "$ROOT/loras" -name '*.safetensors' -not -path '*/.*' | wc -l | tr -d ' ') LoRA files, folder $(du -shL "$ROOT/loras" | cut -f1), disk free $(df -h "$ROOT" | awk 'NR==2 {print $4}')"
     [ -f "$ROOT/loras/sources.json" ] || echo "       ${Y}loras/sources.json is missing${X} ${D}(copy it from the kit: names, blurbs, links and recaps)${X}" ;;
 esac
 [ "$failed" = 0 ]

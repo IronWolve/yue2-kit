@@ -5,6 +5,8 @@
 #   YUE2_HF=/path/to/hf           use another hf program (the regression tests pass a stub)
 #   YUE2_HF_EXPECTED=DIR          read expected file lists from DIR/<owner>__<repo>.json instead of asking
 #                                 Hugging Face (the regression tests use it)
+#   YUE2_HF_CACHE_READONLY=1      tools/hf_expect.py reads its cached file lists (tmp/hf/expect) but writes
+#                                 none: the scripts' --check and --verify modes set it, so they write nothing
 
 export TMPDIR="$ROOT/tmp"
 # a profile may export its own HF_HUB_CACHE, which beats HF_HOME: pin every cache
@@ -35,7 +37,8 @@ hf_rev() { local r=""; [ -f "$HF_REVS" ] && r=$(awk -v k="$1" '$1 == k {print $2
 hf_ready() {
   [ -n "${YUE2_HF:-}" ] && return 0
   local want
-  want=$(command grep -v '^[[:space:]]*#' "$HF_REQ" | command grep -o 'huggingface_hub[^=]*==[0-9.]*' | head -1 | sed 's/.*==//')
+  # one awk over the file (no "| head": under pipefail an early exit can fail the command before it)
+  want=$(awk '/^[[:space:]]*#/ {next} match($0, /huggingface_hub[^=]*==[0-9.]+/) {s = substr($0, RSTART, RLENGTH); sub(/.*==/, "", s); print s; exit}' "$HF_REQ")
   if [ -x "$HF_VENV/bin/python" ] && [ -x "$HF" ] && \
      [ "$("$HF_VENV/bin/python" -c 'import huggingface_hub as h; print(h.__version__)' 2>/dev/null)" = "$want" ]; then
     return 0
