@@ -849,6 +849,8 @@ select:disabled { opacity: .7; }
 .muse-row.secondary { max-width: 420px; }
 .muse-row.secondary select { padding: 6px 9px; font-size: 12.5px; }
 .muse-row input { flex: 1; }
+/* the idea: a full line that grows with its text, like the style box */
+#idea { flex: 1; field-sizing: content; min-height: 0; max-height: 40vh; resize: vertical; }
 
 .btn.writer {
   flex: none;
@@ -864,7 +866,10 @@ select:disabled { opacity: .7; }
 .muse-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .muse-foot .check { font-size: 11.5px; color: var(--dim); }
 .muse .row-hint { margin: 0; }
-.muse-status { font-size: 11px; color: var(--patina); margin-left: auto; }
+/* the two buttons stay together on the right; the status line (a run's result) goes under them */
+.muse-actions { display: flex; flex: none; gap: 8px; align-items: center; margin-left: auto; }
+.muse-status { order: 3; flex-basis: 100%; text-align: right; font-size: 11px; color: var(--patina); }
+.muse-status:empty { display: none; }
 .muse-status.bad { color: var(--bad); }
 /* the chat server's state: a square button, green when it answers, red when not. Both labels share one
    grid cell, so it is always as wide as the longer one and never changes size; the details are its tip. */
@@ -875,6 +880,8 @@ select:disabled { opacity: .7; }
 .chat-link[data-s="on"] { border-color: var(--good-line); background: color-mix(in srgb, var(--good) 12%, transparent); color: var(--good); }
 .chat-link[data-s="on"] .off, .chat-link[data-s="off"] .on { visibility: hidden; }
 .chat-link:hover { filter: brightness(1.15); }
+/* Write the brief sits beside it, the same height */
+.muse-foot .btn.writer { height: 28px; padding: 0 12px; font-size: 12px; }
 
 /* The writer lives in a closed drawer; inside it the muse panel drops its own frame. */
 #museDrawer .muse { margin: 0; padding: 0; background: none; border: 0; border-radius: 0; }
@@ -3426,11 +3433,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         <select id="museModel" title="The model loaded on the chat server; this page never picks another" disabled></select>
       </div>
       <div class="muse-row">
-        <input type="text" id="idea" autocomplete="off"
-               placeholder="a slow song about missing the last train home" />
-        <button type="button" class="btn writer" id="museBtn">
-          <span id="museGlyph" aria-hidden="true">✎</span> <span id="museLabel">Write the brief</span>
-        </button>
+        <textarea id="idea" rows="1" autocomplete="off"
+                  placeholder="a slow song about missing the last train home"></textarea>
       </div>
       <div class="muse-row secondary">
         <label class="field grow">
@@ -3448,9 +3452,14 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         <label class="check"><input type="checkbox" id="autoRun" />
           <span><strong>Write and generate</strong> — go straight on to the song</span></label>
         <span class="muse-status mono" id="museStatus"></span>
+        <div class="muse-actions">
         <button type="button" class="chat-link" id="chatLink" data-s="off" data-tip="Set the chat server address under Engine">
           <span class="on">Chat Server Connected</span><span class="off">Chat Server Offline</span>
         </button>
+        <button type="button" class="btn writer" id="museBtn">
+          <span id="museGlyph" aria-hidden="true">✎</span> <span id="museLabel">Write the brief</span>
+        </button>
+        </div>
       </div>
     </section>
       </div>
@@ -9509,7 +9518,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   });
 
   $("idea").addEventListener("keydown", function (event) {
-    if (event.key === "Enter") { event.preventDefault(); writeBrief(); }
+    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); writeBrief(); }   // Shift+Enter: a new line
   });
   $("museBtn").addEventListener("click", writeBrief);
 

@@ -519,3 +519,12 @@ Files:
 - `tools/console/app.css` (+9 −0)
 - `tools/console/app.js` (+10 −5)
 - `tools/console/index.html` (+3 −0)
+
+## 0039 Make the idea box a full line that grows; Write the brief beside the chat state
+
+2026-09-27. The idea is a one-line box across the whole drawer that grows with its text, like the style box (Shift+Enter for a new line; Enter still writes). Write the brief moves down beside the Chat Server button, the same height, the two kept together on the right; a run's result line goes under them.
+
+Files:
+- `tools/console/app.css` (+8 −1)
+- `tools/console/app.js` (+1 −1)
+- `tools/console/index.html` (+7 −5)

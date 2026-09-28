@@ -838,6 +838,8 @@ select:disabled { opacity: .7; }
 .muse-row.secondary { max-width: 420px; }
 .muse-row.secondary select { padding: 6px 9px; font-size: 12.5px; }
 .muse-row input { flex: 1; }
+/* the idea: a full line that grows with its text, like the style box */
+#idea { flex: 1; field-sizing: content; min-height: 0; max-height: 40vh; resize: vertical; }
 
 .btn.writer {
   flex: none;
@@ -853,7 +855,10 @@ select:disabled { opacity: .7; }
 .muse-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .muse-foot .check { font-size: 11.5px; color: var(--dim); }
 .muse .row-hint { margin: 0; }
-.muse-status { font-size: 11px; color: var(--patina); margin-left: auto; }
+/* the two buttons stay together on the right; the status line (a run's result) goes under them */
+.muse-actions { display: flex; flex: none; gap: 8px; align-items: center; margin-left: auto; }
+.muse-status { order: 3; flex-basis: 100%; text-align: right; font-size: 11px; color: var(--patina); }
+.muse-status:empty { display: none; }
 .muse-status.bad { color: var(--bad); }
 /* the chat server's state: a square button, green when it answers, red when not. Both labels share one
    grid cell, so it is always as wide as the longer one and never changes size; the details are its tip. */
@@ -864,6 +869,8 @@ select:disabled { opacity: .7; }
 .chat-link[data-s="on"] { border-color: var(--good-line); background: color-mix(in srgb, var(--good) 12%, transparent); color: var(--good); }
 .chat-link[data-s="on"] .off, .chat-link[data-s="off"] .on { visibility: hidden; }
 .chat-link:hover { filter: brightness(1.15); }
+/* Write the brief sits beside it, the same height */
+.muse-foot .btn.writer { height: 28px; padding: 0 12px; font-size: 12px; }
 
 /* The writer lives in a closed drawer; inside it the muse panel drops its own frame. */
 #museDrawer .muse { margin: 0; padding: 0; background: none; border: 0; border-radius: 0; }

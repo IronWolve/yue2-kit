@@ -216,11 +216,8 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         <select id="museModel" title="The model loaded on the chat server; this page never picks another" disabled></select>
       </div>
       <div class="muse-row">
-        <input type="text" id="idea" autocomplete="off"
-               placeholder="a slow song about missing the last train home" />
-        <button type="button" class="btn writer" id="museBtn">
-          <span id="museGlyph" aria-hidden="true">✎</span> <span id="museLabel">Write the brief</span>
-        </button>
+        <textarea id="idea" rows="1" autocomplete="off"
+                  placeholder="a slow song about missing the last train home"></textarea>
       </div>
       <div class="muse-row secondary">
         <label class="field grow">
@@ -238,9 +235,14 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         <label class="check"><input type="checkbox" id="autoRun" />
           <span><strong>Write and generate</strong> — go straight on to the song</span></label>
         <span class="muse-status mono" id="museStatus"></span>
+        <div class="muse-actions">
         <button type="button" class="chat-link" id="chatLink" data-s="off" data-tip="Set the chat server address under Engine">
           <span class="on">Chat Server Connected</span><span class="off">Chat Server Offline</span>
         </button>
+        <button type="button" class="btn writer" id="museBtn">
+          <span id="museGlyph" aria-hidden="true">✎</span> <span id="museLabel">Write the brief</span>
+        </button>
+        </div>
       </div>
     </section>
       </div>

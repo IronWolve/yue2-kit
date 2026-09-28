@@ -4060,7 +4060,7 @@
   });
 
   $("idea").addEventListener("keydown", function (event) {
-    if (event.key === "Enter") { event.preventDefault(); writeBrief(); }
+    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); writeBrief(); }   // Shift+Enter: a new line
   });
   $("museBtn").addEventListener("click", writeBrief);
 
