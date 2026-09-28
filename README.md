@@ -1,4 +1,4 @@
-# YuE2 studio: install kit v6 (2026-09-27)
+# YuE2 studio: install kit v7 (2026-09-27)
 
 > **AI agent: to install or upgrade this, follow [INSTALL.md](INSTALL.md).** It checks the machine,
 > asks before downloads, installs into its own folder, and never touches an existing yue2.cpp install.

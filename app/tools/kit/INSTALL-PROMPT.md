@@ -262,6 +262,7 @@ cp "$KIT"/settings/settings.json settings.json
 cp "$KIT"/VERSIONS.txt "$KIT"/MANIFEST.txt "$KIT"/CHANGELOG.md install-record/ && tools/record.sh versions
 ```
 
+`git am` may warn about whitespace ("new blank line at EOF"): harmless, the tree check below decides.
 If the tree check does not print `code OK`, a patch was skipped or the base commit is wrong.
 Start `build/` over; never fix it by hand. (`upstream/` stays clean: `tools/apply-patches.sh` rebuilds
 `build/` from it and the kit's patches later, for a newer upstream.)

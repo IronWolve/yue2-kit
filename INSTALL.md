@@ -1,6 +1,6 @@
 # Install a complete local YuE2 music studio, exactly like the original (instructions for an AI coding agent)
 
-Kit v6, 2026-09-27.
+Kit v7, 2026-09-27.
 
 You are an AI coding agent running on my computer with a shell. A friend has given me his
 local setup for **YuE2** (m-a-p/YuE2-3B, an AI model that writes whole songs with vocals from a
@@ -140,13 +140,13 @@ What it has (all of it comes with the patches; you do not build any of it by han
 
 ## 1. Check the machine first, then ask me
 
-The zip is in the folder you were started in. Unzip it (that only makes `yue2-kit-v6/`), then run the machine
+The zip is in the folder you were started in. Unzip it (that only makes `yue2-kit-v7/`), then run the machine
 check. It changes nothing. It also finds tools that are installed but **not on PATH**: on WSL, `nvcc`
 is often in `/usr/local/cuda/bin` and `nvidia-smi` in `/usr/lib/wsl/lib`.
 
 ```bash
-unzip -q -n yue2-kit-v6.zip       # makes yue2-kit-v6/ (-n: never overwrites a file)
-mkdir -p install-record && bash yue2-kit-v6/app/tools/check-machine.sh . 2>&1 | tee install-record/check-machine.txt
+unzip -q -n yue2-kit-v7.zip       # makes yue2-kit-v7/ (-n: never overwrites a file)
+mkdir -p install-record && bash yue2-kit-v7/app/tools/check-machine.sh . 2>&1 | tee install-record/check-machine.txt
 ```
 
 Summarise its report. The rules that follow from it:
@@ -222,7 +222,7 @@ Then ask me, in one message:
 
 ```
 ROOT/
-  yue2-kit-v6/     this kit (unzipped here); call it KIT
+  yue2-kit-v7/     this kit (unzipped here); call it KIT
   upstream/          github.com/ServeurpersoCom/yue2.cpp @ f17d526 (+ ggml submodule), never edited
   build/             upstream + the 36 patches + the built page: compiled and run from here
   build/checkpoints -> ../checkpoints       build/models -> ../models
@@ -238,8 +238,8 @@ ROOT/
 
 ```bash
 ROOT=~/yue2-studio            # the folder I chose (you are already in it)
-mkdir -p "$ROOT" && cd "$ROOT" && unzip -q yue2-kit-v6.zip    # makes yue2-kit-v6/ (skip if already unzipped)
-KIT=$ROOT/yue2-kit-v6
+mkdir -p "$ROOT" && cd "$ROOT" && unzip -q yue2-kit-v7.zip    # makes yue2-kit-v7/ (skip if already unzipped)
+KIT=$ROOT/yue2-kit-v7
 export TMPDIR=$ROOT/tmp && mkdir -p tmp outputs tools
 ```
 
@@ -262,6 +262,7 @@ cp "$KIT"/settings/settings.json settings.json
 cp "$KIT"/VERSIONS.txt "$KIT"/MANIFEST.txt "$KIT"/CHANGELOG.md install-record/ && tools/record.sh versions
 ```
 
+`git am` may warn about whitespace ("new blank line at EOF"): harmless, the tree check below decides.
 If the tree check does not print `code OK`, a patch was skipped or the base commit is wrong.
 Start `build/` over; never fix it by hand. (`upstream/` stays clean: `tools/apply-patches.sh` rebuilds
 `build/` from it and the kit's patches later, for a newer upstream.)
