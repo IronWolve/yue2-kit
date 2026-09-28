@@ -64,28 +64,41 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - a supplied or editable ABC score, covers from a recording or from a take;
   - sampling controls, versions per pass, and Plan score only.
 - **Add-ons, marked ADD-ON everywhere**:
-  - **VAE**: Standard and Legacy are stock; Blend is an add-on. One per song.
+  - **VAE**: Standard and Legacy are stock; Blend is an add-on. One per song. Each explains itself on
+    hover (Standard: the quality choice and the newer model; Blend: two thirds Standard, one third Legacy).
   - **{{NSLIDER}} voice and genre sliders**.
   - **{{NLORA}} LoRAs** in an even grid of buttons. Each button shows a short name, the half it steers
     (MUSIC / SOUND / BOTH) and a few words of what it does. Each LoRA gets its own strength for
     the music half and the sound half, plus a trigger-word button.
 - **Top bar**:
+  - the logo: "YuE2" links to the model's GitHub, the CPP badge to the engine's;
   - status and hardware readout;
   - a Model menu (BF16, Q5_K_M);
-  - a theme picker with **50 themes**;
+  - a theme picker with **50 themes** (the default is Studio, a dark warm palette);
   - Open/Save, Load example (110 official demos), Clear, a **New song** button, Unload model;
   - **Engine**.
-- **Run view and library**:
-  - a live score, progress and waveform, and a PLAYING tag on the take that is playing;
-  - takes with favourites and versions, and a new VAE version of a take in seconds;
-  - **Retake** (the exact same song again) and **Reuse** (same prompt, lyrics and settings, new music);
-  - downloads: FLAC, WAV 24-bit, and MP3 at 128–320 kbps;
-  - lyrics export, rename and delete.
+- **Library** (right): a tinted card with a ▶ PLAYING badge for the song that plays; favourites and
+  versions; a double-click on a song plays it.
+- **Song page** (middle):
+  - the title with **▶ Play this song** beside it, and Favourite, Rename and a red Delete as icons on the
+    right; under it: age, length and render time;
+  - buttons in three groups: Download (WAV, FLAC, MP3 with its bitrate), Make again (**Retake**: the
+    exact same song again; **Reuse**: same prompt, lyrics and settings, new music; Re-render sound),
+    Files (Request, Score);
+  - one compact details card: **Song | Sound | Shape** side by side (mode, format; VAE, model, steps;
+    Composition, Performance and Style on five-dot scales), then **Sliders | LoRAs** with each strength
+    beside its name, then the two seeds with copy buttons;
+  - a new VAE version of a take in seconds, the prompt, lyrics (with export) and the score;
+  - a live score, progress and waveform while a song is made.
+- **Player bar** (bottom): the song's name (its style prompt on hover), play, waveform, volume, and a
+  **status pill**: Rendering, Queued, Playing, Paused or Idle (a click shows the run or opens the song).
 - **Engine page** (its own page, with a pinned "⚙ Engine" band and a dotted backdrop):
   - server, compute, memory presets (8/12/16/24/32 GB) and hardware cards;
   - VAE tiles marked STOCK/ADD-ON;
   - LoRA tiles, each with its source link and an (i) recap;
-  - a Sliders card, the idea writer (a local chat server) and the server log.
+  - a Sliders card, the idea writer (a local chat server) and the server log;
+  - an **About** card at the end: "Customized Collection by SeattleSysop" with his GitHub, then YuE2,
+    yue2.cpp and ggml with their links, and every add-on's own page.
 - **An (i) help tip on every setting.**
 
 ---
@@ -140,13 +153,13 @@ What it has (all of it comes with the patches; you do not build any of it by han
 
 ## 1. Check the machine first, then ask me
 
-The zip is in the folder you were started in. Unzip it (that only makes `yue2-kit-v{{KITVER}}/`), then run the machine
+The zip is in the folder you were started in. Unzip it (that only makes `yue2-install-{{DATE}}-v{{KITVER}}/`), then run the machine
 check. It changes nothing. It also finds tools that are installed but **not on PATH**: on WSL, `nvcc`
 is often in `/usr/local/cuda/bin` and `nvidia-smi` in `/usr/lib/wsl/lib`.
 
 ```bash
-unzip -q -n yue2-kit-v{{KITVER}}.zip       # makes yue2-kit-v{{KITVER}}/ (-n: never overwrites a file)
-mkdir -p install-record && bash yue2-kit-v{{KITVER}}/app/tools/check-machine.sh . 2>&1 | tee install-record/check-machine.txt
+unzip -q -n yue2-install-{{DATE}}-v{{KITVER}}.zip       # makes yue2-install-{{DATE}}-v{{KITVER}}/ (-n: never overwrites a file)
+mkdir -p install-record && bash yue2-install-{{DATE}}-v{{KITVER}}/app/tools/check-machine.sh . 2>&1 | tee install-record/check-machine.txt
 ```
 
 Summarise its report. The rules that follow from it:
@@ -222,7 +235,7 @@ Then ask me, in one message:
 
 ```
 ROOT/
-  yue2-kit-v{{KITVER}}/     this kit (unzipped here); call it KIT
+  yue2-install-{{DATE}}-v{{KITVER}}/     this kit (unzipped here); call it KIT
   upstream/          github.com/ServeurpersoCom/yue2.cpp @ {{BASE}} (+ ggml submodule), never edited
   build/             upstream + the {{NPATCH}} patches + the built page: compiled and run from here
   build/checkpoints -> ../checkpoints       build/models -> ../models
@@ -238,8 +251,8 @@ ROOT/
 
 ```bash
 ROOT=~/yue2-studio            # the folder I chose (you are already in it)
-mkdir -p "$ROOT" && cd "$ROOT" && unzip -q yue2-kit-v{{KITVER}}.zip    # makes yue2-kit-v{{KITVER}}/ (skip if already unzipped)
-KIT=$ROOT/yue2-kit-v{{KITVER}}
+mkdir -p "$ROOT" && cd "$ROOT" && unzip -q yue2-install-{{DATE}}-v{{KITVER}}.zip    # makes yue2-install-{{DATE}}-v{{KITVER}}/ (skip if already unzipped)
+KIT=$ROOT/yue2-install-{{DATE}}-v{{KITVER}}
 export TMPDIR=$ROOT/tmp && mkdir -p tmp outputs tools
 ```
 
@@ -494,15 +507,18 @@ Then try a LoRA:
 
 Compare with the kit's `docs/screenshots/`:
 - `compose-page.png`: the song form with the ADD-ON marks and the LoRA grid;
+- `song-page.png`: a song open: the grouped buttons, the compact details card, the player bar;
+- `song-page-narrow.png`: the same in a narrower window (the details card folds);
 - `engine-page.png`: the Engine page with its band and dotted backdrop;
 - `engine-tiles.png`: VAE, LoRA and Sliders tiles with links and (i);
+- `engine-about.png`: the end of the Engine page, with the About card;
 - `theme-picker.png`: the 50 themes.
 
 The screenshots were taken against a stand-in server, so their songs, names and hardware
 readouts are placeholders. The layout, text, colours and controls are what I should see.
 
-- The default theme is **Studio (warm)**, a dark warm palette with amber accents. The theme
-  menu in the top bar changes it per browser.
+- The default theme is **Studio (warm)**, a dark warm palette with amber accents. The theme menu in
+  the top bar changes it per browser (and the browser remembers).
 - The page loads its fonts (Google Fonts: Bodoni Moda, IBM Plex Sans, IBM Plex Mono) and the
   score renderer (abcjs from cdnjs) from the internet. Without internet it still works but
   falls back to plain fonts, and scores show as text.

@@ -3,6 +3,19 @@
 Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
 `d48e6e2e4a4e9bff24f8f60c943eddd976358df1`. v5 is the first kit that changes the app itself.
 
+## v9 (2026-09-27)
+
+The app is the same as in v6 to v8: 36 patches, tree `46618fde37a376e5c80eb46d5ce3fef9334e6456`.
+
+- **The kit's name is back to `yue2-install-<date>-v<N>.zip`**, as the owner named it from the start
+  (v6 to v8 were wrongly called `yue2-kit-vN.zip`).
+- **The install guide describes the page as it is now**: the song page's grouped buttons and compact
+  details card (Song | Sound | Shape, Sliders | LoRAs, seeds), the player bar's status pill, the About
+  card, the logo links, double-click to play, the VAE hover notes. **7 fresh screenshots** instead of 4,
+  including the song page (wide and narrow) and the About card.
+- **Release checks**: a release now refuses screenshots older than the page, an install guide older
+  than the last page change, or a missing page source or root script, and prints what the kit carries.
+
 ## v8 (2026-09-27)
 
 The app is the same as in v6 and v7: 36 patches, tree `46618fde37a376e5c80eb46d5ce3fef9334e6456`.

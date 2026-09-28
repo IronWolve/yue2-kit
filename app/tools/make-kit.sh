@@ -64,7 +64,7 @@ if [ -z "$KITVER" ]; then
       { if (v > m) m = v; v = 0 } END { print m + 0 }') + 1 ))
 fi
 [[ "$KITVER" =~ ^[0-9]+$ ]] || fail "the kit version must be a number, not $KITVER"
-ZIP="$OUTDIR/yue2-kit-v$KITVER.zip"
+ZIP="$OUTDIR/yue2-install-$DATE-v$KITVER.zip"   # his name for the kits: yue2-install-<date>-v<N>.zip
 if [ "$RELEASE" = 1 ]; then
   [ -e "$ZIP" ] && fail "${ZIP#$ROOT/} already exists: pick another --version"
   command git -C "$DIST" rev-parse -q --verify "refs/tags/v$KITVER" >/dev/null && fail "repo/ already has a tag v$KITVER: pick another --version"
@@ -257,10 +257,27 @@ header() { printf '> The original owner'"'"'s %s, copied as they were on %s. His
 { header "working notes"; cat "$ROOT/AGENTS.md"; } > "$STAGE/docs/notes.md"
 { header "list of how his install differs from a stock one"; cat "$ROOT/LOCAL-CHANGES.md"; } > "$STAGE/docs/local-changes.md"
 SHOTS="$ROOT/tmp/shots/console"
-for pair in "1920x960-1-page:compose-page" "1920x960-2-engine-open:engine-page" "engine-loras:engine-tiles" "theme-picker:theme-picker"; do
+page_built=$(stat -c %Y "$BUILD/tools/public/index.html.gz")
+for pair in "1920x960-1-page:compose-page" "take-open:song-page" "take-open-1280:song-page-narrow" "1920x960-2-engine-open:engine-page" \
+            "engine-loras:engine-tiles" "1920x960-3-engine-scrolled:engine-about" "theme-picker:theme-picker"; do
   from="$SHOTS/${pair%%:*}.png"
-  [ -f "$from" ] && cp "$from" "$STAGE/docs/screenshots/${pair#*:}.png" || note "no ${pair%%:*}.png: run node tools/cdp-console.mjs first for the screenshots"
+  if [ ! -f "$from" ]; then
+    [ "$RELEASE" = 1 ] && fail "no ${pair%%:*}.png: run node tools/cdp-console.mjs first for the screenshots"
+    note "no ${pair%%:*}.png: run node tools/cdp-console.mjs first for the screenshots"; continue
+  fi
+  # a screenshot older than the built page shows an older page: a release refuses it
+  if [ "$(stat -c %Y "$from")" -lt "$page_built" ]; then
+    [ "$RELEASE" = 1 ] && fail "${pair%%:*}.png is older than the built page: run node tools/cdp-console.mjs for fresh screenshots"
+    note "${pair%%:*}.png is older than the built page"
+  fi
+  cp "$from" "$STAGE/docs/screenshots/${pair#*:}.png"
 done
+# the install guide describes the page: a page changed after the guide was last touched may not be in it
+page_changed=$(git log -1 --format=%ct -- tools/console)
+if [ "$(stat -c %Y "$ROOT/tools/kit/INSTALL-PROMPT.md")" -lt "$page_changed" ]; then
+  [ "$RELEASE" = 1 ] && fail "the page changed after tools/kit/INSTALL-PROMPT.md: bring its feature list (What it has, section 10) up to date first"
+  note "the page changed after tools/kit/INSTALL-PROMPT.md: its feature list may be out of date"
+fi
 
 # --- 6. the prompt and README, filled in from this install
 BATCH=$(command grep -o 'YUE2CPP_BATCH:-[0-9]*' "$ROOT/start.sh" | head -1 | cut -d- -f2)
@@ -336,6 +353,20 @@ if [ "$VERIFY" = 1 ]; then
   [ "$got" = "$TREE" ] && echo "${G}verified${X}  a fresh clone + the patches + the page gives this exact tree" || fail "the patches give tree $got, not $TREE"
 fi
 
+# --- audit: what this kit carries, counted from the files themselves, and what it leaves out on purpose
+nsrc=$(find "$BUILD/tools/console" -type f | wc -l | tr -d ' '); nsrc_kit=$(find "$DIST/page/src" -type f 2>/dev/null | wc -l | tr -d ' ')
+[ "$nsrc_kit" = "$nsrc" ] || fail "repo/page/src has $nsrc_kit of the page's $nsrc source files"
+nroot=$(find "$ROOT" -maxdepth 1 -type f ! -name AGENTS.md ! -name LOCAL-CHANGES.md ! -name settings.json | wc -l | tr -d ' ')
+nroot_kit=$(find "$DIST/app" -maxdepth 1 -type f | wc -l | tr -d ' ')
+[ "$nroot_kit" = "$nroot" ] || fail "repo/app has $nroot_kit of the $nroot root scripts"
+echo "${B}audit${X}  engine: ${G}$NPATCH${X} patches + PATCHES.md notes + BASE.txt ($BASE7, $BASEDATE) + the built page"
+echo "       page as plain files: ${G}$nsrc_kit${X} sources in page/src + page/index.html"
+echo "       app: ${G}$nroot_kit${X} root scripts, tools/ with $(find "$DIST/app/tools" -type f | wc -l | tr -d ' ') files; settings.json; loras/sources.json"
+echo "       downloads pinned: $(( $(wc -l < "$STAGE/app/tools/hf-revisions.txt") - 1 )) Hugging Face repos; converter packages: $( [ -f "$STAGE/app/tools/converter-requirements.txt" ] && echo yes || echo NO)"
+echo "       docs: notes, local changes, $(ls "$STAGE/docs/screenshots" | wc -l | tr -d ' ') screenshots; INSTALL.md, README.md, CHANGELOG.md, VERSIONS.txt"
+echo "       look: the page's default theme (Studio); each browser keeps its own theme and other choices"
+echo "       ${D}left out on purpose: songs, compiled programs, model/LoRA files (downloaded at the pins), tmp/, the theme generator (lost with the old app)${X}"
+
 # --- 10. manifest of every file, then commit in repo/; with --release, tag it and zip exactly that tag
 (cd "$STAGE" && find . -path ./.git -prune -o -type f ! -name MANIFEST.txt -printf '%P\n' | sort | xargs -d '\n' sha256sum) > "$STAGE/MANIFEST.txt"
 command git -C "$DIST" add -A
@@ -351,7 +382,7 @@ echo
 if [ "$RELEASE" = 1 ]; then
   command git -C "$DIST" tag -a "v$KITVER" -m "Kit v$KITVER"
   mkdir -p "$OUTDIR"
-  command git -C "$DIST" archive --format=zip --prefix="yue2-kit-v$KITVER/" -o "$ZIP" "v$KITVER"
+  command git -C "$DIST" archive --format=zip --prefix="yue2-install-$DATE-v$KITVER/" -o "$ZIP" "v$KITVER"
   unzip -tq "$ZIP" >/dev/null || fail "the zip does not test clean"
   echo "${B}stats${X}  ${G}${ZIP#$ROOT/}${X}  kit v$KITVER (tag v$KITVER), $(du -h "$ZIP" | cut -f1), $files files, $NPATCH patches, $pins repos pinned, $( [ "$VERIFY" = 1 ] && echo "tree verified" || echo "tree not re-verified (--verify)"), $state, notes $warn, $(( $(date +%s) - t0 ))s"
 else
