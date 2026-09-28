@@ -1058,11 +1058,16 @@ const ideaBox = await ev(`(() => { const box = document.getElementById("idea"), 
     wW: Math.round(w.width), wC: Math.round(c.width), left: Math.round(c.left - row.left),
     oldTag: !!document.getElementById("museTag"), oldHint: !!document.getElementById("structureHint"),
     ideaInfo: !!box.closest(".field").querySelector(".label .info"), modelInfo: !!document.getElementById("museModel").closest(".field").querySelector(".label .info"),
-    structureTip: document.getElementById("structure").closest(".field").querySelector(".info")?.dataset.tip || "" }; })()`);
+    structureTip: document.getElementById("structure").closest(".field").querySelector(".info")?.dataset.tip || "",
+    stackedFill: Math.round(document.getElementById("structure").getBoundingClientRect().width / row.width * 100),
+    modelUnder: document.getElementById("museModel").getBoundingClientRect().top >= document.getElementById("structure").getBoundingClientRect().bottom,
+    modelFill: Math.round(document.getElementById("museModel").getBoundingClientRect().width / row.width * 100) }; })()`);
 check("the idea box is a full line across that grows with its text, like the style box", ideaBox.tag === "TEXTAREA" && ideaBox.fill >= 90 && ideaBox.grown > ideaBox.one * 2 &&
   ideaBox.back === ideaBox.one, JSON.stringify(ideaBox));
 check("  the Chat Server button and Write the brief sit together on the left, the same size", ideaBox.sameRow && ideaBox.gap >= 0 && ideaBox.gap <= 10 &&
   ideaBox.hW === ideaBox.hC && ideaBox.wW === ideaBox.wC && ideaBox.left <= 1, JSON.stringify(ideaBox));
+check("  Structure and Writer model each on their own full line, the model under the structure", ideaBox.stackedFill >= 95 && ideaBox.modelFill >= 95 &&
+  ideaBox.modelUnder, JSON.stringify({ structure: ideaBox.stackedFill, model: ideaBox.modelFill, under: ideaBox.modelUnder }));
 check("  one chat server marker (no small tag); the (i)s sit on the labels; the structure's note is in its (i)", !ideaBox.oldTag && !ideaBox.oldHint &&
   ideaBox.ideaInfo && ideaBox.modelInfo && /Now: Verse, Chorus and Bridge/.test(ideaBox.structureTip), JSON.stringify({ tag: ideaBox.oldTag, hint: ideaBox.oldHint, tip: ideaBox.structureTip.slice(-80) }));
 await ev(`document.getElementById("idea").focus(); true`);

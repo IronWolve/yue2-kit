@@ -64,7 +64,7 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - a supplied or editable ABC score, covers from a recording or from a take;
   - sampling controls, versions per pass, and Plan score only;
   - **Start from an idea**: a local chat model drafts title, style and lyrics. An Idea line that grows as you
-    type; Structure and the writer model side by side; then, under a thin line, a square **Chat Server
+    type; Structure, and the writer model on its own line under it; then, under a thin line, a square **Chat Server
     Connected** (green) or **Chat Server Offline** (red) button and **Write the brief**, the same size on the
     left, and "Generate the song right after". The chat button's tip says what to do; a click checks again.
 - **Add-ons, marked ADD-ON everywhere**:
