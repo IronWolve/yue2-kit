@@ -9,7 +9,7 @@
 
 <p align="center">
   <img alt="kit v10" src="https://img.shields.io/badge/kit-v10-c8963e?style=flat-square">
-  <img alt="yue2.cpp f17d526 + 40 patches" src="https://img.shields.io/badge/yue2.cpp-f17d526%20%2B%2040%20patches-4a6b8a?style=flat-square">
+  <img alt="yue2.cpp f17d526 + 41 patches" src="https://img.shields.io/badge/yue2.cpp-f17d526%20%2B%2041%20patches-4a6b8a?style=flat-square">
   <img alt="11 LoRAs" src="https://img.shields.io/badge/LoRAs-11-7a5c9e?style=flat-square">
   <img alt="3 VAEs" src="https://img.shields.io/badge/VAEs-3-3f8f6b?style=flat-square">
   <img alt="16 sliders" src="https://img.shields.io/badge/sliders-16-b5653b?style=flat-square">
@@ -74,7 +74,7 @@ one folder: models, caches and songs.
 
 ```
 INSTALL.md     the steps the agent follows (install or upgrade)
-engines/cpp/   40 patches for yue2.cpp f17d526 (2026-09-24), with a note for each
+engines/cpp/   41 patches for yue2.cpp f17d526 (2026-09-24), with a note for each
 page/          the web page as plain files
 app/           scripts: start, downloads, model conversion, tests
 loras/         the LoRA, VAE and slider names, descriptions and links
@@ -129,7 +129,7 @@ Everything comes at a pinned revision, the exact files this kit was made from, a
 
 | | What it is | From |
 |---|---|---|
-| **yue2.cpp** | The C++ engine; the kit's 40 patches go on top | [ServeurpersoCom/yue2.cpp](https://github.com/ServeurpersoCom/yue2.cpp) <sub>`f17d526`</sub> |
+| **yue2.cpp** | The C++ engine; the kit's 41 patches go on top | [ServeurpersoCom/yue2.cpp](https://github.com/ServeurpersoCom/yue2.cpp) <sub>`f17d526`</sub> |
 | **ggml** | Its tensor library (the engine's own fork) | [ServeurpersoCom/ggml](https://github.com/ServeurpersoCom/ggml) <sub>`765bc96`</sub> |
 | **Python packages** | For the model converter, at pinned versions | [app/tools/converter-requirements.txt](app/tools/converter-requirements.txt) |
 

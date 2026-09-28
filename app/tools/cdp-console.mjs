@@ -106,8 +106,11 @@ const ev = async (expr) => {
   if (r.result?.exceptionDetails) return "EVAL ERROR: " + (r.result.exceptionDetails.exception?.description || r.result.exceptionDetails.text).split("\n")[0];
   return r.result?.result?.value;
 };
+// screenshots only on request (YUE2_SHOTS=1): the kit and the README take theirs from tools/screenshots.mjs
+const SHOTS_ON = process.env.YUE2_SHOTS === "1";
 let shots = 0;
 const shot = async (name) => {
+  if (!SHOTS_ON) return;
   const r = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(`${OUT}/${name}.png`, Buffer.from(r.result.data, "base64"));
   shots++;
@@ -156,7 +159,7 @@ function report() {
   console.log(lines.join("\n"));
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`\n${B}cdp-console${X}  ${failed ? R : G}${passed} passed, ${failed} failed${X}` +
-              `  ${D}${secs} s · ${shots} screenshots in tmp/shots/console · mock ${BASE}${X}`);
+              `  ${D}${secs} s · ${SHOTS_ON ? shots + " screenshots in tmp/shots/console · " : ""}mock ${BASE}${X}`);
 }
 
 await send("Page.enable");
@@ -297,6 +300,14 @@ await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Home", code: "Home",
 await sleep(50);
 const c7 = await ev(cols);
 check("  both back to the defaults, nothing stored", c7.left === c0.left && c7.right === c0.right && c7.saved === null, JSON.stringify({ now: [c7.left, c7.right], saved: c7.saved }));
+// drawer headings in the narrowest compose column: the name on one line, its sentence under it (never beside it)
+const heads = await ev(`(() => { document.querySelector(".workspace").style.setProperty("--col-left", "380px");
+  const out = [...document.querySelectorAll("#view-compose .drawer > summary")].map(s => { const n = s.querySelector(".sum-name").getBoundingClientRect(), y = s.querySelector(".sum-say");
+    const r = y.getBoundingClientRect(); return { name: s.querySelector(".sum-name").textContent, oneLine: n.height < 24, under: r.top >= n.bottom - 1, say: y.textContent }; });
+  document.querySelector(".workspace").style.removeProperty("--col-left"); return out; })()`);
+check("drawer headings: the name on one line with its sentence under it, even in the narrowest column", heads.length === 5 &&
+  heads.every(h => h.oneLine && h.under && h.say) && /^A local chat model writes the title, style and lyrics from one line\.$/.test(heads[0].say),
+  JSON.stringify(heads.filter(h => !h.oneLine || !h.under).map(h => h.name)) + " " + heads[0].say);
 await send("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
 await sleep(200);
 const gripsNarrow = await ev(`[getComputedStyle(document.getElementById("gripLeft")).display, getComputedStyle(document.getElementById("gripRight")).display].join()`);

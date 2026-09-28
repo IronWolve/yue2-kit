@@ -252,25 +252,23 @@ fi
 
 cp "$ROOT/tools/kit/CHANGELOG.md" "$STAGE/CHANGELOG.md"
 
-# --- 5. his notes, marked as his, and the clean screenshots (tools/screenshots.mjs)
+# --- 5. his notes, marked as his, and the screenshots: optional. New ones come from tools/screenshots.mjs
+#     (run it only for a GitHub push or when he wants them in a kit); otherwise the kit keeps repo/'s.
 header() { printf '> The original owner'"'"'s %s, copied as they were on %s. His paths (%s/..., ~/work/...),\n> his shared model folder under %s/models and his personal rules do not apply to this\n> install; the technical facts do. The install itself is ../INSTALL.md.\n\n' "$1" "$DATE" "$HOME" "$HOME"; }
 { header "working notes"; cat "$ROOT/AGENTS.md"; } > "$STAGE/docs/notes.md"
 { header "list of how his install differs from a stock one"; cat "$ROOT/LOCAL-CHANGES.md"; } > "$STAGE/docs/local-changes.md"
 SHOTS="$ROOT/tmp/shots/showcase"
 page_built=$(stat -c %Y "$BUILD/tools/public/index.html.gz")
+shots_new=0 shots_kept=0
 for name in compose-page song-page song-page-narrow engine-page engine-tiles engine-about theme-picker; do
   from="$SHOTS/$name.png"
-  if [ ! -f "$from" ]; then
-    [ "$RELEASE" = 1 ] && fail "no $name.png: run node tools/screenshots.mjs first"
-    note "no $name.png: run node tools/screenshots.mjs first"; continue
+  if [ -f "$from" ] && [ "$(stat -c %Y "$from")" -ge "$page_built" ]; then
+    cp "$from" "$STAGE/docs/screenshots/$name.png"; shots_new=$((shots_new + 1))
+  elif [ -f "$DIST/docs/screenshots/$name.png" ]; then
+    cp "$DIST/docs/screenshots/$name.png" "$STAGE/docs/screenshots/$name.png"; shots_kept=$((shots_kept + 1))
   fi
-  # a screenshot older than the built page shows an older page: a release refuses it
-  if [ "$(stat -c %Y "$from")" -lt "$page_built" ]; then
-    [ "$RELEASE" = 1 ] && fail "$name.png is older than the built page: run node tools/screenshots.mjs for fresh ones"
-    note "$name.png is older than the built page"
-  fi
-  cp "$from" "$STAGE/docs/screenshots/$name.png"
 done
+[ "$shots_kept" = 0 ] || note "screenshots: $shots_kept kept from repo/ (older than the page; fine unless this is for GitHub)"
 # the install guide describes the page: a page changed after the guide was last touched may not be in it
 page_changed=$(git log -1 --format=%ct -- tools/console)
 if [ "$(stat -c %Y "$ROOT/tools/kit/INSTALL-PROMPT.md")" -lt "$page_changed" ]; then
