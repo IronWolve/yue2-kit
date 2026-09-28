@@ -529,6 +529,8 @@ songs and the hardware readout are examples. The layout, text, colours and contr
 
 - The default theme is **Studio (warm)**, a dark warm palette with amber accents. The theme menu in
   the top bar changes it per browser (and the browser remembers).
+- Text and headings are in IBM Plex Sans (headings at medium weight), numbers in IBM Plex Mono; only the
+  "YuE2" logo is in the Bodoni Moda serif. The Engine page's **Fonts** card changes them per browser.
 - The page loads its fonts (Google Fonts: Bodoni Moda, IBM Plex Sans, IBM Plex Mono) and the
   score renderer (abcjs from cdnjs) from the internet. Without internet it still works but
   falls back to plain fonts, and scores show as text.

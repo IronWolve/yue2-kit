@@ -3,9 +3,9 @@
 Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
 `d48e6e2e4a4e9bff24f8f60c943eddd976358df1`. v5 is the first kit that changes the app itself.
 
-## v10 (2026-09-27, not yet released as a zip)
+## v10 (2026-09-27)
 
-50 patches, tree `0c1ff5bd25a9e13a687290796cc841de56912ba7`. The kit repository is now on GitHub as **yue2-kit**.
+50 patches, tree `0c1ff5bd25a9e13a687290796cc841de56912ba7`. The kit's git repository is named **yue2-kit**, ready for GitHub.
 
 - **Workspace**: drag the lines between the three columns to size them (double-click resets). The Compose
   heading stands alone; the empty song page has a friendlier welcome.
