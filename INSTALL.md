@@ -313,7 +313,7 @@ for 12.x. So 8.6 → `86`, 8.9 → `89`, 12.0 → `120a`, 7.5 → `75`; `tools/c
 
 ```bash
 ARCH=86   # from compute_cap
-tools/record.sh configure -- cmake -S build -B build/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON \
+tools/record.sh configure -- cmake -S build -B build/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_BUILD_RPATH_USE_ORIGIN=ON -DGGML_CUDA=ON \
   -DCMAKE_CUDA_COMPILER="$(command -v nvcc)" -DCMAKE_CUDA_ARCHITECTURES=$ARCH
 tools/record.sh build -- env TMPDIR="$ROOT/tmp" CCACHE_DIR="$ROOT/tmp/ccache" CCACHE_BASEDIR="$ROOT" \
   nice -n 15 cmake --build build/build -j $(( $(nproc) / 4 > 2 ? $(nproc) / 4 : 2 ))
@@ -326,7 +326,7 @@ much faster: `build/` stays at the same path from kit v6 on.
 and ran on an 8 GiB M1:
 
 ```bash
-tools/record.sh configure -- cmake -S build -B build/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+tools/record.sh configure -- cmake -S build -B build/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_BUILD_RPATH_USE_ORIGIN=ON \
   -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
   -DGGML_CUDA=OFF -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple
 tools/record.sh build -- env TMPDIR="$ROOT/tmp" CCACHE_DIR="$ROOT/tmp/ccache" CCACHE_BASEDIR="$ROOT" \
