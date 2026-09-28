@@ -77,7 +77,24 @@ echo "${B}kit v$KITVER${X}  upstream ${C}$BASE7${X} + ${G}$NPATCH${X} patches, t
 echo "${G}tested${X}  $(tail -1 "$ROOT/tmp/kit-test-downloaders.txt" | sed 's/\x1b\[[0-9;]*m//g')"
 rm -f "$ROOT/tmp/kit-test-downloaders.txt"
 
-# --- 2. the rest of repo/ is made again from this install on every run (the engine part is done above)
+# --- 2. what is published, by name: an explicit list, so nothing private rides along (a key, a log, a note).
+#     A root or tools/ file on neither list stops the run before repo/ is touched: a new file is never
+#     published, or left out, without a decision.
+PUBLISH_ROOT="build-page.sh convert-extras.py convert-models.sh download-models.sh start.sh"
+PRIVATE_ROOT="AGENTS.md LOCAL-CHANGES.md settings.json .kit-denylist"   # settings.json is published as settings/ below
+PUBLISH_TOOLS="apply-patches.sh cdp-common.mjs cdp-console.mjs cdp-real.mjs check-machine.sh download-checkpoints.sh download-loras.sh downloader-requirements.txt export-patches.sh flac_check.cpp gguf_atomic.py gguf_check.py hf-env.sh hf_expect.py kit/CHANGELOG.md kit/INSTALL-PROMPT.md kit/MACOS-NOTES.md kit/README.md kit/readme_downloads.py local-changes.sh make-kit.sh mock_server.py record.sh screenshots.mjs test-real.sh test_downloaders.sh test_flac.py verify-install.sh"
+PRIVATE_TOOLS=""
+listed() { case " $2 " in *" $1 "*) return 0 ;; esac; return 1; }
+unlisted=""
+for f in $(cd "$ROOT" && find . -maxdepth 1 -type f -printf '%P\n'); do
+  listed "$f" "$PUBLISH_ROOT $PRIVATE_ROOT" || unlisted="$unlisted $f"
+done
+for f in $(cd "$ROOT/tools" && find . -type f ! -path '*/__pycache__/*' -printf '%P\n'); do
+  listed "$f" "$PUBLISH_TOOLS $PRIVATE_TOOLS" || unlisted="$unlisted tools/$f"
+done
+[ -z "$unlisted" ] || fail "not on the publish or the private list in tools/make-kit.sh:$unlisted"
+
+# the rest of repo/ is made again from this install on every run (the engine part is done above)
 STAGE="$DIST"
 FACTS="$ROOT/tmp/kit-facts.json"
 rm -rf "$STAGE/app" "$STAGE/loras" "$STAGE/settings" "$STAGE/docs"
@@ -90,14 +107,9 @@ if command grep -l -i -E "$DENY" "$DIST"/engines/cpp/patches/*.patch >/dev/null 
   fail "a patch carries an attribution trailer or a name from .kit-denylist"
 fi
 
-# --- 3. every root script and the whole tools/ folder (by rule, so a new script is never left out)
-for f in "$ROOT"/*; do
-  [ -f "$f" ] && [ ! -L "$f" ] || continue
-  case "$(basename "$f")" in AGENTS.md|LOCAL-CHANGES.md|settings.json) continue ;; esac   # -> docs/, settings/
-  cp "$f" "$STAGE/app/"
-done
-cp -r "$ROOT/tools" "$STAGE/app/tools"
-find "$STAGE/app" -name __pycache__ -type d -prune -exec rm -rf {} +
+# --- 3. the listed root scripts and tools, and nothing else
+for f in $PUBLISH_ROOT; do cp "$ROOT/$f" "$STAGE/app/"; done
+for f in $PUBLISH_TOOLS; do mkdir -p "$STAGE/app/tools/$(dirname "$f")"; cp "$ROOT/tools/$f" "$STAGE/app/tools/$f"; done
 cp "$ROOT/settings.json" "$STAGE/settings/settings.json"
 cp "$ROOT/loras/sources.json" "$STAGE/loras/sources.json"
 if command grep -rlF "$HOME" "$STAGE/app" >/dev/null 2>&1; then
@@ -256,12 +268,9 @@ fi
 
 cp "$ROOT/tools/kit/CHANGELOG.md" "$STAGE/CHANGELOG.md"
 
-# --- 5. his notes, marked as his, and the screenshots: optional. New ones come from tools/screenshots.mjs
-#     (run it only for a GitHub push or when he wants them in a kit); otherwise the kit keeps repo/'s.
-header() { printf '> The original owner'"'"'s %s, copied as they were on %s. His paths (under ~), his shared model\n> folder (~/models) and his personal rules do not apply to this install; the technical facts do.\n> The install itself is ../INSTALL.md.\n\n' "$1" "$DATE"; }
-# published copies say ~ where his home folder is
-{ header "working notes"; sed "s|$HOME|~|g" "$ROOT/AGENTS.md"; } > "$STAGE/docs/notes.md"
-{ header "list of how his install differs from a stock one"; sed "s|$HOME|~|g" "$ROOT/LOCAL-CHANGES.md"; } > "$STAGE/docs/local-changes.md"
+# --- 5. the screenshots, optional. The owner's working notes (AGENTS.md, LOCAL-CHANGES.md) stay private: the
+#     technical content a friend needs is in INSTALL.md and engines/cpp/PATCHES.md. New screenshots come from
+#     tools/screenshots.mjs (only for a GitHub push, or when he wants them in a kit); otherwise repo/'s stay.
 SHOTS="$ROOT/tmp/shots/showcase"
 page_built=$(stat -c %Y "$BUILD/tools/public/index.html.gz")
 shots_new=0 shots_kept=0
@@ -324,23 +333,22 @@ print("YuE2 studio install reference kit v$KITVER, $DATE")
 print()
 print("Code:   $UPSTREAM  @ $BASE7 of $BASEDATE (branch master; ggml submodule at $GGML)")
 print("        + $NPATCH patches (engines/cpp/patches, git am) + the built page (engines/cpp/page)")
-print("Check:  after the patches and the page, git rev-parse HEAD^{tree} = $TREE (his machine, $DATE)")
+print("Check:  after the patches and the page, git rev-parse HEAD^{tree} = $TREE (checked $DATE)")
 print()
 print("Hugging Face revisions (app/tools/hf-revisions.txt; the download scripts fetch exactly these):")
 for repo, sha, how, now in f["pins"]:
     print(f"  {repo:58s} {sha}  {how}{'; ' + now if now else ''}")
 print()
-print("His model files (models/): " + ", ".join(f["models"]))
-print(f"His add-ons: {f['sliders']} sliders, {f['loras']} LoRA files from {f['lora_repos']} repos")
+print("Model files the install makes (models/): " + ", ".join(f["models"]))
+print(f"Add-ons: {f['sliders']} sliders, {f['loras']} LoRA files from {f['lora_repos']} repos")
 print("Converter packages: app/tools/converter-requirements.txt")
-print("His toolchain: $(nvcc --version 2>/dev/null | tail -2 | head -1 | sed 's/.*release /CUDA /;s/,.*//'), $(gcc --version | head -1 | awk '{print "gcc " $NF}'), $(cmake --version | head -1)")
+print("Built and tested with: $(nvcc --version 2>/dev/null | tail -2 | head -1 | sed 's/.*release /CUDA /;s/,.*//'), $(gcc --version | head -1 | awk '{print "gcc " $NF}'), $(cmake --version | head -1)")
 print()
 print("Not in the kit, on purpose:")
-print("  - his songs (outputs/): personal")
-print("  - browser-side choices (the theme picked, favourites, form drafts): they live in his browser")
-print("  - the built programs: they are compiled for his GPU; the friend compiles for theirs")
+print("  - songs (outputs/)")
+print("  - browser-side choices (the theme picked, fonts, favourites, form drafts): they live in each browser")
+print("  - the built programs: each install compiles for its own GPU")
 print("  - the model, slider and LoRA files: downloaded at the revisions above and converted locally")
-print("  - his shared model folder (~/models): the friend's copies are plain folders in the install")
 print("  - tmp/: test runs, caches, the converter venv (rebuilt from converter-requirements.txt)")
 PY
 
@@ -367,30 +375,54 @@ fi
 # --- audit: what this kit carries, counted from the files themselves, and what it leaves out on purpose
 nsrc=$(find "$BUILD/tools/console" -type f | wc -l | tr -d ' '); nsrc_kit=$(find "$DIST/page/src" -type f 2>/dev/null | wc -l | tr -d ' ')
 [ "$nsrc_kit" = "$nsrc" ] || fail "repo/page/src has $nsrc_kit of the page's $nsrc source files"
-nroot=$(find "$ROOT" -maxdepth 1 -type f ! -name ".*" ! -name AGENTS.md ! -name LOCAL-CHANGES.md ! -name settings.json | wc -l | tr -d ' ')
+nroot=$(echo $PUBLISH_ROOT | wc -w | tr -d ' ')
 nroot_kit=$(find "$DIST/app" -maxdepth 1 -type f | wc -l | tr -d ' ')
 [ "$nroot_kit" = "$nroot" ] || fail "repo/app has $nroot_kit of the $nroot root scripts"
 echo "${B}audit${X}  engine: ${G}$NPATCH${X} patches + PATCHES.md notes + BASE.txt ($BASE7, $BASEDATE) + the built page"
 echo "       page as plain files: ${G}$nsrc_kit${X} sources in page/src + page/index.html"
 echo "       app: ${G}$nroot_kit${X} root scripts, tools/ with $(find "$DIST/app/tools" -type f | wc -l | tr -d ' ') files; settings.json; loras/sources.json"
 echo "       downloads pinned: $(( $(wc -l < "$STAGE/app/tools/hf-revisions.txt") - 1 )) Hugging Face repos; converter packages: $( [ -f "$STAGE/app/tools/converter-requirements.txt" ] && echo yes || echo NO)"
-echo "       docs: notes, local changes, $(ls "$STAGE/docs/screenshots" | wc -l | tr -d ' ') screenshots; INSTALL.md, README.md, CHANGELOG.md, VERSIONS.txt"
+echo "       docs: $(ls "$STAGE/docs/screenshots" | wc -l | tr -d ' ') screenshots; INSTALL.md, README.md, CHANGELOG.md, VERSIONS.txt; .gitignore"
+echo "       ${D}kept private: $PRIVATE_ROOT${X}"
 echo "       look: the page's default theme (Studio); each browser keeps its own theme and other choices"
 echo "       ${D}left out on purpose: songs, compiled programs, model/LoRA files (downloaded at the pins), tmp/, the theme generator (lost with the old app)${X}"
 
+# the published repo ignores what must never be committed, should a file slip past the lists above
+cat > "$STAGE/.gitignore" <<'IGN'
+# never published: secrets, local settings, logs, caches, runtime data
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*credentials*
+*secret*
+token-cache*
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+tmp/
+outputs/
+models/
+checkpoints/
+IGN
 # --- 10. manifest of every file, then commit in repo/; with --release, tag it and zip exactly that tag
 (cd "$STAGE" && find . -path ./.git -prune -o -type f ! -name MANIFEST.txt -printf '%P\n' | sort | xargs -d '\n' sha256sum) > "$STAGE/MANIFEST.txt"
 # nothing published names his home folder, carries an attribution or names a denied vendor (whole repo, not just app/)
 # (grep finds nothing = exit 1: "|| true" keeps set -e from stopping the run here; the trailer words are left
 # out, since the guards themselves spell them)
 VENDORS=$(tr -d '\n' < "$ROOT/.kit-denylist" 2>/dev/null || true)
+# token shapes: GitHub, Hugging Face, "sk-" API keys, AWS keys, Slack, and PEM private keys (built from parts, so
+# this script never matches itself)
+SECRETS='(github_pat_|gh[pousr]_)[A-Za-z0-9_]{30,}|hf_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}'
+SECRETS="$SECRETS|-----BEGIN [A-Z ]*PRIV""ATE KEY-----"
 leaks=$( { command grep -r -l -F "$HOME" "$STAGE" --exclude-dir=.git || true
-           [ -z "$VENDORS" ] || command grep -r -l -i -E "$VENDORS" "$STAGE" --exclude-dir=.git || true; } 2>/dev/null |
+           [ -z "$VENDORS" ] || command grep -r -l -i -E "$VENDORS" "$STAGE" --exclude-dir=.git || true
+           command grep -r -l -I -E "$SECRETS" "$STAGE" --exclude-dir=.git || true; } 2>/dev/null |
          sed "s|^$STAGE/||" | sort -u | head -5 | tr '\n' ' ')
-if [ -n "$leaks" ]; then
-  [ "$RELEASE" = 1 ] && fail "published files name the home folder or a denied name: $leaks"
-  note "published files name the home folder or a denied name: $leaks"
-fi
+# a sync stops too: nothing like this may even reach a commit
+[ -z "$leaks" ] || fail "published files name the home folder, a denied name or something shaped like a secret: $leaks"
 command git -C "$DIST" add -A
 if command git -C "$DIST" diff --cached --quiet; then
   state="no change in repo/"

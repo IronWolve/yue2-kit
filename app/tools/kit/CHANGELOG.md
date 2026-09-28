@@ -20,8 +20,12 @@ Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
 - **Fixes**: the page no longer waits on the web fonts or the score engraver to start; a tip stays open
   while the server log scrolls. The About card credits the layout's inspiration.
 - **The repository**: a GitHub README with every download (link, pinned revision, size) and the project
-  links; clean screenshots from `tools/screenshots.mjs` (optional for a kit); published notes say `~` for
-  the owner's home folder; every sync checks the whole repository for names it must not carry.
+  links, and clean screenshots from `tools/screenshots.mjs` (optional for a kit).
+- **Privacy**: the owner's working notes are no longer published (the install guide and the per-patch
+  notes carry the technical content); only files on an explicit list are copied into the kit, a new file
+  stops the build until it is listed as public or private; a `.gitignore` keeps secrets, logs and caches
+  out; every sync checks all published files for the home folder, denied names and secret-shaped strings.
+  The repository's history was rewritten to remove the earlier copies.
 
 ## v9 (2026-09-27)
 

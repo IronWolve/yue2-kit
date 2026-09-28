@@ -1,8 +1,8 @@
-YuE2 studio install reference kit v10, 2026-09-27
+YuE2 studio install reference kit v11, 2026-09-27
 
 Code:   https://github.com/ServeurpersoCom/yue2.cpp.git  @ f17d526 of 2026-09-24 (branch master; ggml submodule at 765bc96)
         + 50 patches (engines/cpp/patches, git am) + the built page (engines/cpp/page)
-Check:  after the patches and the page, git rev-parse HEAD^{tree} = 0c1ff5bd25a9e13a687290796cc841de56912ba7 (his machine, 2026-09-27)
+Check:  after the patches and the page, git rev-parse HEAD^{tree} = 0c1ff5bd25a9e13a687290796cc841de56912ba7 (checked 2026-09-27)
 
 Hugging Face revisions (app/tools/hf-revisions.txt; the download scripts fetch exactly these):
   m-a-p/YuE2-3B                                              29b3558dd469  this install's files; main is now 14fc6c6f1464
@@ -21,15 +21,14 @@ Hugging Face revisions (app/tools/hf-revisions.txt; the download scripts fetch e
   Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4  e2e63d859f3a  this install's files
   monsterovich/yue2-steps-from-hell                          bc84ad186715  this install's files
 
-His model files (models/): SheetSage2-F32.gguf, YuE2-3B-BF16.gguf, YuE2-3B-Q5_K_M.gguf, YuE2-Vae-F32.gguf, YuE2-Vae-blend-F32.gguf, YuE2-Vae-legacy-F32.gguf
-His add-ons: 16 sliders, 11 LoRA files from 8 repos
+Model files the install makes (models/): SheetSage2-F32.gguf, YuE2-3B-BF16.gguf, YuE2-3B-Q5_K_M.gguf, YuE2-Vae-F32.gguf, YuE2-Vae-blend-F32.gguf, YuE2-Vae-legacy-F32.gguf
+Add-ons: 16 sliders, 11 LoRA files from 8 repos
 Converter packages: app/tools/converter-requirements.txt
-His toolchain: CUDA 13.3, gcc 15.2.0, cmake version 4.2.3
+Built and tested with: CUDA 13.3, gcc 15.2.0, cmake version 4.2.3
 
 Not in the kit, on purpose:
-  - his songs (outputs/): personal
-  - browser-side choices (the theme picked, favourites, form drafts): they live in his browser
-  - the built programs: they are compiled for his GPU; the friend compiles for theirs
+  - songs (outputs/)
+  - browser-side choices (the theme picked, fonts, favourites, form drafts): they live in each browser
+  - the built programs: each install compiles for its own GPU
   - the model, slider and LoRA files: downloaded at the revisions above and converted locally
-  - his shared model folder (~/models): the friend's copies are plain folders in the install
   - tmp/: test runs, caches, the converter venv (rebuilt from converter-requirements.txt)

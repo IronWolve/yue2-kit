@@ -1,0 +1,17 @@
+# never published: secrets, local settings, logs, caches, runtime data
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*credentials*
+*secret*
+token-cache*
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+tmp/
+outputs/
+models/
+checkpoints/

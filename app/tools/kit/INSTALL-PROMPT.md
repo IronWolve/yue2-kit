@@ -12,7 +12,7 @@ Everything comes from public GitHub and Hugging Face sources, plus this kit:
 - his scripts;
 - his LoRA library list with its descriptions;
 - his settings;
-- his notes, and screenshots of his screens.
+- screenshots of his screens.
 
 **Nothing on my machine exists yet**: no models, no model folder, no caches. Everything is
 downloaded into one install folder and runs from there.
@@ -140,7 +140,7 @@ What it has (all of it comes with the patches; you do not build any of it by han
 6. **Never run upstream's own scripts in `upstream/` or `build/`** (`update.sh`, `buildwebui.sh`, `buildcuda.sh`,
    `server.sh`, `models.sh`, `checkpoints.sh`, `quantize.sh`). The kit's scripts replace them:
    `buildwebui.sh` would overwrite his page, and the others write outside this layout or use
-   every CPU core. `docs/local-changes.md` explains each one.
+   every CPU core.
 7. **Keep a record inside the install** (`install-record/`).
    - From section 3 on, run every stage through `tools/record.sh STAGE -- COMMAND`. It saves the
      command, the start and end times, the exit status, the attempt number and the full output.
@@ -155,9 +155,7 @@ What it has (all of it comes with the patches; you do not build any of it by han
    - If a patch really has to change, the owner regenerates the tree hash and the manifest with his
      kit builder; tell me instead of working around it.
 9. **Background reading**, if something is unclear:
-   - `docs/notes.md` and `docs/local-changes.md` are my friend's own notes from his machine. His
-     paths (`{{HOME}}/...`, `~/work/...`), his shared model folder under `{{HOME}}/models` and
-     his personal rules do not apply here; the technical facts do.
+   - `engines/cpp/PATCHES.md` says what each patch changes, why, and which files it touches.
    - `docs/screenshots/` shows how the finished pages look.
 
 ## 1. Check the machine first, then ask me

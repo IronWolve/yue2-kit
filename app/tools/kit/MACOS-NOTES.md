@@ -38,11 +38,10 @@ improvements.**
 
 ## The tested Mac
 
-- Apple M1 Mac mini, 8 GiB unified memory, macOS 26.6.2, native arm64; Python 3.14.6, Apple Clang 21,
-  CMake 4.4.3 and Ninja 1.13.2.
-- The C++ app was in `~/work/yue2.cpp` (page on http://127.0.0.1:41867). The MLX project is separate, in
-  `~/work/yue2-mlx`: the engine and models under `YuE2-3B-MLX/`, its Python under `.venv/`. These are
-  that machine's paths: an installer takes them as parameters.
+- An Apple M1 with 8 GiB of unified memory, native arm64, on a current macOS with Python 3.14, Apple
+  Clang 21, CMake 4.4 and Ninja 1.13.
+- The C++ app and the MLX project live in separate folders (the MLX engine and models under
+  `YuE2-3B-MLX/`, its Python under `.venv/`); an installer takes the folders as parameters.
 - The MLX engine is the Python code from the model repository above, on MLX 0.32.2 and Metal. It needs
   no PyTorch and no CUDA.
 

@@ -80,7 +80,7 @@ engines/cpp/   {{NPATCH}} patches for yue2.cpp {{BASE}} ({{BASEDATE}}), with a n
 page/          the web page as plain files
 app/           scripts: start, downloads, model conversion, tests
 loras/         the LoRA, VAE and slider names, descriptions and links
-docs/          notes and screenshots
+docs/          screenshots
 ```
 
 What changed in each version: [CHANGELOG.md](CHANGELOG.md).

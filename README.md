@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <img alt="kit v10" src="https://img.shields.io/badge/kit-v10-c8963e?style=flat-square">
+  <img alt="kit v11" src="https://img.shields.io/badge/kit-v11-c8963e?style=flat-square">
   <img alt="yue2.cpp f17d526 + 50 patches" src="https://img.shields.io/badge/yue2.cpp-f17d526%20%2B%2050%20patches-4a6b8a?style=flat-square">
   <img alt="11 LoRAs" src="https://img.shields.io/badge/LoRAs-11-7a5c9e?style=flat-square">
   <img alt="3 VAEs" src="https://img.shields.io/badge/VAEs-3-3f8f6b?style=flat-square">
@@ -80,7 +80,7 @@ engines/cpp/   50 patches for yue2.cpp f17d526 (2026-09-24), with a note for eac
 page/          the web page as plain files
 app/           scripts: start, downloads, model conversion, tests
 loras/         the LoRA, VAE and slider names, descriptions and links
-docs/          notes and screenshots
+docs/          screenshots
 ```
 
 What changed in each version: [CHANGELOG.md](CHANGELOG.md).
