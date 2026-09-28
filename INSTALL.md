@@ -18,7 +18,7 @@ Everything comes from public GitHub and Hugging Face sources, plus this kit:
 downloaded into one install folder and runs from there.
 
 **The app** is `yue2.cpp` (ServeurpersoCom/yue2.cpp), a fast C++/GGML engine for YuE2 that you
-compile. It gets 57 patches from my friend, which give it his web page and everything
+compile. It gets 58 patches from my friend, which give it his web page and everything
 below. They were made for upstream commit `f17d526` of 2026-09-24: upstream may be newer by now. It
 runs on port 41867.
 
@@ -259,7 +259,7 @@ Then ask me, in one message:
 ROOT/
   yue2-install-2026-09-28-v12/     this kit (unzipped here, or the yue2-kit clone); call it KIT
   upstream/          github.com/ServeurpersoCom/yue2.cpp @ f17d526 (+ ggml submodule), never edited
-  build/             upstream + the 57 patches + the built page: compiled and run from here
+  build/             upstream + the 58 patches + the built page: compiled and run from here
   build/checkpoints -> ../checkpoints       build/models -> ../models
   checkpoints/       the Hugging Face checkpoints the converter reads
   models/            the GGUF files the app loads (made here, no download)
@@ -293,7 +293,7 @@ git -C build submodule update --init --recursive --reference "$ROOT/upstream/ggm
 (cd build && git -c user.name=install -c user.email=install@localhost am "$KIT"/engines/cpp/patches/*.patch)
 cp "$KIT"/engines/cpp/page/index.html.gz build/tools/public/index.html.gz   # the built page (not in the patches)
 git -C build -c user.name=install -c user.email=install@localhost commit -q -am "Add the built page"
-[ "$(git -C build rev-parse HEAD^{tree})" = e5f850f9e9d3ca0fb474b0bc9b5f4846d5b72fd9 ] && echo "code OK: identical to the original"
+[ "$(git -C build rev-parse HEAD^{tree})" = 41c64b6e1af2b3c7f135dea18a00517907b6c16b ] && echo "code OK: identical to the original"
 ln -s ../checkpoints build/checkpoints && ln -s ../models build/models
 printf 'checkpoints\nmodels\n' >> build/.git/info/exclude
 cp -r "$KIT"/app/. . && chmod +x *.sh tools/*.sh      # his root scripts and his whole tools/ folder
