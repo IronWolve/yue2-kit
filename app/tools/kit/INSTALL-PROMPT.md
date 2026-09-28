@@ -62,7 +62,10 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - a style prompt that grows with its text and counts tokens (about 11,400 for style and lyrics together);
   - lyrics, an official **Instrumental** switch, and three modes: Full plan, Melody only, Direct;
   - a supplied or editable ABC score, covers from a recording or from a take;
-  - sampling controls, versions per pass, and Plan score only.
+  - sampling controls, versions per pass, and Plan score only;
+  - **Start from an idea**: a local chat server drafts title, style and lyrics. A square button beside it
+    says **Chat Server Connected** (green) or **Chat Server Offline** (red), always the same size; its
+    tip says what to do, and a click checks again.
 - **Add-ons, marked ADD-ON everywhere**:
   - **VAE**: Standard and Legacy are stock; Blend is an add-on. One per song. Each explains itself on
     hover (Standard: the quality choice and the newer model; Blend: two thirds Standard, one third Legacy).
@@ -77,6 +80,8 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - a theme picker with **50 themes** (the default is Studio, a dark warm palette);
   - Open/Save, Load example (110 official demos), Clear, a **New song** button, Unload model;
   - **Engine**.
+- **Three columns** (song form, song page, library): drag the line on either side of the middle one to
+  resize the song form or the library; a double-click puts one back, and the browser remembers.
 - **Library** (right): a tinted card with a ▶ PLAYING badge for the song that plays; favourites and
   versions; a double-click on a song plays it.
 - **Song page** (middle):
@@ -154,7 +159,8 @@ What it has (all of it comes with the patches; you do not build any of it by han
 ## 1. Check the machine first, then ask me
 
 The zip is in the folder you were started in. Unzip it (that only makes `yue2-install-{{DATE}}-v{{KITVER}}/`), then run the machine
-check. It changes nothing. It also finds tools that are installed but **not on PATH**: on WSL, `nvcc`
+check. (A clone of the kit's git repository, yue2-kit, works the same: that folder is the kit, so skip the
+unzip and use its name wherever these steps say `yue2-install-{{DATE}}-v{{KITVER}}`.) It changes nothing. It also finds tools that are installed but **not on PATH**: on WSL, `nvcc`
 is often in `/usr/local/cuda/bin` and `nvidia-smi` in `/usr/lib/wsl/lib`.
 
 ```bash
@@ -235,7 +241,7 @@ Then ask me, in one message:
 
 ```
 ROOT/
-  yue2-install-{{DATE}}-v{{KITVER}}/     this kit (unzipped here); call it KIT
+  yue2-install-{{DATE}}-v{{KITVER}}/     this kit (unzipped here, or the yue2-kit clone); call it KIT
   upstream/          github.com/ServeurpersoCom/yue2.cpp @ {{BASE}} (+ ggml submodule), never edited
   build/             upstream + the {{NPATCH}} patches + the built page: compiled and run from here
   build/checkpoints -> ../checkpoints       build/models -> ../models

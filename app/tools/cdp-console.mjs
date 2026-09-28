@@ -242,6 +242,68 @@ for (const [w, h] of [[1536, 730], [1920, 960]]) {
     back.doc <= back.vh && back.wsTop === 52 && back.wsBottom <= back.pb + 1, JSON.stringify(back));
 }
 
+// ============================================================ column grips
+section("column grips (drag the lines between the columns)");
+const cols = `(() => { const w = (sel) => Math.round(document.querySelector(sel).getBoundingClientRect().width);
+  const g = (id) => { const r = document.getElementById(id).getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + 200), shown: r.width > 0 }; };
+  const c = document.getElementById("view-compose").getBoundingClientRect(), t = document.getElementById("view-take").getBoundingClientRect(), l = document.getElementById("library").getBoundingClientRect();
+  let saved = null; try { saved = JSON.parse(localStorage.getItem("yue2.cols")); } catch (e) {}
+  return { left: w("#view-compose"), mid: w("#view-take"), right: w("#library"), gl: g("gripLeft"), gr: g("gripRight"),
+    gapL: (c.right + t.left) / 2, gapR: (t.right + l.left) / 2, saved, sw: document.scrollingElement.scrollWidth, vw: innerWidth }; })()`;
+const drag = async (from, dx) => {
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: from.x, y: from.y });
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", x: from.x, y: from.y, button: "left", buttons: 1, clickCount: 1 });
+  for (let i = 1; i <= 6; i++) await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: from.x + Math.round(dx * i / 6), y: from.y, button: "left", buttons: 1 });
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: from.x + dx, y: from.y, button: "left", buttons: 0, clickCount: 1 });
+  await sleep(100);
+};
+const c0 = await ev(cols);
+check("two grips sit on the lines between the columns", c0.gl.shown && c0.gr.shown && Math.abs(c0.gl.x - c0.gapL) <= 1.5 && Math.abs(c0.gr.x - c0.gapR) <= 1.5 && c0.saved === null,
+  JSON.stringify({ gl: c0.gl.x, gapL: c0.gapL, gr: c0.gr.x, gapR: c0.gapR, saved: c0.saved }));
+const hit = await ev(`[document.elementFromPoint(${c0.gl.x}, ${c0.gl.y})?.id, document.elementFromPoint(${c0.gr.x}, ${c0.gr.y})?.id].join()`);
+check("  the mouse finds them there (nothing covers them)", hit === "gripLeft,gripRight", hit);
+await drag(c0.gl, 120);
+const c1 = await ev(cols);
+check("dragging the left grip 120px right widens the compose column by 120px; the takes list stays", Math.abs(c1.left - c0.left - 120) <= 1 && c1.right === c0.right &&
+  c1.saved?.left === c1.left, JSON.stringify({ before: [c0.left, c0.mid, c0.right], after: [c1.left, c1.mid, c1.right], saved: c1.saved }));
+await drag(c1.gr, -100);
+const c2 = await ev(cols);
+check("dragging the right grip 100px left widens the takes list by 100px; the compose column stays", Math.abs(c2.right - c1.right - 100) <= 1 && c2.left === c1.left &&
+  c2.saved?.right === c2.right, JSON.stringify({ after: [c2.left, c2.mid, c2.right], saved: c2.saved }));
+await drag(c2.gl, 2000);
+const c3 = await ev(cols);
+check("  dragged too far, the middle column stops at its minimum (420px) and the page gets no side scroll", c3.mid >= 419 && c3.mid <= 421 && c3.sw <= c3.vw,
+  JSON.stringify({ cols: [c3.left, c3.mid, c3.right], scrollWidth: c3.sw, window: c3.vw }));
+await drag(c3.gl, c2.left - c3.left);
+await boot();
+const c4 = await ev(cols);
+check("the widths survive a reload (this browser keeps them)", Math.abs(c4.left - c2.left) <= 1 && Math.abs(c4.right - c2.right) <= 1, JSON.stringify({ was: [c2.left, c2.right], now: [c4.left, c4.right] }));
+for (const clickCount of [1, 2]) {
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", x: c4.gl.x, y: c4.gl.y, button: "left", buttons: 1, clickCount });
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: c4.gl.x, y: c4.gl.y, button: "left", buttons: 0, clickCount });
+}
+await sleep(100);
+const c5 = await ev(cols);
+check("double-clicking the left grip gives the compose column its default width back", c5.left === c0.left && c5.right === c4.right && c5.saved?.left === undefined,
+  JSON.stringify({ now: [c5.left, c5.right], defaults: [c0.left, c0.right], saved: c5.saved }));
+await ev(`document.getElementById("gripRight").focus(); true`);
+await send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 });
+await send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 });
+await sleep(50);
+const c6 = await ev(cols);
+check("  the keyboard moves a focused grip (ArrowLeft widens the takes list 16px); Home resets it", c6.right === c5.right + 16, JSON.stringify({ before: c5.right, after: c6.right }));
+await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Home", code: "Home", windowsVirtualKeyCode: 36 });
+await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Home", code: "Home", windowsVirtualKeyCode: 36 });
+await sleep(50);
+const c7 = await ev(cols);
+check("  both back to the defaults, nothing stored", c7.left === c0.left && c7.right === c0.right && c7.saved === null, JSON.stringify({ now: [c7.left, c7.right], saved: c7.saved }));
+await send("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
+await sleep(200);
+const gripsNarrow = await ev(`[getComputedStyle(document.getElementById("gripLeft")).display, getComputedStyle(document.getElementById("gripRight")).display].join()`);
+check("  a narrow window stacks the columns and hides the grips", gripsNarrow === "none,none", gripsNarrow);
+await send("Emulation.setDeviceMetricsOverride", { width: 1920, height: 960, deviceScaleFactor: 1, mobile: false });
+await sleep(200);
+
 // ============================================================ engine panel
 section("engine panel");
 await click("#engineToggle");
@@ -962,6 +1024,17 @@ section("idea writer (stand-in chat server)");
 await mockClear();
 await ev(`(() => { const u = document.getElementById("chatUrl"); u.value = location.origin + "/fakechat-loaded/v1"; u.dispatchEvent(new Event("change")); return true; })()`);
 await waitFor(`document.getElementById("chatState").textContent === "ready"`, 5000);
+// the Chat Server button: its state, the label that shows, its colour against the theme's, its size, its tip
+const chatBtn = `(() => { const b = document.getElementById("chatLink"), r = b.getBoundingClientRect(), probe = document.createElement("i"); document.body.append(probe);
+  const col = (v) => { probe.style.color = "var(" + v + ")"; return getComputedStyle(probe).color; };
+  const out = { s: b.dataset.s, label: [...b.children].filter(e => getComputedStyle(e).visibility === "visible").map(e => e.textContent).join("|"),
+    green: getComputedStyle(b).color === col("--good"), red: getComputedStyle(b).color === col("--bad"), w: Math.round(r.width), h: Math.round(r.height),
+    radius: parseFloat(getComputedStyle(b).borderTopLeftRadius), tip: b.dataset.tip, status: document.getElementById("museStatus").textContent };
+  probe.remove(); return out; })()`;
+await ev(`document.getElementById("museDrawer").open = true; true`);
+const chatOn = await ev(chatBtn);
+check("chat server answering: a green square Chat Server Connected button, the model in its tip", chatOn.s === "on" && chatOn.label === "Chat Server Connected" && chatOn.green &&
+  chatOn.radius <= 3 && /model-b/.test(chatOn.tip), JSON.stringify(chatOn));
 check("status names the loaded model only", /model-b/.test(await ev(`document.getElementById("chatHint").textContent`)) &&
   (await ev(`[...document.getElementById("museModel").options].map(o => o.value).join()`)) === "model-b");
 await ev(`document.getElementById("museDrawer").open = true; document.getElementById("idea").value = "a truck that will not start"; true`);
@@ -975,14 +1048,32 @@ await shot("writer");
 await mockClear();
 await ev(`(() => { const u = document.getElementById("chatUrl"); u.value = location.origin + "/fakechat-none/v1"; u.dispatchEvent(new Event("change")); return true; })()`);
 await waitFor(`document.getElementById("chatState").textContent === "no model loaded"`, 5000);
-check("nothing loaded: writer refuses and asks you to load one", (await ev(`document.getElementById("museBtn").disabled`)) === true &&
-  /Load a model/.test(await ev(`document.getElementById("museStatus").textContent`)));
+const chatNone = await ev(chatBtn);
+check("nothing loaded: writer refuses; the button's tip asks you to load one", (await ev(`document.getElementById("museBtn").disabled`)) === true &&
+  chatNone.s === "on" && /no model loaded: load one there first/.test(chatNone.tip), JSON.stringify(chatNone));
 await ev(`document.getElementById("museBtn").disabled = false; document.getElementById("museBtn").click(); true`);
 await sleep(600);
 check("  and sends no completion request", (await mockGet("mock/requests")).filter((r) => /fakechat/.test(r.path)).length === 0);
 await ev(`(() => { const u = document.getElementById("chatUrl"); u.value = "http://127.0.0.1:9/v1"; u.dispatchEvent(new Event("change")); return true; })()`);
 await waitFor(`document.getElementById("chatState").textContent === "not answering"`, 6000);
 check("unreachable or blocked: says so plainly (CORS)", /CORS/.test(await ev(`document.getElementById("chatHint").textContent`)), await ev(`document.getElementById("chatHint").textContent`));
+const chatOff = await ev(chatBtn);
+check("  the button turns red, Chat Server Offline; the old line of text is now its tip", chatOff.s === "off" && chatOff.label === "Chat Server Offline" && chatOff.red &&
+  chatOff.tip.startsWith("The chat server is not answering — check its address under Engine") && chatOff.status === "", JSON.stringify(chatOff));
+check("  and it keeps its size between the two states", chatOff.w === chatOn.w && chatOff.h === chatOn.h, `connected ${chatOn.w}x${chatOn.h}, offline ${chatOff.w}x${chatOff.h}`);
+await ev(`document.getElementById("chatLink").scrollIntoView({ block: "center", behavior: "instant" }); true`);
+await sleep(200);
+const chatAt = await ev(`(() => { const r = document.getElementById("chatLink").getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: chatAt.x, y: chatAt.y });
+await sleep(250);
+const chatTip = await ev(`(() => { const t = document.querySelector(".tip.is-on"); return t ? t.textContent : ""; })()`);
+check("  hovering it pops the text up", chatTip.startsWith("The chat server is not answering — check its address under Engine"), chatTip);
+await shot("chat-offline");
+await ev(`document.getElementById("chatUrl").value = location.origin + "/fakechat-loaded/v1"; true`);
+await click("#chatLink");
+const rechecked = await waitFor(`document.getElementById("chatLink").dataset.s === "on"`, 5000);
+check("  clicking it checks again: the server is back, so it turns green", !!rechecked && (await ev(chatBtn)).label === "Chat Server Connected");
+await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });
 await ev(`localStorage.removeItem("yue2.chatUrl"); document.getElementById("museDrawer").open = false; true`);
 
 // ===================================================== prompt files + extras

@@ -1,6 +1,6 @@
 # Install a complete local YuE2 music studio, exactly like the original (instructions for an AI coding agent)
 
-Kit v9, 2026-09-27.
+Kit v10, 2026-09-27.
 
 You are an AI coding agent running on my computer with a shell. A friend has given me his
 local setup for **YuE2** (m-a-p/YuE2-3B, an AI model that writes whole songs with vocals from a
@@ -18,7 +18,7 @@ Everything comes from public GitHub and Hugging Face sources, plus this kit:
 downloaded into one install folder and runs from there.
 
 **The app** is `yue2.cpp` (ServeurpersoCom/yue2.cpp), a fast C++/GGML engine for YuE2 that you
-compile. It gets 36 patches from my friend, which give it his web page and everything
+compile. It gets 38 patches from my friend, which give it his web page and everything
 below. They were made for upstream commit `f17d526` of 2026-09-24: upstream may be newer by now. It
 runs on port 41867.
 
@@ -62,7 +62,10 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - a style prompt that grows with its text and counts tokens (about 11,400 for style and lyrics together);
   - lyrics, an official **Instrumental** switch, and three modes: Full plan, Melody only, Direct;
   - a supplied or editable ABC score, covers from a recording or from a take;
-  - sampling controls, versions per pass, and Plan score only.
+  - sampling controls, versions per pass, and Plan score only;
+  - **Start from an idea**: a local chat server drafts title, style and lyrics. A square button beside it
+    says **Chat Server Connected** (green) or **Chat Server Offline** (red), always the same size; its
+    tip says what to do, and a click checks again.
 - **Add-ons, marked ADD-ON everywhere**:
   - **VAE**: Standard and Legacy are stock; Blend is an add-on. One per song. Each explains itself on
     hover (Standard: the quality choice and the newer model; Blend: two thirds Standard, one third Legacy).
@@ -77,6 +80,8 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - a theme picker with **50 themes** (the default is Studio, a dark warm palette);
   - Open/Save, Load example (110 official demos), Clear, a **New song** button, Unload model;
   - **Engine**.
+- **Three columns** (song form, song page, library): drag the line on either side of the middle one to
+  resize the song form or the library; a double-click puts one back, and the browser remembers.
 - **Library** (right): a tinted card with a ▶ PLAYING badge for the song that plays; favourites and
   versions; a double-click on a song plays it.
 - **Song page** (middle):
@@ -153,13 +158,14 @@ What it has (all of it comes with the patches; you do not build any of it by han
 
 ## 1. Check the machine first, then ask me
 
-The zip is in the folder you were started in. Unzip it (that only makes `yue2-install-2026-09-27-v9/`), then run the machine
-check. It changes nothing. It also finds tools that are installed but **not on PATH**: on WSL, `nvcc`
+The zip is in the folder you were started in. Unzip it (that only makes `yue2-install-2026-09-27-v10/`), then run the machine
+check. (A clone of the kit's git repository, yue2-kit, works the same: that folder is the kit, so skip the
+unzip and use its name wherever these steps say `yue2-install-2026-09-27-v10`.) It changes nothing. It also finds tools that are installed but **not on PATH**: on WSL, `nvcc`
 is often in `/usr/local/cuda/bin` and `nvidia-smi` in `/usr/lib/wsl/lib`.
 
 ```bash
-unzip -q -n yue2-install-2026-09-27-v9.zip       # makes yue2-install-2026-09-27-v9/ (-n: never overwrites a file)
-mkdir -p install-record && bash yue2-install-2026-09-27-v9/app/tools/check-machine.sh . 2>&1 | tee install-record/check-machine.txt
+unzip -q -n yue2-install-2026-09-27-v10.zip       # makes yue2-install-2026-09-27-v10/ (-n: never overwrites a file)
+mkdir -p install-record && bash yue2-install-2026-09-27-v10/app/tools/check-machine.sh . 2>&1 | tee install-record/check-machine.txt
 ```
 
 Summarise its report. The rules that follow from it:
@@ -235,9 +241,9 @@ Then ask me, in one message:
 
 ```
 ROOT/
-  yue2-install-2026-09-27-v9/     this kit (unzipped here); call it KIT
+  yue2-install-2026-09-27-v10/     this kit (unzipped here, or the yue2-kit clone); call it KIT
   upstream/          github.com/ServeurpersoCom/yue2.cpp @ f17d526 (+ ggml submodule), never edited
-  build/             upstream + the 36 patches + the built page: compiled and run from here
+  build/             upstream + the 38 patches + the built page: compiled and run from here
   build/checkpoints -> ../checkpoints       build/models -> ../models
   checkpoints/       the Hugging Face checkpoints the converter reads
   models/            the GGUF files the app loads (made here, no download)
@@ -251,8 +257,8 @@ ROOT/
 
 ```bash
 ROOT=~/yue2-studio            # the folder I chose (you are already in it)
-mkdir -p "$ROOT" && cd "$ROOT" && unzip -q yue2-install-2026-09-27-v9.zip    # makes yue2-install-2026-09-27-v9/ (skip if already unzipped)
-KIT=$ROOT/yue2-install-2026-09-27-v9
+mkdir -p "$ROOT" && cd "$ROOT" && unzip -q yue2-install-2026-09-27-v10.zip    # makes yue2-install-2026-09-27-v10/ (skip if already unzipped)
+KIT=$ROOT/yue2-install-2026-09-27-v10
 export TMPDIR=$ROOT/tmp && mkdir -p tmp outputs tools
 ```
 
@@ -267,7 +273,7 @@ git -C build checkout -B master f17d526 && git -C build submodule update --init 
 (cd build && git -c user.name=install -c user.email=install@localhost am "$KIT"/engines/cpp/patches/*.patch)
 cp "$KIT"/engines/cpp/page/index.html.gz build/tools/public/index.html.gz   # the built page (not in the patches)
 git -C build -c user.name=install -c user.email=install@localhost commit -q -am "Add the built page"
-[ "$(git -C build rev-parse HEAD^{tree})" = 46618fde37a376e5c80eb46d5ce3fef9334e6456 ] && echo "code OK: identical to the original"
+[ "$(git -C build rev-parse HEAD^{tree})" = 9e35b0af02e408b11489f6065bbdb700b544dfdf ] && echo "code OK: identical to the original"
 ln -s ../checkpoints build/checkpoints && ln -s ../models build/models
 printf 'checkpoints\nmodels\n' >> build/.git/info/exclude
 cp -r "$KIT"/app/. . && chmod +x *.sh tools/*.sh      # his root scripts and his whole tools/ folder
@@ -449,7 +455,7 @@ treat it as GPU VRAM from the table above. Start from these, and treat them as u
 |---|---|---|---|
 | `tools/verify-install.sh` | the whole install against his: the code tree, 22 GGUF files (6 models + 16 sliders), 11 LoRAs (pinned sizes, then the server's LoRA reader), `sources.json`, settings | nothing | ~10 s |
 | `tools/test_downloaders.sh` | the download scripts: the include patterns reach the downloader literally, and incomplete downloads are caught | nothing | seconds |
-| `node tools/cdp-console.mjs` | the whole page against a stand-in server: 271 checks | node, google-chrome, python3 | ~75 s |
+| `node tools/cdp-console.mjs` | the whole page against a stand-in server: 286 checks | node, google-chrome, python3 | ~75 s |
 | `tools/test-real.sh` | the real server and page, including a real 1-second song on the CPU: 6 checks + 13 page checks | node, google-chrome, the models | ~1–3 min |
 | `tmp/venv/bin/python tools/test_flac.py --no-song` | the built-in FLAC encoder, bit-exact against flac and ffmpeg | flac, ffmpeg | ~20 s |
 | `tools/test_downloaders.sh --online` | also the real pinned downloader on two include patterns (about 16 MB) | network | ~10 s |

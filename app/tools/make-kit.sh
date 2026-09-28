@@ -8,7 +8,7 @@
 #   files come out the same). It stops on anything the kit could not rebuild, then commits in repo/.
 #
 #   tools/make-kit.sh                        sync repo/ with this install (no version yet)
-#   tools/make-kit.sh --release              also tag the next version and write kits/yue2-kit-vN.zip
+#   tools/make-kit.sh --release              also tag the next version and write kits/yue2-install-<date>-vN.zip
 #                                            (an exact snapshot of that tag)
 #   tools/make-kit.sh --release --verify     also clone upstream fresh, apply the patches and the page,
 #                                            and compare the tree hash (network, ~5 s)
