@@ -1,7 +1,7 @@
 From f34962a0549a0c16de91c52ad4188bb6962c4807 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Fri, 25 Sep 2026 20:39:55 -0700
-Subject: [PATCH 10/45] Add a copy icon to the song page's Prompt card
+Subject: [PATCH 10/48] Add a copy icon to the song page's Prompt card
 
 It copies the prompt exactly as the card shows it and says so in a toast.
 ---

@@ -1,7 +1,7 @@
 From b9ead1aae61b6e617a8bedeeaaf7e2c2637447fb Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 15:41:16 -0700
-Subject: [PATCH 33/45] Clean up the song details: grouped buttons and one
+Subject: [PATCH 33/48] Clean up the song details: grouped buttons and one
  aligned card
 
 Favourite, Rename and Delete become icons on the title line; the line under the title says age, length and render time instead of repeating the music seed; the buttons sit in Download, Make again and Files groups with MP3 and its bitrate as one split button. The pills become one card in five sections (song, sound, shape, add-ons, seeds) with fixed label and value columns: the shape sliders on a five-step scale, one line per slider or LoRA with its halves together, seeds with copy buttons. The card folds its columns in a narrow window.

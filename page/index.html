@@ -6,8 +6,11 @@
 <title>YuE2 Console · cpp</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
-<script>try { var t = localStorage.getItem("yue2.theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<!-- the fonts never hold up the first paint: loaded as a print sheet, switched on when they arrive -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
+<script>try { var t = localStorage.getItem("yue2.theme"); if (t) document.documentElement.dataset.theme = t;
+  var f = JSON.parse(localStorage.getItem("yue2.fonts") || "{}"), g = { sans: "sans-serif", heading: "sans-serif", mono: "monospace" };
+  for (var k in g) if (typeof f[k] === "string") document.documentElement.style.setProperty("--" + k, JSON.stringify(f[k]) + ", " + g[k]); } catch (e) {}</script>
 <style>
 /* YuE2 Console for the C++ server — the same tape-machine console as the
    PyTorch page, in warm near-black, with the score set on manuscript paper:
@@ -22,7 +25,8 @@
 
   --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --mono: "IBM Plex Mono", "Cascadia Mono", ui-monospace, monospace;
-  --display: "Bodoni Moda", "Didot", "Times New Roman", serif;
+  --display: "Bodoni Moda", "Didot", "Times New Roman", serif;   /* the logo and the (i) glyph only */
+  --heading: var(--sans);   /* headings, at medium weight; the Engine page's Fonts card can change all three */
 
   /* The score is set on light manuscript paper in every theme. */
   --paper:      #f2e9d5;
@@ -440,7 +444,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .about-grid { display: flex; flex-direction: column; gap: 16px; container-type: inline-size; }
 .about-projects, .about-addons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 28px; }
 .about-addons { padding-top: 14px; border-top: 1px solid var(--line-soft); }
-.about-project h4 { margin: 0; font: 400 17px/1.2 var(--display); color: var(--ink); letter-spacing: 0; text-transform: none; }
+.about-project h4 { margin: 0; font: 500 15px/1.2 var(--heading); color: var(--ink); letter-spacing: 0; text-transform: none; }
 .about-what { margin: 2px 0 9px; color: var(--muted); font-size: 12px; }
 .about-addons h4 { margin: 0 0 7px; font: 600 10px/1.3 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
 @container (max-width: 760px) { .about-projects, .about-addons { grid-template-columns: minmax(0, 1fr); } }
@@ -501,7 +505,7 @@ body:has(#view-engine:not(.is-hidden)) #engineToggle { background: var(--amber);
   margin: 0 -20px 16px; padding: 10px 20px;
   background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: inset 0 3px 0 var(--amber);
 }
-.engine-title { margin: 0; font: 400 21px/1 var(--display); color: var(--amber); white-space: nowrap; }
+.engine-title { margin: 0; font: 500 19px/1 var(--heading); color: var(--amber); white-space: nowrap; }
 .engine-gear { font-size: 17px; vertical-align: 1px; }
 .engine-sub { margin: 0; color: var(--dim); font-size: 12px; }
 #engineBack { margin-left: auto; }
@@ -514,6 +518,7 @@ body:has(#view-engine:not(.is-hidden)) #engineToggle { background: var(--amber);
 .engine-grid > .card.writer-card { flex: 2 1 400px; }
 .engine-grid > .card.wide { flex-basis: 100%; }
 .engine-grid > .card.compute-card { flex: 1.3 1 300px; }
+.fonts-card select option { font-size: 14px; }
 .check-row { display: flex; align-items: center; gap: 2px; }
 .card.is-off .field, .card.is-off .check-row { opacity: .5; }
 .card-actions { margin-top: auto; }
@@ -569,7 +574,7 @@ body.is-resizing, body.is-resizing * { cursor: col-resize !important; user-selec
   padding: 18px 22px 12px;
   background: inherit;
 }
-.col-head h2 { margin: 0; font: 400 20px/1.2 var(--display); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.col-head h2 { margin: 0; font: 500 18px/1.2 var(--heading); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .take-col .col-head { flex-wrap: wrap; row-gap: 8px; }
 .col-note { white-space: nowrap; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); }
 
@@ -771,7 +776,6 @@ select:disabled { opacity: .7; }
 }
 .chip:hover { color: var(--ink); border-color: var(--patina-dim); }
 .chip.danger:hover { color: var(--bad); border-color: var(--bad-line); }
-.chip.static { cursor: default; }
 
 /* sampling knobs */
 
@@ -997,7 +1001,7 @@ select:disabled { opacity: .7; }
   max-width: 62ch;
 }
 .take-empty p { margin: 0; }
-.take-empty .take-empty-title { margin-bottom: 6px; font-size: 14px; font-weight: 500; color: var(--ink); }
+.take-empty .take-empty-title { margin-bottom: 6px; font: 500 14px/1.55 var(--heading); color: var(--ink); }
 .take-empty strong { color: var(--muted); }
 
 .take-body { display: flex; flex-direction: column; gap: 20px; }
@@ -1065,7 +1069,7 @@ pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-br
   flex-direction: column;
   gap: 13px;
 }
-.card h3 { margin: 0; font: 400 16px/1 var(--display); }
+.card h3 { margin: 0; font: 500 15px/1 var(--heading); }
 
 .kv { margin: 0; display: grid; gap: 8px; }
 .kv div { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; min-width: 0; }
@@ -1135,7 +1139,7 @@ pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-br
   padding: 18px 14px 12px 18px;
   border-bottom: 1px solid var(--line);
 }
-.lib-head h3 { margin: 0; font: 400 17px/1 var(--display); }
+.lib-head h3 { margin: 0; font: 500 16px/1 var(--heading); }
 .count { font-size: 11px; color: var(--dim); }
 
 .lib-toggle {
@@ -1266,7 +1270,7 @@ pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-br
   gap: 10px;
 }
 .panel-head { display: flex; align-items: baseline; gap: 10px; }
-.panel-head h3 { margin: 0; font: 400 16px/1 var(--display); }
+.panel-head h3 { margin: 0; font: 500 15px/1 var(--heading); }
 
 /* Prompt first, lyrics under it, both full width of the column. */
 .word-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
@@ -1332,7 +1336,7 @@ pre.paper { font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-br
   min-width: 180px;
   max-width: 460px;
   padding: 4px 9px !important;
-  font: 400 18px/1.2 var(--display) !important;
+  font: 500 17px/1.2 var(--heading) !important;
 }
 
 /* -------------------------------------------------------------- scrollbars */
@@ -1676,7 +1680,6 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
 .lora-half output { font: 12px var(--mono); color: var(--muted); text-align: right; }
 .lora-half.is-off { opacity: .4; }
 .lora-trigger { font-size: 11px; padding: 3px 8px; }
-.chip .chip-sub { margin-left: 6px; font-size: 10px; color: var(--dim); }
 .lora-hint { margin-top: 8px; }
 @media (max-width: 720px) {
   .lora-row { grid-template-columns: minmax(0, 1fr) 30px; }
@@ -3251,7 +3254,7 @@ fieldset.sound { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; 
     <a class="engine-tag" href="https://github.com/ServeurpersoCom/yue2.cpp" target="_blank" rel="noopener noreferrer" data-tip="The C++ engine this page runs on: its repo on GitHub (opens in a new tab)">cpp</a>
   </div>
 
-  <div class="engine-chip" id="engineChip">
+  <div class="engine-chip">
     <span class="lamp" id="engineLamp"></span>
     <div>
       <strong id="engineState">Checking</strong>
@@ -3370,6 +3373,21 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       </div>
     </div>
 
+    <div class="card fonts-card" id="fontsCard">
+      <h3>Fonts</h3>
+      <label class="field"><span class="label">Text <em>labels, fields and paragraphs</em></span>
+        <select id="fontSans" data-font="sans"></select></label>
+      <label class="field"><span class="label">Headings</span>
+        <select id="fontHeading" data-font="heading"></select></label>
+      <label class="field"><span class="label">Numbers and code <em>seeds, scores, the log</em></span>
+        <select id="fontMono" data-font="mono"></select></label>
+      <p class="row-hint" id="fontsHint"></p>
+      <div class="card-actions">
+        <button type="button" class="btn ghost small" id="fontsAll">List all my fonts</button>
+        <button type="button" class="btn ghost small" id="fontsReset">Default fonts</button>
+      </div>
+    </div>
+
     <div class="card wide">
       <div class="pane-head">
         <h3>Server log</h3>
@@ -3433,36 +3451,36 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     <details class="drawer" id="museDrawer">
       <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Start from an idea</span><span class="sum-say">A local chat model writes the title, style and lyrics from one line.</span></span></summary>
       <div class="drawer-body">
-    <section class="muse" id="muse">
-      <label class="field">
-        <span class="label">Idea <em>a line about the song; the box grows as you type</em></span>
-        <textarea id="idea" rows="2" autocomplete="off"
-                  placeholder="a slow song about missing the last train home"></textarea>
-      </label>
-      <label class="field">
-          <span class="label">Structure</span>
-          <select id="structure">
-            <option value="simple">Verse · Chorus</option>
-            <option value="bridge" selected>Verse · Chorus · Bridge</option>
-            <option value="prechorus">With a pre-chorus</option>
-            <option value="full">Full arc — intro, pre-chorus, bridge, outro</option>
-          </select>
-      </label>
-      <div class="field">
-        <span class="label">Writer model</span>
-        <div class="static-field" id="museModel"><span class="dim">none yet</span></div>
-      </div>
-      <div class="muse-foot">
-        <button type="button" class="chat-link" id="chatLink" data-s="off" data-tip="Set the chat server address under Engine">
-          <span class="on">Chat Server Connected</span><span class="off">Chat Server Offline</span>
-        </button>
-        <button type="button" class="btn writer" id="museBtn">
-          <span id="museGlyph" aria-hidden="true">✎</span> <span id="museLabel">Write the brief</span>
-        </button>
-        <label class="check"><input type="checkbox" id="autoRun" /> <span>Generate the song right after</span></label>
-      </div>
-      <p class="muse-status mono" id="museStatus"></p>
-    </section>
+        <section class="muse" id="muse">
+          <label class="field">
+            <span class="label">Idea <em>a line about the song; the box grows as you type</em></span>
+            <textarea id="idea" rows="2" autocomplete="off"
+                      placeholder="a slow song about missing the last train home"></textarea>
+          </label>
+          <label class="field">
+            <span class="label">Structure</span>
+            <select id="structure">
+              <option value="simple">Verse · Chorus</option>
+              <option value="bridge" selected>Verse · Chorus · Bridge</option>
+              <option value="prechorus">With a pre-chorus</option>
+              <option value="full">Full arc — intro, pre-chorus, bridge, outro</option>
+            </select>
+          </label>
+          <div class="field">
+            <span class="label">Writer model</span>
+            <div class="static-field" id="museModel"><span class="dim">none yet</span></div>
+          </div>
+          <div class="muse-foot">
+            <button type="button" class="chat-link" id="chatLink" data-s="off" data-tip="Set the chat server address under Engine">
+              <span class="on">Chat Server Connected</span><span class="off">Chat Server Offline</span>
+            </button>
+            <button type="button" class="btn writer" id="museBtn">
+              <span id="museGlyph" aria-hidden="true">✎</span> <span id="museLabel">Write the brief</span>
+            </button>
+            <label class="check"><input type="checkbox" id="autoRun" /> <span>Generate the song right after</span></label>
+          </div>
+          <p class="muse-status mono" id="museStatus"></p>
+        </section>
       </div>
     </details>
 
@@ -3562,7 +3580,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Cover or remix</span><span class="sum-say">Reuse a melody and change the style.</span></span></summary>
         <div class="drawer-body cover-body">
           <!-- two ways in, the same shape: a heading with its short note, one control per line, the button on the left -->
-          <section class="cover-part" id="coverAudioRow">
+          <section class="cover-part">
             <h4 class="mini">From a recording <span class="info" tabindex="0" role="img" aria-label="About transcription" data-tip-ref="tip-transcribe">i</span>
               <em>its tune only, not the words or the singer</em></h4>
             <label class="field"><span class="label">Recording</span>
@@ -3848,8 +3866,10 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
 
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.7.0/abcjs-basic-min.js"
-        onerror="window.__abcjsFailed=true"></script>
+<!-- the score engraver loads beside the page instead of in front of it (app.js: renderScore) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.7.0/abcjs-basic-min.js" defer
+        onload="window.__abcjsLanded && window.__abcjsLanded()"
+        onerror="window.__abcjsFailed = true; window.__abcjsLanded && window.__abcjsLanded()"></script>
 
 <!-- ---------------------------------------------------------- info tips -->
 <!-- Shown by hovering the (i) icons; one floating tip, so no column clips it. -->
@@ -4533,6 +4553,10 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       "(default 10: the top 0.001% are clipped, which also lifts quiet songs). 0 normalises to the true peak: no clipping, a little quieter. " +
       "WAV 32-bit float is not normalised.",
     instrumental: null,   // has its own (i)
+    fontSans: "The font for labels, fields and paragraphs. The app's own fonts come first; under the line, fonts installed on this computer. " +
+      "Each browser keeps its own choice.",
+    fontHeading: "The font for headings: Compose, Takes, the song's title, the cards. Medium weight.",
+    fontMono: "The font for numbers and code: seeds, the score, the server log. A fixed-width font keeps columns straight.",
     coverFile: "A recording to take the melody from (WAV, FLAC, MP3, M4A, OGG). Only the tune is transcribed: " +
       "not the words and not the singer's voice.",
     coverTask: "Lead melody: the most prominent line, voice or instrument, without chords (use Melody mode).\n" +
@@ -8308,7 +8332,13 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     $("scoreAbc").textContent = abc || "";
     STATE.abcRendered = abc || "";
     if (!abc) { $("scoreStaff").textContent = ""; return; }
-    if (window.__abcjsFailed || typeof window.ABCJS === "undefined") {
+    if (!window.__abcjsFailed && typeof window.ABCJS === "undefined") {
+      // the engraver is still on its way: the ABC tab has the score now, the staff is drawn when it lands
+      window.__abcjsLanded = function () { window.__abcjsLanded = null; if (STATE.abcRendered) renderScore(STATE.abcRendered); };
+      $("scoreStaff").textContent = "";   // not the last song's staff
+      return;
+    }
+    if (window.__abcjsFailed) {
       // No renderer available: the ABC text is the score.
       $("scoreStaff").classList.add("is-hidden");
       $("scoreAbc").classList.remove("is-hidden");
@@ -9722,6 +9752,101 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
   if (window.ResizeObserver) new ResizeObserver(applyCols).observe(workspace);
   else window.addEventListener("resize", applyCols);
   applyCols();
+
+  // ------------------------------------------------------------------ fonts
+  // Three fonts this browser can change ("yue2.fonts"; the <head> script applies them before the first paint):
+  // the text (--sans), the headings (--heading, the text font unless picked) and numbers and code (--mono).
+  // Each menu lists the app's own fonts, a line, then the fonts this computer has: a common set, found by
+  // measuring, or every installed family after List all my fonts (the browser asks first; Chrome and Edge).
+  var FONT_ROLES = {
+    sans: { select: "fontSans", generic: "sans-serif", own: "IBM Plex Sans" },
+    heading: { select: "fontHeading", generic: "sans-serif", own: "" },
+    mono: { select: "fontMono", generic: "monospace", own: "IBM Plex Mono" }
+  };
+  var APP_FONTS = ["IBM Plex Sans", "IBM Plex Mono", "Bodoni Moda"];
+  var COMMON_FONTS = ["Aptos", "Arial", "Avenir", "Avenir Next", "Bahnschrift", "Baskerville", "Calibri", "Cambria", "Candara",
+    "Cantarell", "Cascadia Code", "Cascadia Mono", "Charter", "Consolas", "Constantia", "Corbel", "Courier New", "DejaVu Sans",
+    "DejaVu Sans Mono", "DejaVu Serif", "Didot", "Fira Mono", "Fira Sans", "Franklin Gothic Medium", "Futura", "Garamond",
+    "Georgia", "Gill Sans", "Helvetica", "Helvetica Neue", "Hoefler Text", "Inter", "Iowan Old Style", "JetBrains Mono", "Lato",
+    "Liberation Mono", "Liberation Sans", "Liberation Serif", "Lucida Console", "Lucida Sans Unicode", "Menlo", "Monaco",
+    "Noto Sans", "Noto Sans Mono", "Noto Serif", "Open Sans", "Optima", "Palatino", "Palatino Linotype", "Roboto", "Roboto Mono",
+    "SF Mono", "Segoe UI", "Segoe UI Variable Text", "Sitka Text", "Source Code Pro", "Source Sans 3", "Tahoma", "Times New Roman",
+    "Trebuchet MS", "Ubuntu", "Ubuntu Mono", "Verdana"];
+  var systemFonts = [];
+
+  function savedFonts() {
+    var fonts;
+    try { fonts = JSON.parse(recall("yue2.fonts") || "{}") || {}; } catch (error) { fonts = {}; }
+    return fonts;
+  }
+  function applyFonts() {
+    var saved = savedFonts(), root = document.documentElement;
+    Object.keys(FONT_ROLES).forEach(function (role) {
+      if (typeof saved[role] === "string") root.style.setProperty("--" + role, JSON.stringify(saved[role]) + ", " + FONT_ROLES[role].generic);
+      else root.style.removeProperty("--" + role);
+    });
+  }
+  // installed when text set in it measures differently from a generic fallback
+  function hasFont(family) {
+    var ctx = hasFont.ctx || (hasFont.ctx = document.createElement("canvas").getContext("2d")), sample = "mmmmmwwwwwiiilll 0123 AaQq";
+    return ["monospace", "serif", "sans-serif"].some(function (generic) {
+      ctx.font = "32px " + generic;
+      var base = ctx.measureText(sample).width;
+      ctx.font = "32px " + JSON.stringify(family) + ", " + generic;
+      return ctx.measureText(sample).width !== base;
+    });
+  }
+  function fontOption(family, label) {
+    var option = document.createElement("option");
+    option.value = family;
+    option.textContent = label;
+    if (family) option.style.fontFamily = JSON.stringify(family) + ", sans-serif";
+    return option;
+  }
+  function paintFonts() {
+    var saved = savedFonts();
+    Object.keys(FONT_ROLES).forEach(function (role) {
+      var r = FONT_ROLES[role], select = $(r.select), want = typeof saved[role] === "string" ? saved[role] : r.own;
+      var system = systemFonts.slice();
+      if (want && APP_FONTS.indexOf(want) < 0 && system.indexOf(want) < 0) system.push(want);   // kept from a longer list
+      select.textContent = "";
+      if (!r.own) select.appendChild(fontOption("", "Same as the text (default)"));
+      APP_FONTS.forEach(function (family) { select.appendChild(fontOption(family, family === r.own ? family + " (default)" : family)); });
+      select.appendChild(document.createElement("hr"));
+      system.sort(function (a, b) { return a.localeCompare(b); }).forEach(function (family) { select.appendChild(fontOption(family, family)); });
+      select.value = want;
+    });
+    $("fontsHint").textContent = systemFonts.length + " fonts found on this computer" +
+      (typeof window.queryLocalFonts === "function" ? "; List all my fonts shows every one." : ".");
+  }
+  Object.keys(FONT_ROLES).forEach(function (role) {
+    $(FONT_ROLES[role].select).addEventListener("change", function () {
+      var saved = savedFonts();
+      if (this.value === FONT_ROLES[role].own) delete saved[role]; else saved[role] = this.value;
+      store("yue2.fonts", Object.keys(saved).length ? JSON.stringify(saved) : null);
+      applyFonts();
+    });
+  });
+  $("fontsReset").addEventListener("click", function () {
+    store("yue2.fonts", null);
+    applyFonts();
+    paintFonts();
+    toast("Fonts are back to the app's own");
+  });
+  $("fontsAll").classList.toggle("is-hidden", typeof window.queryLocalFonts !== "function");
+  $("fontsAll").addEventListener("click", function () {
+    window.queryLocalFonts().then(function (fonts) {
+      var seen = {};
+      systemFonts = [];
+      fonts.forEach(function (font) {
+        if (!seen[font.family] && APP_FONTS.indexOf(font.family) < 0) { seen[font.family] = true; systemFonts.push(font.family); }
+      });
+      paintFonts();
+      toast(systemFonts.length + " fonts listed");
+    }).catch(function (error) { toast("The browser did not list the fonts: " + error.message, "bad"); });
+  });
+  systemFonts = COMMON_FONTS.filter(hasFont);
+  paintFonts();
 
   STATE.favOnly = recall("yue2.favOnly") === "1";
 

@@ -70,6 +70,10 @@
       "(default 10: the top 0.001% are clipped, which also lifts quiet songs). 0 normalises to the true peak: no clipping, a little quieter. " +
       "WAV 32-bit float is not normalised.",
     instrumental: null,   // has its own (i)
+    fontSans: "The font for labels, fields and paragraphs. The app's own fonts come first; under the line, fonts installed on this computer. " +
+      "Each browser keeps its own choice.",
+    fontHeading: "The font for headings: Compose, Takes, the song's title, the cards. Medium weight.",
+    fontMono: "The font for numbers and code: seeds, the score, the server log. A fixed-width font keeps columns straight.",
     coverFile: "A recording to take the melody from (WAV, FLAC, MP3, M4A, OGG). Only the tune is transcribed: " +
       "not the words and not the singer's voice.",
     coverTask: "Lead melody: the most prominent line, voice or instrument, without chords (use Melody mode).\n" +

@@ -6,8 +6,11 @@
 <title>YuE2 Console · cpp</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
-<script>try { var t = localStorage.getItem("yue2.theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<!-- the fonts never hold up the first paint: loaded as a print sheet, switched on when they arrive -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
+<script>try { var t = localStorage.getItem("yue2.theme"); if (t) document.documentElement.dataset.theme = t;
+  var f = JSON.parse(localStorage.getItem("yue2.fonts") || "{}"), g = { sans: "sans-serif", heading: "sans-serif", mono: "monospace" };
+  for (var k in g) if (typeof f[k] === "string") document.documentElement.style.setProperty("--" + k, JSON.stringify(f[k]) + ", " + g[k]); } catch (e) {}</script>
 <link rel="stylesheet" href="app.css" />
 <link rel="stylesheet" href="themes.css" />
 </head>
@@ -28,7 +31,7 @@
     <a class="engine-tag" href="https://github.com/ServeurpersoCom/yue2.cpp" target="_blank" rel="noopener noreferrer" data-tip="The C++ engine this page runs on: its repo on GitHub (opens in a new tab)">cpp</a>
   </div>
 
-  <div class="engine-chip" id="engineChip">
+  <div class="engine-chip">
     <span class="lamp" id="engineLamp"></span>
     <div>
       <strong id="engineState">Checking</strong>
@@ -147,6 +150,21 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
       </div>
     </div>
 
+    <div class="card fonts-card" id="fontsCard">
+      <h3>Fonts</h3>
+      <label class="field"><span class="label">Text <em>labels, fields and paragraphs</em></span>
+        <select id="fontSans" data-font="sans"></select></label>
+      <label class="field"><span class="label">Headings</span>
+        <select id="fontHeading" data-font="heading"></select></label>
+      <label class="field"><span class="label">Numbers and code <em>seeds, scores, the log</em></span>
+        <select id="fontMono" data-font="mono"></select></label>
+      <p class="row-hint" id="fontsHint"></p>
+      <div class="card-actions">
+        <button type="button" class="btn ghost small" id="fontsAll">List all my fonts</button>
+        <button type="button" class="btn ghost small" id="fontsReset">Default fonts</button>
+      </div>
+    </div>
+
     <div class="card wide">
       <div class="pane-head">
         <h3>Server log</h3>
@@ -210,36 +228,36 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
     <details class="drawer" id="museDrawer">
       <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Start from an idea</span><span class="sum-say">A local chat model writes the title, style and lyrics from one line.</span></span></summary>
       <div class="drawer-body">
-    <section class="muse" id="muse">
-      <label class="field">
-        <span class="label">Idea <em>a line about the song; the box grows as you type</em></span>
-        <textarea id="idea" rows="2" autocomplete="off"
-                  placeholder="a slow song about missing the last train home"></textarea>
-      </label>
-      <label class="field">
-          <span class="label">Structure</span>
-          <select id="structure">
-            <option value="simple">Verse · Chorus</option>
-            <option value="bridge" selected>Verse · Chorus · Bridge</option>
-            <option value="prechorus">With a pre-chorus</option>
-            <option value="full">Full arc — intro, pre-chorus, bridge, outro</option>
-          </select>
-      </label>
-      <div class="field">
-        <span class="label">Writer model</span>
-        <div class="static-field" id="museModel"><span class="dim">none yet</span></div>
-      </div>
-      <div class="muse-foot">
-        <button type="button" class="chat-link" id="chatLink" data-s="off" data-tip="Set the chat server address under Engine">
-          <span class="on">Chat Server Connected</span><span class="off">Chat Server Offline</span>
-        </button>
-        <button type="button" class="btn writer" id="museBtn">
-          <span id="museGlyph" aria-hidden="true">✎</span> <span id="museLabel">Write the brief</span>
-        </button>
-        <label class="check"><input type="checkbox" id="autoRun" /> <span>Generate the song right after</span></label>
-      </div>
-      <p class="muse-status mono" id="museStatus"></p>
-    </section>
+        <section class="muse" id="muse">
+          <label class="field">
+            <span class="label">Idea <em>a line about the song; the box grows as you type</em></span>
+            <textarea id="idea" rows="2" autocomplete="off"
+                      placeholder="a slow song about missing the last train home"></textarea>
+          </label>
+          <label class="field">
+            <span class="label">Structure</span>
+            <select id="structure">
+              <option value="simple">Verse · Chorus</option>
+              <option value="bridge" selected>Verse · Chorus · Bridge</option>
+              <option value="prechorus">With a pre-chorus</option>
+              <option value="full">Full arc — intro, pre-chorus, bridge, outro</option>
+            </select>
+          </label>
+          <div class="field">
+            <span class="label">Writer model</span>
+            <div class="static-field" id="museModel"><span class="dim">none yet</span></div>
+          </div>
+          <div class="muse-foot">
+            <button type="button" class="chat-link" id="chatLink" data-s="off" data-tip="Set the chat server address under Engine">
+              <span class="on">Chat Server Connected</span><span class="off">Chat Server Offline</span>
+            </button>
+            <button type="button" class="btn writer" id="museBtn">
+              <span id="museGlyph" aria-hidden="true">✎</span> <span id="museLabel">Write the brief</span>
+            </button>
+            <label class="check"><input type="checkbox" id="autoRun" /> <span>Generate the song right after</span></label>
+          </div>
+          <p class="muse-status mono" id="museStatus"></p>
+        </section>
       </div>
     </details>
 
@@ -339,7 +357,7 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
         <summary><span class="chev" aria-hidden="true"></span><span class="sum-head"><span class="sum-name">Cover or remix</span><span class="sum-say">Reuse a melody and change the style.</span></span></summary>
         <div class="drawer-body cover-body">
           <!-- two ways in, the same shape: a heading with its short note, one control per line, the button on the left -->
-          <section class="cover-part" id="coverAudioRow">
+          <section class="cover-part">
             <h4 class="mini">From a recording <span class="info" tabindex="0" role="img" aria-label="About transcription" data-tip-ref="tip-transcribe">i</span>
               <em>its tune only, not the words or the singer</em></h4>
             <label class="field"><span class="label">Recording</span>
@@ -625,8 +643,10 @@ Make more copies with repo/build/quantize (see AGENTS.md)."></select>
 
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.7.0/abcjs-basic-min.js"
-        onerror="window.__abcjsFailed=true"></script>
+<!-- the score engraver loads beside the page instead of in front of it (app.js: renderScore) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.7.0/abcjs-basic-min.js" defer
+        onload="window.__abcjsLanded && window.__abcjsLanded()"
+        onerror="window.__abcjsFailed = true; window.__abcjsLanded && window.__abcjsLanded()"></script>
 
 <!-- ---------------------------------------------------------- info tips -->
 <!-- Shown by hovering the (i) icons; one floating tip, so no column clips it. -->

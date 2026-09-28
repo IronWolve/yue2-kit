@@ -1,7 +1,7 @@
 From 817fd6f37464eab77b219ea4862a34665e7f6b64 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 14:24:05 -0700
-Subject: [PATCH 28/45] Add --fp16-matmul for GPUs without BF16 tensor cores
+Subject: [PATCH 28/48] Add --fp16-matmul for GPUs without BF16 tensor cores
 
 On older GPUs with FP16 but no BF16 tensor cores (compute 7.x), a batched BF16 matmul runs on the FP32 cores. With the flag, matmuls of more than 8 rows cast the BF16 weight to F16 and run on the FP16 tensor cores; single-token decode keeps reading BF16. Measured on his 8 GB laptop GPU: sound stage 9.25 -> 3.4 s per step, a song 440 -> 215 s, closer to the full-precision render than Q8_0. It changes the output, so earlier seeds do not reproduce exactly. Off by default.
 ---

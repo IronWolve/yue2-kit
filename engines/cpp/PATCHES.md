@@ -578,3 +578,29 @@ Files:
 Files:
 - `tools/console/app.css` (+2 −0)
 - `tools/console/index.html` (+2 −0)
+
+## 0046 Headings in the page's text font
+
+2026-09-27. Column, card, panel, Engine and About headings move from the display serif to the text font at medium weight, a size smaller to match; the serif stays for the logo and the (i) glyph.
+
+Files:
+- `tools/console/app.css` (+8 −8)
+
+## 0047 Add a Fonts card to the Engine page
+
+2026-09-27. Three menus change the text, heading and number fonts for this browser: the app's own fonts first with the default marked, a line, then the fonts this computer has (a common set found by measuring, or every installed family on request where the browser can list them). The choice is applied before the first paint; Default fonts forgets it. Headings get their own font setting, the text font unless picked.
+
+Files:
+- `tools/console/app.css` (+11 −9)
+- `tools/console/app.js` (+95 −0)
+- `tools/console/help.js` (+4 −0)
+- `tools/console/index.html` (+18 −1)
+
+## 0048 Page clean-up: nothing external holds up the page
+
+2026-09-27. The web fonts' stylesheet no longer blocks the first paint (it loads as a print sheet and switches on when it arrives), and the score engraver loads beside the page instead of in front of its scripts; a score opened before it lands shows as ABC and is drawn when it arrives. Removes two unused style rules and two unused ids, and re-indents the idea drawer.
+
+Files:
+- `tools/console/app.css` (+0 −2)
+- `tools/console/app.js` (+7 −1)
+- `tools/console/index.html` (+38 −35)

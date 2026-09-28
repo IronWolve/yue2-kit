@@ -1,7 +1,7 @@
 From 8d2261eb11211b664bbf8ef8e4a99a8bc6023c42 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Fri, 25 Sep 2026 21:20:35 -0700
-Subject: [PATCH 15/45] Add 41 themes and a swatch picker
+Subject: [PATCH 15/48] Add 41 themes and a swatch picker
 
 The top bar's theme menu becomes a swatch grid of 50 themes: the nine
 hand-tuned ones plus 41 generated from compact palettes (23 Bold, 12 Soft,

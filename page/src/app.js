@@ -2846,7 +2846,13 @@
     $("scoreAbc").textContent = abc || "";
     STATE.abcRendered = abc || "";
     if (!abc) { $("scoreStaff").textContent = ""; return; }
-    if (window.__abcjsFailed || typeof window.ABCJS === "undefined") {
+    if (!window.__abcjsFailed && typeof window.ABCJS === "undefined") {
+      // the engraver is still on its way: the ABC tab has the score now, the staff is drawn when it lands
+      window.__abcjsLanded = function () { window.__abcjsLanded = null; if (STATE.abcRendered) renderScore(STATE.abcRendered); };
+      $("scoreStaff").textContent = "";   // not the last song's staff
+      return;
+    }
+    if (window.__abcjsFailed) {
       // No renderer available: the ABC text is the score.
       $("scoreStaff").classList.add("is-hidden");
       $("scoreAbc").classList.remove("is-hidden");
@@ -4260,6 +4266,101 @@
   if (window.ResizeObserver) new ResizeObserver(applyCols).observe(workspace);
   else window.addEventListener("resize", applyCols);
   applyCols();
+
+  // ------------------------------------------------------------------ fonts
+  // Three fonts this browser can change ("yue2.fonts"; the <head> script applies them before the first paint):
+  // the text (--sans), the headings (--heading, the text font unless picked) and numbers and code (--mono).
+  // Each menu lists the app's own fonts, a line, then the fonts this computer has: a common set, found by
+  // measuring, or every installed family after List all my fonts (the browser asks first; Chrome and Edge).
+  var FONT_ROLES = {
+    sans: { select: "fontSans", generic: "sans-serif", own: "IBM Plex Sans" },
+    heading: { select: "fontHeading", generic: "sans-serif", own: "" },
+    mono: { select: "fontMono", generic: "monospace", own: "IBM Plex Mono" }
+  };
+  var APP_FONTS = ["IBM Plex Sans", "IBM Plex Mono", "Bodoni Moda"];
+  var COMMON_FONTS = ["Aptos", "Arial", "Avenir", "Avenir Next", "Bahnschrift", "Baskerville", "Calibri", "Cambria", "Candara",
+    "Cantarell", "Cascadia Code", "Cascadia Mono", "Charter", "Consolas", "Constantia", "Corbel", "Courier New", "DejaVu Sans",
+    "DejaVu Sans Mono", "DejaVu Serif", "Didot", "Fira Mono", "Fira Sans", "Franklin Gothic Medium", "Futura", "Garamond",
+    "Georgia", "Gill Sans", "Helvetica", "Helvetica Neue", "Hoefler Text", "Inter", "Iowan Old Style", "JetBrains Mono", "Lato",
+    "Liberation Mono", "Liberation Sans", "Liberation Serif", "Lucida Console", "Lucida Sans Unicode", "Menlo", "Monaco",
+    "Noto Sans", "Noto Sans Mono", "Noto Serif", "Open Sans", "Optima", "Palatino", "Palatino Linotype", "Roboto", "Roboto Mono",
+    "SF Mono", "Segoe UI", "Segoe UI Variable Text", "Sitka Text", "Source Code Pro", "Source Sans 3", "Tahoma", "Times New Roman",
+    "Trebuchet MS", "Ubuntu", "Ubuntu Mono", "Verdana"];
+  var systemFonts = [];
+
+  function savedFonts() {
+    var fonts;
+    try { fonts = JSON.parse(recall("yue2.fonts") || "{}") || {}; } catch (error) { fonts = {}; }
+    return fonts;
+  }
+  function applyFonts() {
+    var saved = savedFonts(), root = document.documentElement;
+    Object.keys(FONT_ROLES).forEach(function (role) {
+      if (typeof saved[role] === "string") root.style.setProperty("--" + role, JSON.stringify(saved[role]) + ", " + FONT_ROLES[role].generic);
+      else root.style.removeProperty("--" + role);
+    });
+  }
+  // installed when text set in it measures differently from a generic fallback
+  function hasFont(family) {
+    var ctx = hasFont.ctx || (hasFont.ctx = document.createElement("canvas").getContext("2d")), sample = "mmmmmwwwwwiiilll 0123 AaQq";
+    return ["monospace", "serif", "sans-serif"].some(function (generic) {
+      ctx.font = "32px " + generic;
+      var base = ctx.measureText(sample).width;
+      ctx.font = "32px " + JSON.stringify(family) + ", " + generic;
+      return ctx.measureText(sample).width !== base;
+    });
+  }
+  function fontOption(family, label) {
+    var option = document.createElement("option");
+    option.value = family;
+    option.textContent = label;
+    if (family) option.style.fontFamily = JSON.stringify(family) + ", sans-serif";
+    return option;
+  }
+  function paintFonts() {
+    var saved = savedFonts();
+    Object.keys(FONT_ROLES).forEach(function (role) {
+      var r = FONT_ROLES[role], select = $(r.select), want = typeof saved[role] === "string" ? saved[role] : r.own;
+      var system = systemFonts.slice();
+      if (want && APP_FONTS.indexOf(want) < 0 && system.indexOf(want) < 0) system.push(want);   // kept from a longer list
+      select.textContent = "";
+      if (!r.own) select.appendChild(fontOption("", "Same as the text (default)"));
+      APP_FONTS.forEach(function (family) { select.appendChild(fontOption(family, family === r.own ? family + " (default)" : family)); });
+      select.appendChild(document.createElement("hr"));
+      system.sort(function (a, b) { return a.localeCompare(b); }).forEach(function (family) { select.appendChild(fontOption(family, family)); });
+      select.value = want;
+    });
+    $("fontsHint").textContent = systemFonts.length + " fonts found on this computer" +
+      (typeof window.queryLocalFonts === "function" ? "; List all my fonts shows every one." : ".");
+  }
+  Object.keys(FONT_ROLES).forEach(function (role) {
+    $(FONT_ROLES[role].select).addEventListener("change", function () {
+      var saved = savedFonts();
+      if (this.value === FONT_ROLES[role].own) delete saved[role]; else saved[role] = this.value;
+      store("yue2.fonts", Object.keys(saved).length ? JSON.stringify(saved) : null);
+      applyFonts();
+    });
+  });
+  $("fontsReset").addEventListener("click", function () {
+    store("yue2.fonts", null);
+    applyFonts();
+    paintFonts();
+    toast("Fonts are back to the app's own");
+  });
+  $("fontsAll").classList.toggle("is-hidden", typeof window.queryLocalFonts !== "function");
+  $("fontsAll").addEventListener("click", function () {
+    window.queryLocalFonts().then(function (fonts) {
+      var seen = {};
+      systemFonts = [];
+      fonts.forEach(function (font) {
+        if (!seen[font.family] && APP_FONTS.indexOf(font.family) < 0) { seen[font.family] = true; systemFonts.push(font.family); }
+      });
+      paintFonts();
+      toast(systemFonts.length + " fonts listed");
+    }).catch(function (error) { toast("The browser did not list the fonts: " + error.message, "bad"); });
+  });
+  systemFonts = COMMON_FONTS.filter(hasFont);
+  paintFonts();
 
   STATE.favOnly = recall("yue2.favOnly") === "1";
 
