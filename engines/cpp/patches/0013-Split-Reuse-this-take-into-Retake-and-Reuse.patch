@@ -1,7 +1,7 @@
 From 4b13f5ed858a72cbf8de4d02280caefa06b397b2 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Fri, 25 Sep 2026 21:00:41 -0700
-Subject: [PATCH 13/56] Split Reuse this take into Retake and Reuse
+Subject: [PATCH 13/57] Split Reuse this take into Retake and Reuse
 
 Retake loads the exact request, score, both seeds and music codes
 included, so Generate renders the same music again. Reuse loads the

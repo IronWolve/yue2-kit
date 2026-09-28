@@ -1,7 +1,7 @@
 From 8076f8d9b02a3aec65493be14544aeaa4f440658 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 20:00:01 -0700
-Subject: [PATCH 49/56] Cover or remix: listen to the chosen recording
+Subject: [PATCH 49/57] Cover or remix: listen to the chosen recording
 
 A Listen button beside Transcribe, the same size, plays the chosen file in its own player and shows the time; starting it pauses the player at the bottom and the other way round, and closing the drawer stops it.
 ---

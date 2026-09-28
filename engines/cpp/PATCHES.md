@@ -679,3 +679,11 @@ Files:
 - `tools/console/app.js` (+18 −13)
 - `tools/console/help.js` (+2 −2)
 - `tools/console/index.html` (+6 −7)
+
+## 0057 The status note opens the collection's repository; the GPU readout beside the Model menu; About's projects in one column
+
+2026-09-28. The top-left status note (Ready, Generating...) links the collection's own repository, in a new tab. The two-line GPU readout moves to the right, directly left of the Model menu. In About, the four projects stand in one column.
+
+Files:
+- `tools/console/app.css` (+4 −1)
+- `tools/console/index.html` (+5 −4)

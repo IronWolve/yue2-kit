@@ -1,7 +1,7 @@
 From 2a02283a9fff0706f1a373e4e2024164dc608246 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sun, 27 Sep 2026 18:41:06 -0700
-Subject: [PATCH 40/56] Clean up the idea drawer; the Compose heading stands
+Subject: [PATCH 40/57] Clean up the idea drawer; the Compose heading stands
  alone
 
 The drawer gets labels like the rest of the form (Idea, Structure, Writer model, each (i) on its label), the writer model as a read-only box instead of a disabled menu, and the structure's note inside its (i). The small chat server tag goes: the Chat Server button already says it. Under a thin line, the Chat Server button and Write the brief sit together on the left at the same size, then the checkbox; a run's result line goes under them. The Compose heading loses its tagline.

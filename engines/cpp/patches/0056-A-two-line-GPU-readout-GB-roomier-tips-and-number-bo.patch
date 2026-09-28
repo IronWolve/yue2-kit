@@ -1,7 +1,7 @@
 From 3ebda0a63b57981c289c85477d3abf470d41addb Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Mon, 28 Sep 2026 11:41:17 -0700
-Subject: [PATCH 56/56] A two-line GPU readout, GB, roomier tips and number
+Subject: [PATCH 56/57] A two-line GPU readout, GB, roomier tips and number
  boxes; the credit links the kit
 
 The top bar's readout becomes two small lines (the GPU's short name, its memory in use) that stay on small screens; the full GPU name, backbone, context and batch move to its tip. Memory reads GB, not GiB. Tips are wider so their lines stay whole, and the model menu's tip is four short lines. Number boxes leave room before their up/down arrows (the compose knobs are a little wider). In About, Customized Collection links the collection's own repository.

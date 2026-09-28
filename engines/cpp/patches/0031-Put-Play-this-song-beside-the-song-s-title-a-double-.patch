@@ -1,7 +1,7 @@
 From 30a6a71cdade9216932779fcfd4c68372dda7e58 Mon Sep 17 00:00:00 2001
 From: IronWolve <3938589+IronWolve@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 15:07:56 -0700
-Subject: [PATCH 31/56] Put Play this song beside the song's title; a
+Subject: [PATCH 31/57] Put Play this song beside the song's title; a
  double-click in the list plays
 
 The button moves from the end of the action row to right after the title. A double-click on a song in the list opens and plays it; it is read from the second click, because the first click redraws the list and the browser then sends no dblclick. Renaming stays on the Rename button.

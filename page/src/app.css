@@ -446,7 +446,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* two bands: the three projects (the model, the engine, the tensor library), then the add-ons */
 .about-grid { display: flex; flex-direction: column; gap: 16px; container-type: inline-size; }
 .about-projects, .about-addons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 28px; }
-.about-projects { grid-template-columns: repeat(4, minmax(0, 1fr)); }   /* the model, the engine, the layout and the tensor library */
+.about-projects { grid-template-columns: minmax(0, 1fr); gap: 14px; }   /* the four projects in one column */
 .about-addons { padding-top: 14px; border-top: 1px solid var(--line-soft); }
 .about-project h4 { margin: 0; font: 500 15px/1.2 var(--heading); color: var(--ink); letter-spacing: 0; text-transform: none; }
 .about-what { margin: 2px 0 9px; color: var(--muted); font-size: 12px; }
@@ -486,6 +486,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* the GPU readout: two small lines (GPU, VRAM) that fit a small screen; its tip has the rest */
 .hw-strip { display: grid; gap: 1px; margin: 0; font-size: 10.5px; line-height: 1.3; min-width: 0; flex: none; cursor: default; }
+a.engine-chip { color: inherit; text-decoration: none; }
+a.engine-chip:hover small, a.engine-chip:focus-visible small { text-decoration: underline; text-underline-offset: 2px; }
+.head-actions .hw-strip { margin-right: 6px; }
 .hw-strip div { display: flex; gap: 6px; align-items: baseline; white-space: nowrap; }
 .hw-strip dt { color: var(--dim); min-width: 32px; }
 .hw-strip dd { margin: 0; font-family: var(--mono); font-size: 10px; color: var(--muted); }

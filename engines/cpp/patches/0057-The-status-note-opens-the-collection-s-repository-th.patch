@@ -1,0 +1,64 @@
+From a576eea9296d6c31758e3c0aa1677d5a4dfb07ff Mon Sep 17 00:00:00 2001
+From: IronWolve <3938589+IronWolve@users.noreply.github.com>
+Date: Mon, 28 Sep 2026 11:46:56 -0700
+Subject: [PATCH 57/57] The status note opens the collection's repository; the
+ GPU readout beside the Model menu; About's projects in one column
+
+The top-left status note (Ready, Generating...) links the collection's own repository, in a new tab. The two-line GPU readout moves to the right, directly left of the Model menu. In About, the four projects stand in one column.
+---
+ tools/console/app.css    | 5 ++++-
+ tools/console/index.html | 9 +++++----
+ 2 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/tools/console/app.css b/tools/console/app.css
+index ac6c340..abfe763 100644
+--- a/tools/console/app.css
++++ b/tools/console/app.css
+@@ -446,7 +446,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
+ /* two bands: the three projects (the model, the engine, the tensor library), then the add-ons */
+ .about-grid { display: flex; flex-direction: column; gap: 16px; container-type: inline-size; }
+ .about-projects, .about-addons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 28px; }
+-.about-projects { grid-template-columns: repeat(4, minmax(0, 1fr)); }   /* the model, the engine, the layout and the tensor library */
++.about-projects { grid-template-columns: minmax(0, 1fr); gap: 14px; }   /* the four projects in one column */
+ .about-addons { padding-top: 14px; border-top: 1px solid var(--line-soft); }
+ .about-project h4 { margin: 0; font: 500 15px/1.2 var(--heading); color: var(--ink); letter-spacing: 0; text-transform: none; }
+ .about-what { margin: 2px 0 9px; color: var(--muted); font-size: 12px; }
+@@ -486,6 +486,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
+ 
+ /* the GPU readout: two small lines (GPU, VRAM) that fit a small screen; its tip has the rest */
+ .hw-strip { display: grid; gap: 1px; margin: 0; font-size: 10.5px; line-height: 1.3; min-width: 0; flex: none; cursor: default; }
++a.engine-chip { color: inherit; text-decoration: none; }
++a.engine-chip:hover small, a.engine-chip:focus-visible small { text-decoration: underline; text-underline-offset: 2px; }
++.head-actions .hw-strip { margin-right: 6px; }
+ .hw-strip div { display: flex; gap: 6px; align-items: baseline; white-space: nowrap; }
+ .hw-strip dt { color: var(--dim); min-width: 32px; }
+ .hw-strip dd { margin: 0; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+diff --git a/tools/console/index.html b/tools/console/index.html
+index 593e523..4e7c648 100644
+--- a/tools/console/index.html
++++ b/tools/console/index.html
+@@ -33,19 +33,20 @@
+     <a class="engine-tag" href="https://github.com/ServeurpersoCom/yue2.cpp" target="_blank" rel="noopener noreferrer" data-tip="The C++ engine this page runs on: its repo on GitHub (opens in a new tab)">cpp</a>
+   </div>
+ 
+-  <div class="engine-chip">
++  <!-- the status note, top left: it opens the collection's own repository -->
++  <a class="engine-chip" href="https://github.com/IronWolve/yue2-kit" target="_blank" rel="noopener noreferrer"
++     data-tip="yue2-kit on GitHub: this collection's install kit, its patches and its releases">
+     <span class="lamp" id="engineLamp"></span>
+     <div>
+       <strong id="engineState">Checking</strong>
+       <small id="engineDetail">asking the server</small>
+     </div>
+-  </div>
+-
+-  <dl class="hw-strip" id="hwStats"></dl>
++  </a>
+ 
+   <div class="spacer"></div>
+ 
+   <div class="head-actions">
++    <dl class="hw-strip" id="hwStats"></dl>
+     <select id="modelPick" class="theme-pick" aria-label="Model" data-tip="The copy of the model the engine loads (from the next song).
+ BF16 · 7.2 GB · the full release
+ Q8_0 · 3.8 GB · near lossless
