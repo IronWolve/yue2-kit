@@ -318,6 +318,35 @@ check("  a narrow window stacks the columns and hides the grips", gripsNarrow ==
 await send("Emulation.setDeviceMetricsOverride", { width: 1920, height: 960, deviceScaleFactor: 1, mobile: false });
 await sleep(200);
 
+// ================================================================== fonts
+section("fonts (Engine page)");
+const fontMenu = await ev(`(() => { const s = document.getElementById("fontSans"), kids = [...s.children], hr = kids.findIndex(k => k.tagName === "HR");
+  const cards = [...document.querySelectorAll("#view-engine .engine-grid > .card")];
+  return { first: kids.slice(0, hr).map(k => k.textContent), hr, system: kids.slice(hr + 1).map(k => k.value), value: s.value,
+    heading: document.getElementById("fontHeading").options[0].textContent, mono: document.getElementById("fontMono").value,
+    card: cards.findIndex(c => c.id === "fontsCard"), about: cards.findIndex(c => c.id === "aboutCard"), n: cards.length }; })()`);
+check("Fonts: the app's fonts first (the default marked), a line, then the fonts this computer has", fontMenu.first.join() === "IBM Plex Sans (default),IBM Plex Mono,Bodoni Moda" &&
+  fontMenu.hr === 3 && fontMenu.system.length >= 1 && fontMenu.value === "IBM Plex Sans" && fontMenu.heading === "Same as the text (default)" &&
+  fontMenu.mono === "IBM Plex Mono" && fontMenu.card >= 0 && fontMenu.about === fontMenu.n - 1, JSON.stringify({ ...fontMenu, system: fontMenu.system.slice(0, 6) }));
+const pickFont = (id, value) => ev(`(() => { const s = document.getElementById("${id}"); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event("change")); return s.value; })()`);
+const fontsNow = `(() => ({ body: getComputedStyle(document.body).fontFamily, head: getComputedStyle(document.querySelector(".col-head h2")).fontFamily,
+  saved: localStorage.getItem("yue2.fonts") }))()`;
+const sysFont = fontMenu.system[0];
+await pickFont("fontSans", sysFont);
+const f1 = await ev(fontsNow);
+check("  picking a system font for the text changes the text and the headings follow it; this browser keeps it", f1.body.includes(sysFont) && f1.head.includes(sysFont) &&
+  f1.saved === JSON.stringify({ sans: sysFont }), JSON.stringify(f1));
+await pickFont("fontHeading", "Bodoni Moda");
+const f2 = await ev(fontsNow);
+check("  a heading font of its own changes only the headings", f2.head.startsWith('"Bodoni Moda"') && f2.body.includes(sysFont), JSON.stringify(f2));
+await boot();
+const f3 = await ev(`(() => ({ ...${fontsNow}, menus: [document.getElementById("fontSans").value, document.getElementById("fontHeading").value] }))()`);
+check("  both survive a reload, and the menus show them", f3.body.includes(sysFont) && f3.head.startsWith('"Bodoni Moda"') && f3.menus.join() === sysFont + ",Bodoni Moda", JSON.stringify(f3));
+await click("#fontsReset");
+const f4 = await ev(fontsNow);
+check("  Default fonts puts the app's own back and forgets the choice", f4.body.startsWith('"IBM Plex Sans"') && f4.head.startsWith('"IBM Plex Sans"') && f4.saved === null,
+  JSON.stringify(f4));
+
 // ============================================================ engine panel
 section("engine panel");
 await click("#engineToggle");
@@ -1537,6 +1566,24 @@ const onlyFav = await waitFor(`document.querySelectorAll("#libList .take:not(.is
 const left = await serverTakes();
 check("Delete non-favourites keeps only the favourite", !!onlyFav && left.length === 1 && left[0].favorite === true, `${left.length} left`);
 await shot("library-favourites");
+
+section("loading without waiting");
+const loading = await ev(`(() => { const f = document.querySelector('link[href*="fonts.googleapis.com/css2"]'), a = document.querySelector('script[src*="abcjs"]');
+  return { fonts: f && f.getAttribute("onload") === "this.media='all'", engraver: a && a.defer && /__abcjsLanded/.test(a.getAttribute("onload") || ""), loaded: typeof window.ABCJS }; })()`);
+check("the fonts and the score engraver load beside the page, never in front of it", loading.fonts && loading.engraver && loading.loaded === "object", JSON.stringify(loading));
+const late = await ev(`(async () => { const real = window.ABCJS, pause = (ms) => new Promise(r => setTimeout(r, ms));
+  window.ABCJS = undefined;
+  // open songs until one with a score is showing (the engraver held back all the while)
+  let tried = 0;
+  for (const t of [...document.querySelectorAll("#libList .take")].filter(t => !t.classList.contains("is-active"))) {
+    t.click(); await pause(700); tried++;
+    if (document.getElementById("scoreAbc").textContent.startsWith("X:1")) break;
+  }
+  const waiting = { tried, abc: document.getElementById("scoreAbc").textContent.startsWith("X:1"), svg: !!document.querySelector("#scoreStaff svg"), hook: typeof window.__abcjsLanded };
+  window.ABCJS = real; if (window.__abcjsLanded) window.__abcjsLanded(); await pause(300);
+  return { ...waiting, drawn: !!document.querySelector("#scoreStaff svg"), staffTab: !document.querySelector('.stab[data-score="staff"]').disabled }; })()`);
+check("  a song opened before the engraver lands shows its ABC at once and its staff when the engraver arrives", late.abc && !late.svg && late.hook === "function" &&
+  late.drawn && late.staffTab, JSON.stringify(late));
 
 section("a server without transcriber or library");
 await fetch(BASE + "mock/flags", { method: "POST", body: JSON.stringify({ transcriber: false, outputs: false }) });

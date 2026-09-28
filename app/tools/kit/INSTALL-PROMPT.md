@@ -103,7 +103,8 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - server, compute, memory presets (8/12/16/24/32 GB) and hardware cards;
   - VAE tiles marked STOCK/ADD-ON;
   - LoRA tiles, each with its source link and an (i) recap;
-  - a Sliders card, the idea writer (a local chat server) and the server log;
+  - a Sliders card, the idea writer (a local chat server), a **Fonts** card (text, headings, numbers: the
+    app's own fonts, a line, then this computer's; kept per browser) and the server log;
   - an **About** card at the end: "Customized Collection by SeattleSysop" with his GitHub, then YuE2,
     yue2.cpp and ggml with their links, and every add-on's own page.
 - **An (i) help tip on every setting.**
