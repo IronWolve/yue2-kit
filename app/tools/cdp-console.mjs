@@ -164,7 +164,7 @@ for (const [w, h] of [[1536, 730], [1920, 960]]) {
         gh: links.some(a => a.href === "https://github.com/IronWolve"), yue: links.some(a => a.href === "https://github.com/multimodal-art-projection/YuE"),
         cpp: links.some(a => a.href === "https://github.com/ServeurpersoCom/yue2.cpp"), weights: links.some(a => a.href === "https://huggingface.co/m-a-p/YuE2-3B"),
         page: links.some(a => a.href === "https://map-yue2.github.io/"), ggml: links.some(a => a.href === "https://github.com/ggml-org/ggml"),
-        inspired: c.querySelector(".about-inspired")?.textContent.replace(/\\s+/g, " ").trim(),
+        inspired: [...c.querySelectorAll(".about-project")].find(e => e.querySelector("h4").textContent === "YuE2_WebUI")?.querySelector(".about-what").textContent,
         inspiredLink: links.some(a => a.href === "https://github.com/Ladypoly/YuE2_WebUI"),
         projects: [...c.querySelectorAll(".about-project h4")].map(e => e.textContent).join(),
         newTab: links.every(a => a.target === "_blank" && /noopener/.test(a.rel)), web: links.every(a => /^https?:/.test(a.getAttribute("href"))),
@@ -172,7 +172,7 @@ for (const [w, h] of [[1536, 730], [1920, 960]]) {
         plain: [...c.querySelectorAll("#aboutAddons .about-name")].map(e => e.textContent).join(","), shown: onScreen.bottom <= innerHeight && onScreen.top < innerHeight }; })()`);
     check("About closes the Engine page: your credit and GitHub, the model's and the engine's pages, all in new tabs", !!about && about.last &&
       about.credit === "Customized Collection by SeattleSysop github.com/IronWolve" &&
-      about.inspired === "HTML layout inspired by Ladypoly/YuE2_WebUI" && about.inspiredLink && about.gh && about.yue && about.cpp && about.weights && about.page && about.ggml && about.projects === "YuE2,yue2.cpp,ggml" && about.newTab && about.web,
+      about.inspired === "HTML layout inspired by Ladypoly/YuE2_WebUI" && about.inspiredLink && about.gh && about.yue && about.cpp && about.weights && about.page && about.ggml && about.projects === "YuE2,yue2.cpp,YuE2_WebUI,ggml" && about.newTab && about.web,
       JSON.stringify(about));
     check("  the add-ons come from sources.json; a non-web link stays plain text", about?.addons === "Standard VAE,Blend VAE,Voice and genre sliders,sv-billie,Industrial rock" &&
       about.plain === "Legacy VAE", JSON.stringify({ addons: about?.addons, plain: about?.plain }));
@@ -261,10 +261,35 @@ const fontMenu = await ev(`(() => { const s = document.getElementById("fontSans"
   const cards = [...document.querySelectorAll("#view-engine .engine-grid > .card")];
   return { first: kids.slice(0, hr).map(k => k.textContent), hr, system: kids.slice(hr + 1).map(k => k.value), value: s.value,
     heading: document.getElementById("fontHeading").options[0].textContent, mono: document.getElementById("fontMono").value,
-    card: cards.findIndex(c => c.id === "fontsCard"), about: cards.findIndex(c => c.id === "aboutCard"), n: cards.length }; })()`);
+    card: cards.findIndex(c => c.id === "appearanceCard"), about: cards.findIndex(c => c.id === "aboutCard"), n: cards.length }; })()`);
 check("Fonts: the app's fonts first (the default marked), a line, then the fonts this computer has", fontMenu.first.join() === "IBM Plex Sans (default),IBM Plex Mono,Bodoni Moda,Space Grotesk,Michroma" &&
   fontMenu.hr === 5 && fontMenu.system.length >= 1 && fontMenu.value === "IBM Plex Sans" && fontMenu.heading === "Same as the text (default)" &&
   fontMenu.mono === "IBM Plex Mono" && fontMenu.card >= 0 && fontMenu.about === fontMenu.n - 1, JSON.stringify({ ...fontMenu, system: fontMenu.system.slice(0, 6) }));
+// the Appearance card: the theme (in step with the top bar's swatches) and options that work with any theme
+const look = await ev(`(() => { const sel = document.getElementById("lookTheme"), root = document.documentElement;
+  const groups = [...sel.querySelectorAll("optgroup")].map(g => g.label + ":" + g.children.length).join(), first = sel.value;
+  sel.value = "nord"; sel.dispatchEvent(new Event("change")); const picked = root.dataset.theme;
+  YueThemes.set("studio"); const synced = sel.value;
+  const set = (id, on) => { const e = document.getElementById(id); e.checked = on; e.dispatchEvent(new Event("change")); };
+  set("lookHover", true); set("lookGlow", true); set("lookMotion", true);
+  const c = document.getElementById("lookCorners"); c.value = "square"; c.dispatchEvent(new Event("change"));
+  const cs = getComputedStyle(root), card = getComputedStyle(document.querySelector("#view-engine .card"));
+  return { groups, first, picked, synced, hover: root.dataset.hover, glow: root.dataset.glow, motion: root.dataset.motion, corners: root.dataset.corners,
+    rmd: cs.getPropertyValue("--r-md").trim(), line: cs.getPropertyValue("--hover-line").trim(), shadow: card.boxShadow !== "none", saved: localStorage.getItem("yue2.look") }; })()`);
+check("Appearance: a theme menu of all 51 (grouped), in step with the top bar's swatches", look.groups === "Classic:15,Bold:24,Soft:12" && look.first === "studio" &&
+  look.picked === "nord" && look.synced === "studio", JSON.stringify(look).slice(0, 200));
+check("  its options: hover in the theme's colour, a glow round cards, square corners, a calmer page; this browser keeps them",
+  look.hover === "accent" && look.glow === "on" && look.motion === "reduced" && look.corners === "square" && look.rmd === "2px" && /color-mix|rgb/.test(look.line) &&
+  look.shadow && JSON.parse(look.saved || "{}").corners === "square", JSON.stringify(look).slice(0, 240));
+await boot();
+const lookBack = await ev(`({ hover: document.documentElement.dataset.hover, corners: document.documentElement.dataset.corners, box: document.getElementById("lookGlow").checked,
+  menu: document.getElementById("lookCorners").value })`);
+check("  they are on before the page shows, after a reload, and the card shows them", lookBack.hover === "accent" && lookBack.corners === "square" &&
+  lookBack.box === true && lookBack.menu === "square", JSON.stringify(lookBack));
+await click("#fontsReset");
+const lookReset = await ev(`({ attrs: ["hover", "glow", "motion", "corners"].filter(k => k in document.documentElement.dataset).join(), saved: localStorage.getItem("yue2.look"),
+  theme: document.documentElement.dataset.theme })`);
+check("  Default look turns them off again (the theme stays)", lookReset.attrs === "" && lookReset.saved === null && lookReset.theme === "studio", JSON.stringify(lookReset));
 const pickFont = (id, value) => ev(`(() => { const s = document.getElementById("${id}"); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event("change")); return s.value; })()`);
 const fontsNow = `(() => ({ body: getComputedStyle(document.body).fontFamily, head: getComputedStyle(document.querySelector(".col-head h2")).fontFamily,
   saved: localStorage.getItem("yue2.fonts") }))()`;

@@ -117,8 +117,9 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - server, compute, memory presets (8/12/16/24/32 GB) and hardware cards;
   - VAE tiles marked STOCK/ADD-ON;
   - LoRA tiles, each with its source link and an (i) recap;
-  - a Sliders card, the idea writer (a local chat server), a **Fonts** card (text, headings, numbers: the
-    app's own fonts, a line, then this computer's; kept per browser) and the server log;
+  - a Sliders card, the idea writer (a local chat server), an **Appearance** card (the theme; hover
+    highlights in the theme's colour, an accent glow around cards, the corners, a calmer page; and the text,
+    heading and number fonts: the app's own, a line, then this computer's; all kept per browser) and the server log;
   - an **About** card at the end: "Customized Collection by SeattleSysop" with his GitHub, then YuE2,
     yue2.cpp and ggml with their links, and every add-on's own page.
 - **An (i) help tip on every setting.**
@@ -554,7 +555,7 @@ songs and the hardware readout are examples. The layout, text, colours and contr
 - The default theme is **Studio (warm)**, a dark warm palette with amber accents. The theme menu in
   the top bar changes it per browser (and the browser remembers).
 - Text and headings are in IBM Plex Sans (headings at medium weight), numbers in IBM Plex Mono; only the
-  "YuE2" logo is in the Bodoni Moda serif. The Engine page's **Fonts** card changes them per browser.
+  "YuE2" logo is in the Bodoni Moda serif. The Engine page's **Appearance** card changes them per browser.
 - The page loads its fonts (Google Fonts: Bodoni Moda, IBM Plex Sans, IBM Plex Mono) and the
   score renderer (abcjs from cdnjs) from the internet, beside the page rather than before it: on a first
   visit the text can show in a plain font for a moment, then switch. Without internet it still works but

@@ -43,7 +43,8 @@ it builds in its own folder and never changes an existing yue2.cpp install.
 ## Features
 
 - **A studio page**: song form, song page and library side by side, with columns you can drag wider or
-  narrower, 51 colour themes, your own choice of fonts, and an (i) help on every setting.
+  narrower, 51 colour themes with an Appearance card (fonts, corners, hover colour, glow), and an (i) help
+  on every setting.
 - **Add-ons**: 3 VAEs (Standard, Legacy and a Blend of the two), {{NSLIDER}} stackable voice and genre sliders,
   and {{NLORA}} LoRAs, each with its own strength for the music and the sound, and its trigger word.
 - **Songs**: Full plan, Melody only and Direct modes, the official Instrumental mode, covers from a
@@ -54,7 +55,7 @@ it builds in its own folder and never changes an existing yue2.cpp install.
   double-click a song to play it; a status light in the player.
 - **Idea writer**: a local chat model drafts the title, style and lyrics from one line; a Connected or
   Offline button shows the chat server's state at a glance.
-- **Engine page**: memory presets from 8 to 32 GB, a hardware readout, the live server log, a Fonts card,
+- **Engine page**: memory presets from 8 to 32 GB, a hardware readout, the live server log, the Appearance card,
   and an About card with every link.
 - **Engine patches**: the sound stage's steps take about a third less time on the GPU, a half-precision path
   for older cards, and a coloured server log.

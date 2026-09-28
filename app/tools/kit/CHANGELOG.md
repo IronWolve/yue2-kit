@@ -19,6 +19,10 @@ Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
   with a note only when it matters (a run queued, the server away, codes loaded).
 - **Long song names wrap** in the player (two lines, a size smaller) instead of being cut off.
 - Headings get the room a tall font needs (DMM's were clipped); DMM's hover highlights are purple.
+- **An Appearance card** on the Engine page (was Fonts): the theme, plus options for any theme (hover
+  highlights in the theme's colour, a soft accent glow around cards, Rounded, Softer or Square corners, a
+  calmer page without animations) and the three fonts. Kept per browser; **Default look** resets them.
+- **About**: the layout's inspiration, YuE2_WebUI, has its own section after the engine's.
 - The real-server test now checks the download names too; its screenshots are taken only on request.
 
 ## v11 (2026-09-27)

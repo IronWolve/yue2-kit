@@ -18,7 +18,7 @@ Everything comes from public GitHub and Hugging Face sources, plus this kit:
 downloaded into one install folder and runs from there.
 
 **The app** is `yue2.cpp` (ServeurpersoCom/yue2.cpp), a fast C++/GGML engine for YuE2 that you
-compile. It gets 53 patches from my friend, which give it his web page and everything
+compile. It gets 54 patches from my friend, which give it his web page and everything
 below. They were made for upstream commit `f17d526` of 2026-09-24: upstream may be newer by now. It
 runs on port 41867.
 
@@ -117,8 +117,9 @@ What it has (all of it comes with the patches; you do not build any of it by han
   - server, compute, memory presets (8/12/16/24/32 GB) and hardware cards;
   - VAE tiles marked STOCK/ADD-ON;
   - LoRA tiles, each with its source link and an (i) recap;
-  - a Sliders card, the idea writer (a local chat server), a **Fonts** card (text, headings, numbers: the
-    app's own fonts, a line, then this computer's; kept per browser) and the server log;
+  - a Sliders card, the idea writer (a local chat server), an **Appearance** card (the theme; hover
+    highlights in the theme's colour, an accent glow around cards, the corners, a calmer page; and the text,
+    heading and number fonts: the app's own, a line, then this computer's; all kept per browser) and the server log;
   - an **About** card at the end: "Customized Collection by SeattleSysop" with his GitHub, then YuE2,
     yue2.cpp and ggml with their links, and every add-on's own page.
 - **An (i) help tip on every setting.**
@@ -258,7 +259,7 @@ Then ask me, in one message:
 ROOT/
   yue2-install-2026-09-28-v12/     this kit (unzipped here, or the yue2-kit clone); call it KIT
   upstream/          github.com/ServeurpersoCom/yue2.cpp @ f17d526 (+ ggml submodule), never edited
-  build/             upstream + the 53 patches + the built page: compiled and run from here
+  build/             upstream + the 54 patches + the built page: compiled and run from here
   build/checkpoints -> ../checkpoints       build/models -> ../models
   checkpoints/       the Hugging Face checkpoints the converter reads
   models/            the GGUF files the app loads (made here, no download)
@@ -292,7 +293,7 @@ git -C build submodule update --init --recursive --reference "$ROOT/upstream/ggm
 (cd build && git -c user.name=install -c user.email=install@localhost am "$KIT"/engines/cpp/patches/*.patch)
 cp "$KIT"/engines/cpp/page/index.html.gz build/tools/public/index.html.gz   # the built page (not in the patches)
 git -C build -c user.name=install -c user.email=install@localhost commit -q -am "Add the built page"
-[ "$(git -C build rev-parse HEAD^{tree})" = 212b8c0ebe615eaafbe2cddbd4694c9579fd3a94 ] && echo "code OK: identical to the original"
+[ "$(git -C build rev-parse HEAD^{tree})" = fbdbb75abbede433089a16529189bfa60a56a7bb ] && echo "code OK: identical to the original"
 ln -s ../checkpoints build/checkpoints && ln -s ../models build/models
 printf 'checkpoints\nmodels\n' >> build/.git/info/exclude
 cp -r "$KIT"/app/. . && chmod +x *.sh tools/*.sh      # his root scripts and his whole tools/ folder
@@ -482,7 +483,7 @@ treat it as GPU VRAM from the table above. Start from these, and treat them as u
 |---|---|---|---|
 | `tools/verify-install.sh` | the whole install against his: the code tree, 22 GGUF files (6 models + 16 sliders), 11 LoRAs (pinned sizes, then the server's LoRA reader), `sources.json`, settings | nothing | ~10 s |
 | `tools/test_downloaders.sh` | the download scripts: the include patterns reach the downloader literally, and incomplete downloads are caught | nothing | seconds |
-| `node tools/cdp-console.mjs` | the whole page against a stand-in server: 315 checks | node, google-chrome, python3 | ~75 s |
+| `node tools/cdp-console.mjs` | the whole page against a stand-in server: 319 checks | node, google-chrome, python3 | ~75 s |
 | `tools/test-real.sh` | the real server and page, including a real 1-second song on the CPU: 6 checks + 13 page checks | node, google-chrome, the models | ~1–3 min |
 | `tmp/venv/bin/python tools/test_flac.py --no-song` | the built-in FLAC encoder, bit-exact against flac and ffmpeg | flac, ffmpeg | ~20 s |
 | `tools/test_downloaders.sh --online` | also the real pinned downloader on two include patterns (about 16 MB) | network | ~10 s |
@@ -554,7 +555,7 @@ songs and the hardware readout are examples. The layout, text, colours and contr
 - The default theme is **Studio (warm)**, a dark warm palette with amber accents. The theme menu in
   the top bar changes it per browser (and the browser remembers).
 - Text and headings are in IBM Plex Sans (headings at medium weight), numbers in IBM Plex Mono; only the
-  "YuE2" logo is in the Bodoni Moda serif. The Engine page's **Fonts** card changes them per browser.
+  "YuE2" logo is in the Bodoni Moda serif. The Engine page's **Appearance** card changes them per browser.
 - The page loads its fonts (Google Fonts: Bodoni Moda, IBM Plex Sans, IBM Plex Mono) and the
   score renderer (abcjs from cdnjs) from the internet, beside the page rather than before it: on a first
   visit the text can show in a plain font for a moment, then switch. Without internet it still works but
