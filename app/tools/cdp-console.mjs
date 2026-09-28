@@ -415,7 +415,7 @@ check("  the tip sits inside the window", inView(t));
 t = await hoverOn('[data-tip-ref="tip-output"]');
 check("(i) beside Format explains WAV 24 and peak clip", t?.on && /WAV 24/.test(t.text) && /Peak clip/.test(t.text));
 t = await hoverOn('[data-tip-ref="tip-versions"]');
-check("(i) beside Versions says the server's batch size", t?.on && /up to 4 side by side/.test(t.text.replace(/\s+/g, " ")), t?.text.replace(/\s+/g, " ").slice(0, 120));
+check("(i) beside Takes says the server's batch size", t?.on && /up to 4 side by side/.test(t.text.replace(/\s+/g, " ")), t?.text.replace(/\s+/g, " ").slice(0, 120));
 await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1100, y: 400 });
 await waitFor(`!(${tipOn})`, 2000, 50);
 check("the tip hides when the pointer leaves", (await ev(tipOn)) === false);
@@ -854,16 +854,39 @@ const dblPlays = await waitFor(`!document.getElementById("audio").paused && docu
 check("double-clicking a song in the list plays it", !!dblPlays, await ev(`document.getElementById("audio").src.split("name=")[1]`));
 check("  the play button says Pause while a song plays (for screen readers too)", (await ev(`document.getElementById("playBtn").getAttribute("aria-label") === "Pause" &&
   document.getElementById("playBtn").classList.contains("is-playing")`)) === true);
+const bar = await ev(`(() => { const p = document.getElementById("planBtn").getBoundingClientRect(), g = document.getElementById("generateBtn").getBoundingClientRect();
+  const n = document.getElementById("submitNote"); return { label: document.querySelector(".versions > span").firstChild.textContent.trim(),
+    plan: Math.round(p.width) + "x" + Math.round(p.height), gen: Math.round(g.width) + "x" + Math.round(g.height), sameRow: Math.abs(p.top - g.top) < 1,
+    note: n.textContent, noteShown: getComputedStyle(n).display !== "none" }; })()`);
+check("the bottom bar: Takes, then two slim buttons of one size, no model-loading text", bar.label === "Takes" && bar.plan === bar.gen &&
+  /x32$/.test(bar.gen) && bar.sameRow && !/load/i.test(bar.note), JSON.stringify(bar));
 const dmm = await ev(`(() => { const was = document.documentElement.dataset.theme; YueThemes.set("dmm");
   const b = document.getElementById("playBtn"), r = b.getBoundingClientRect(), cs = (e) => getComputedStyle(e);
   const out = { accent: cs(document.documentElement).getPropertyValue("--amber").trim(), ground: cs(document.body).backgroundColor,
     heading: cs(document.querySelector(".col-head h2")).fontFamily.split(",")[0], text: cs(document.body).fontFamily.split(",")[0],
     size: Math.round(r.width), glyph: cs(document.getElementById("playGlyph")).display,
-    pauseIcon: cs(b.querySelector(".play-icon-pause")).display, playIcon: cs(b.querySelector(".play-icon-play")).display };
+    pauseIcon: cs(b.querySelector(".play-icon-pause")).display, playIcon: cs(b.querySelector(".play-icon-play")).display,
+    clipped: [...document.querySelectorAll(".col-head h2, .lib-head h3")].filter(e => e.offsetParent && e.scrollHeight > e.clientHeight + 0.5).map(e => e.textContent.trim()) };
   YueThemes.set(was); out.back = cs(b.querySelector(".play-icon-pause")).display; return out; })()`);
 check("  the DMM theme: purple and zinc, its own fonts, and its play button with drawn icons (none in other themes)",
   dmm.accent === "#c94bff" && dmm.ground === "rgb(9, 9, 11)" && /Michroma/.test(dmm.heading) && /Space Grotesk/.test(dmm.text) && dmm.size === 48 &&
   dmm.glyph === "none" && dmm.pauseIcon === "block" && dmm.playIcon === "none" && dmm.back === "none", JSON.stringify(dmm));
+check("  its tall heading font is not clipped (Nothing playing, Takes and the rest have room)", dmm.clipped.length === 0, JSON.stringify(dmm.clipped));
+await ev(`YueThemes.set("dmm"); true`);
+const planAt = await ev(`(() => { const b = document.getElementById("planBtn"); b.scrollIntoView({ block: "center" }); const r = b.getBoundingClientRect();
+  return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: planAt.x, y: planAt.y });
+await sleep(250);   // the hover's colour transition
+const dmmHover = await ev(`(() => { const c = getComputedStyle(document.getElementById("planBtn")); return c.borderTopColor + " / " + c.backgroundColor; })()`);
+await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });
+await ev(`YueThemes.set("studio"); true`);
+check("  its hover highlight is the theme's purple, not grey", /191, 0, 255/.test(dmmHover), dmmHover);
+const longName = await ev(`(() => { const t = document.getElementById("playbarTitle"), was = t.textContent;
+  t.textContent = "In the Air Tonight - Collins cover, slow build, a long title that needs two lines";
+  const cs = getComputedStyle(t), lines = Math.round(t.getBoundingClientRect().height / parseFloat(cs.lineHeight));
+  const out = { lines, size: cs.fontSize, clamp: cs.webkitLineClamp }; t.textContent = was; return out; })()`);
+check("a long song name wraps in the player (two lines, a size smaller) instead of being cut off", longName.lines === 2 && longName.size === "12px" &&
+  longName.clamp === "2", JSON.stringify(longName));
 check("  its card says PLAYING, and the page shows it with no Play button", JSON.stringify(await playingCards()) === JSON.stringify([songA]) &&
   (await ev(`document.getElementById("playHere").classList.contains("is-hidden") && document.getElementById("renameInput") === null`)) === true,
   JSON.stringify(await playingCards()));

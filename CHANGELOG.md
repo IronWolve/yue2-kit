@@ -15,6 +15,10 @@ Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
   text, and a larger play button with drawn play and pause icons. It is one of the themes in the picker;
   Studio stays the default. Its two fonts are also in the Engine page's Fonts card.
 - **The play button says Play or Pause** to screen readers as it changes.
+- **A cleaner bottom bar** in the compose column: **Takes** (was Versions) and two slim buttons of one size,
+  with a note only when it matters (a run queued, the server away, codes loaded).
+- **Long song names wrap** in the player (two lines, a size smaller) instead of being cut off.
+- Headings get the room a tall font needs (DMM's were clipped); DMM's hover highlights are purple.
 - The real-server test now checks the download names too; its screenshots are taken only on request.
 
 ## v11 (2026-09-27)
