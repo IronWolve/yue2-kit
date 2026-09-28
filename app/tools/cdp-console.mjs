@@ -265,6 +265,16 @@ const fontMenu = await ev(`(() => { const s = document.getElementById("fontSans"
 check("Fonts: the app's fonts first (the default marked), a line, then the fonts this computer has", fontMenu.first.join() === "IBM Plex Sans (default),IBM Plex Mono,Bodoni Moda,Space Grotesk,Michroma" &&
   fontMenu.hr === 5 && fontMenu.system.length >= 1 && fontMenu.value === "IBM Plex Sans" && fontMenu.heading === "Same as the text (default)" &&
   fontMenu.mono === "IBM Plex Mono" && fontMenu.card >= 0 && fontMenu.about === fontMenu.n - 1, JSON.stringify({ ...fontMenu, system: fontMenu.system.slice(0, 6) }));
+// the Engine page: the Writer and the Appearance card each have a row of their own; Appearance's two parts side by side
+await click("#engineToggle");
+await waitFor(`!document.getElementById("view-engine").classList.contains("is-hidden")`, 3000, 50);
+const engineRows = await ev(`(() => { const cards = [...document.querySelectorAll("#view-engine .engine-grid > .card")];
+  const top = (c) => Math.round(c.getBoundingClientRect().top), alone = (c) => cards.filter(o => o !== c && top(o) === top(c)).length === 0;
+  const w = document.querySelector(".writer-card"), a = document.getElementById("appearanceCard"), parts = [...a.querySelectorAll(".look-part")].map(e => e.getBoundingClientRect());
+  return { writerAlone: alone(w), appearanceAlone: alone(a), sideBySide: parts.length === 2 && Math.abs(parts[0].top - parts[1].top) < 2 && parts[1].left > parts[0].right }; })()`);
+check("Engine page: the Writer has its own row, and so does Appearance, its Theme and Fonts side by side", engineRows.writerAlone && engineRows.appearanceAlone && engineRows.sideBySide,
+  JSON.stringify(engineRows));
+await click("#engineBack");
 // the Appearance card: the theme (in step with the top bar's swatches) and options that work with any theme
 const look = await ev(`(() => { const sel = document.getElementById("lookTheme"), root = document.documentElement;
   const groups = [...sel.querySelectorAll("optgroup")].map(g => g.label + ":" + g.children.length).join(), first = sel.value;
@@ -880,11 +890,13 @@ check("double-clicking a song in the list plays it", !!dblPlays, await ev(`docum
 check("  the play button says Pause while a song plays (for screen readers too)", (await ev(`document.getElementById("playBtn").getAttribute("aria-label") === "Pause" &&
   document.getElementById("playBtn").classList.contains("is-playing")`)) === true);
 const bar = await ev(`(() => { const p = document.getElementById("planBtn").getBoundingClientRect(), g = document.getElementById("generateBtn").getBoundingClientRect();
-  const n = document.getElementById("submitNote"); return { label: document.querySelector(".versions > span").firstChild.textContent.trim(),
+  const n = document.getElementById("submitNote"), v = document.querySelector(".versions").getBoundingClientRect(), bar = document.querySelector(".submit-bar").getBoundingClientRect();
+  return { label: document.querySelector(".versions > span").firstChild.textContent.trim(), takesRow: Math.abs((v.top + v.bottom) / 2 - (g.top + g.bottom) / 2) < 3 && v.right <= p.left,
+    rightEdge: Math.round(bar.right - g.right),
     plan: Math.round(p.width) + "x" + Math.round(p.height), gen: Math.round(g.width) + "x" + Math.round(g.height), sameRow: Math.abs(p.top - g.top) < 1,
     note: n.textContent, noteShown: getComputedStyle(n).display !== "none" }; })()`);
-check("the bottom bar: Takes, then two slim buttons of one size, no model-loading text", bar.label === "Takes" && bar.plan === bar.gen &&
-  /x32$/.test(bar.gen) && bar.sameRow && !/load/i.test(bar.note), JSON.stringify(bar));
+check("the bottom bar: Takes and two slim buttons of one size together on the right, no model-loading text", bar.label === "Takes" && bar.plan === bar.gen &&
+  /x32$/.test(bar.gen) && bar.sameRow && bar.takesRow && bar.rightEdge <= 1 && !/load/i.test(bar.note), JSON.stringify(bar));
 const dmm = await ev(`(() => { const was = document.documentElement.dataset.theme; YueThemes.set("dmm");
   const b = document.getElementById("playBtn"), r = b.getBoundingClientRect(), cs = (e) => getComputedStyle(e);
   const out = { accent: cs(document.documentElement).getPropertyValue("--amber").trim(), ground: cs(document.body).backgroundColor,

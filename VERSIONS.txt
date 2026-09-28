@@ -1,8 +1,8 @@
 YuE2 studio install reference kit v12, 2026-09-28
 
 Code:   https://github.com/ServeurpersoCom/yue2.cpp.git  @ f17d526 of 2026-09-24 (branch master; ggml submodule at 765bc96)
-        + 54 patches (engines/cpp/patches, git am) + the built page (engines/cpp/page)
-Check:  after the patches and the page, git rev-parse HEAD^{tree} = fbdbb75abbede433089a16529189bfa60a56a7bb (checked 2026-09-28)
+        + 55 patches (engines/cpp/patches, git am) + the built page (engines/cpp/page)
+Check:  after the patches and the page, git rev-parse HEAD^{tree} = 190aa848bd3e73f3816f70e16ad3d0a9e4e8dd4d (checked 2026-09-28)
 
 Hugging Face revisions (app/tools/hf-revisions.txt; the download scripts fetch exactly these):
   m-a-p/YuE2-3B                                              29b3558dd469  this install's files; main is now 14fc6c6f1464
