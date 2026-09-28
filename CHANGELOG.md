@@ -5,7 +5,7 @@ Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
 
 ## v12 (2026-09-28)
 
-52 patches, tree `1368479d4b54bf53cd21a63d435333d676f32b86`. From a friend's copy of the page, brought onto v11.
+58 patches, tree `41c64b6e1af2b3c7f135dea18a00517907b6c16b`. A friend's page changes brought onto v11, and a tidier page.
 
 - **Downloads named after the song**: `Last Train Home.wav` instead of `20260927-183418-last-train-home.wav`,
   for WAV, MP3 and FLAC, named by the server and the page alike (the characters Windows refuses in a file
@@ -13,16 +13,23 @@ Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
   names** to go back to the library name.
 - **The DMM theme**: zinc and electric purple with cyan and neon green, Michroma headings and Space Grotesk
   text, and a larger play button with drawn play and pause icons. It is one of the themes in the picker;
-  Studio stays the default. Its two fonts are also in the Engine page's Fonts card.
+  Studio stays the default. Its two fonts are also in the Appearance card's font menus.
 - **The play button says Play or Pause** to screen readers as it changes.
-- **A cleaner bottom bar** in the compose column: **Takes** (was Versions) and two slim buttons of one size,
-  with a note only when it matters (a run queued, the server away, codes loaded).
+- **A cleaner bottom bar** in the compose column: **Takes** (was Versions) beside two slim buttons of one
+  size, with a note only when it matters (a run queued, the server away, codes loaded).
 - **Long song names wrap** in the player (two lines, a size smaller) instead of being cut off.
 - Headings get the room a tall font needs (DMM's were clipped); DMM's hover highlights are purple.
 - **An Appearance card** on the Engine page (was Fonts): the theme, plus options for any theme (hover
   highlights in the theme's colour, a soft accent glow around cards, Rounded, Softer or Square corners, a
   calmer page without animations) and the three fonts. Kept per browser; **Default look** resets them.
-- **About**: the layout's inspiration, YuE2_WebUI, has its own section after the engine's.
+- **The top bar**: the music note in the top-left corner opens this kit's GitHub page. The GPU readout is two
+  small lines (the GPU, its memory in GB) right beside the Model menu, so it stays visible on a small monitor;
+  the rest is in its tip.
+- **Tidier text**: sizes in GB (not GiB), tips wide enough that their lines stay whole, a shorter Model tip,
+  and more room between a number and its arrows in the compose boxes.
+- **The Engine page**: the Writer and Appearance cards each have a row of their own.
+- **About**: two columns, YuE2 on the left and the engine, the layout and ggml on the right. The layout's
+  inspiration, YuE2_WebUI, has its own section, and the credit links this kit's GitHub page.
 - The real-server test now checks the download names too; its screenshots are taken only on request.
 
 ## v11 (2026-09-27)

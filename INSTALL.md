@@ -546,19 +546,25 @@ Compare with the kit's `docs/screenshots/`:
 - `song-page-narrow.png`: the same in a narrower window (the details card folds);
 - `engine-page.png`: the Engine page with its band and dotted backdrop;
 - `engine-tiles.png`: VAE, LoRA and Sliders tiles with links and (i);
-- `engine-about.png`: the end of the Engine page, with the About card;
+- `engine-about.png`: the end of the Engine page, with the About card (YuE2 on the left, the engine, the
+  layout and ggml on the right);
 - `theme-picker.png`: the themes.
 
 The screenshots were taken against a stand-in server that had his real LoRAs, VAEs and sliders; the
 songs and the hardware readout are examples. The layout, text, colours and controls are what I should see.
 
-- The default theme is **Studio (warm)**, a dark warm palette with amber accents. The theme menu in
-  the top bar changes it per browser (and the browser remembers).
+- The top bar, left to right: the music note (opens this kit's GitHub page), the "YuE2" logo (the model's
+  repo), the small "cpp" tag (the engine's repo), the server status, and on the right a two-line GPU readout
+  (the GPU, its memory in GB) right beside the Model menu, then the theme menu and the buttons.
+- The default theme is **Studio (warm)**, a dark warm palette with amber accents, one of 51 (DMM is the
+  purple one with its own fonts). The theme menu in the top bar changes it per browser (and the browser
+  remembers).
+- Downloads are named after the song (`Last Train Home.wav`); the Takes list's ⋯ menu puts the date back.
 - Text and headings are in IBM Plex Sans (headings at medium weight), numbers in IBM Plex Mono; only the
   "YuE2" logo is in the Bodoni Moda serif. The Engine page's **Appearance** card changes them per browser.
-- The page loads its fonts (Google Fonts: Bodoni Moda, IBM Plex Sans, IBM Plex Mono) and the
-  score renderer (abcjs from cdnjs) from the internet, beside the page rather than before it: on a first
-  visit the text can show in a plain font for a moment, then switch. Without internet it still works but
+- The page loads its fonts (Google Fonts: Bodoni Moda, IBM Plex Sans, IBM Plex Mono, and Michroma and
+  Space Grotesk for the DMM theme) and the score renderer (abcjs from cdnjs) from the internet, beside the
+  page rather than before it: on a first visit the text can show in a plain font for a moment, then switch. Without internet it still works but
   keeps plain fonts, and scores show as text.
 - After the app is updated, press Ctrl+Shift+R so the browser reloads the page.
 
