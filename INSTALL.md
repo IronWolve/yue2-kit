@@ -553,8 +553,9 @@ songs and the hardware readout are examples. The layout, text, colours and contr
 - Text and headings are in IBM Plex Sans (headings at medium weight), numbers in IBM Plex Mono; only the
   "YuE2" logo is in the Bodoni Moda serif. The Engine page's **Fonts** card changes them per browser.
 - The page loads its fonts (Google Fonts: Bodoni Moda, IBM Plex Sans, IBM Plex Mono) and the
-  score renderer (abcjs from cdnjs) from the internet. Without internet it still works but
-  falls back to plain fonts, and scores show as text.
+  score renderer (abcjs from cdnjs) from the internet, beside the page rather than before it: on a first
+  visit the text can show in a plain font for a moment, then switch. Without internet it still works but
+  keeps plain fonts, and scores show as text.
 - After the app is updated, press Ctrl+Shift+R so the browser reloads the page.
 
 ## 11. Model copies
