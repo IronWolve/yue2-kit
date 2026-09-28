@@ -1,5 +1,5 @@
 {
- "kit": "v11",
+ "kit": "v10",
  "tree": "0c1ff5bd25a9e13a687290796cc841de56912ba7",
  "models": [
   "SheetSage2-F32.gguf",

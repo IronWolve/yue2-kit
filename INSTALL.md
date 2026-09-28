@@ -1,6 +1,6 @@
 # Install a complete local YuE2 music studio, exactly like the original (instructions for an AI coding agent)
 
-Kit v11, 2026-09-27.
+Kit v10, 2026-09-27.
 
 You are an AI coding agent running on my computer with a shell. A friend has given me his
 local setup for **YuE2** (m-a-p/YuE2-3B, an AI model that writes whole songs with vocals from a
@@ -160,14 +160,14 @@ What it has (all of it comes with the patches; you do not build any of it by han
 
 ## 1. Check the machine first, then ask me
 
-The zip is in the folder you were started in. Unzip it (that only makes `yue2-install-2026-09-27-v11/`), then run the machine
+The zip is in the folder you were started in. Unzip it (that only makes `yue2-install-2026-09-27-v10/`), then run the machine
 check. (A clone of the kit's git repository, yue2-kit, works the same: that folder is the kit, so skip the
-unzip and use its name wherever these steps say `yue2-install-2026-09-27-v11`.) It changes nothing. It also finds tools that are installed but **not on PATH**: on WSL, `nvcc`
+unzip and use its name wherever these steps say `yue2-install-2026-09-27-v10`.) It changes nothing. It also finds tools that are installed but **not on PATH**: on WSL, `nvcc`
 is often in `/usr/local/cuda/bin` and `nvidia-smi` in `/usr/lib/wsl/lib`.
 
 ```bash
-unzip -q -n yue2-install-2026-09-27-v11.zip       # makes yue2-install-2026-09-27-v11/ (-n: never overwrites a file)
-mkdir -p install-record && bash yue2-install-2026-09-27-v11/app/tools/check-machine.sh . 2>&1 | tee install-record/check-machine.txt
+unzip -q -n yue2-install-2026-09-27-v10.zip       # makes yue2-install-2026-09-27-v10/ (-n: never overwrites a file)
+mkdir -p install-record && bash yue2-install-2026-09-27-v10/app/tools/check-machine.sh . 2>&1 | tee install-record/check-machine.txt
 ```
 
 Summarise its report. The rules that follow from it:
@@ -243,7 +243,7 @@ Then ask me, in one message:
 
 ```
 ROOT/
-  yue2-install-2026-09-27-v11/     this kit (unzipped here, or the yue2-kit clone); call it KIT
+  yue2-install-2026-09-27-v10/     this kit (unzipped here, or the yue2-kit clone); call it KIT
   upstream/          github.com/ServeurpersoCom/yue2.cpp @ f17d526 (+ ggml submodule), never edited
   build/             upstream + the 50 patches + the built page: compiled and run from here
   build/checkpoints -> ../checkpoints       build/models -> ../models
@@ -259,8 +259,8 @@ ROOT/
 
 ```bash
 ROOT=~/yue2-studio            # the folder I chose (you are already in it)
-mkdir -p "$ROOT" && cd "$ROOT" && unzip -q yue2-install-2026-09-27-v11.zip    # makes yue2-install-2026-09-27-v11/ (skip if already unzipped)
-KIT=$ROOT/yue2-install-2026-09-27-v11
+mkdir -p "$ROOT" && cd "$ROOT" && unzip -q yue2-install-2026-09-27-v10.zip    # makes yue2-install-2026-09-27-v10/ (skip if already unzipped)
+KIT=$ROOT/yue2-install-2026-09-27-v10
 export TMPDIR=$ROOT/tmp && mkdir -p tmp outputs tools
 ```
 
