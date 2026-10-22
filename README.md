@@ -150,6 +150,17 @@ Everything comes at a pinned revision, the exact files this kit was made from, a
 
 Customized Collection by **SeattleSysop** ([github.com/IronWolve](https://github.com/IronWolve)).
 
+The original yue2-kit contributions by SeattleSysop (IronWolve), including the
+kit scripts, documentation, studio page customizations and engine modifications,
+are licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for
+attribution. Distributed derivatives must preserve applicable attribution as
+required by section 4 of the license; a credit in your README or About page is
+appreciated, but is not an additional license condition.
+
+Third-party code, assets, model weights and adapters retain their existing
+licenses and notices. Apache 2.0 applies to the original kit contributions, not
+to those third-party materials.
+
 HTML layout inspired by [Ladypoly/YuE2_WebUI](https://github.com/Ladypoly/YuE2_WebUI).
 
 - **YuE2 weights**: CC BY-NC 4.0, with a creator permission for selling your own songs (the
