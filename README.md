@@ -2,6 +2,8 @@
 
 <p align="center"><b>(Yue2 Installer)</b></p>
 
+<p align="center">Original kit code: <a href="LICENSE">Apache License 2.0</a> · <a href="NOTICE">Attribution</a></p>
+
 <p align="center">
   YuE2 install kit with new features, LoRAs, VAEs and more.<br>
   Whole songs with vocals, from a style prompt and lyrics, on your own GPU.
