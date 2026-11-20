@@ -11452,10 +11452,10 @@ index 0000000000000000000000000000000000000000..e6baff1a78eecd3ba20f2d2f66ef1943
 +})(window);
 diff --git a/tools/console/index.html b/tools/console/index.html
 new file mode 100644
-index 0000000000000000000000000000000000000000..07678a94d559f35b424273d23bbaa5904d003d82
+index 0000000000000000000000000000000000000000..2ffdd16e0f25dbc7b8451440a8c39c839cefb146
 --- /dev/null
 +++ b/tools/console/index.html
-@@ -0,0 +1,811 @@
+@@ -0,0 +1,815 @@
 +<!doctype html>
 +<html lang="en" data-theme="studio">
 +<head>
@@ -11552,8 +11552,8 @@ index 0000000000000000000000000000000000000000..07678a94d559f35b424273d23bbaa590
 +          <input type="number" id="setMaxSeq" step="1024" placeholder="0 = whole" /></label>
 +        <label class="field grow"><span class="label">VAE tile frames</span>
 +          <input type="number" id="setVaeCore" step="64" /></label>
-+        <label class="field grow"><span class="label">Acoustic chunk frames</span>
-+          <input type="number" id="setNarChunk" min="0" max="24576" step="1" placeholder="0 = automatic" title="Limit sound-stage memory without reducing the song context. Zero keeps automatic sizing." /></label>
++        <label class="field grow"><span class="label">Acoustic chunk frames <span class="info" tabindex="0" role="img" aria-label="About acoustic chunk frames" data-tip="Limit sound-stage memory without reducing the song context. Zero keeps automatic sizing.">i</span></span>
++          <input type="number" id="setNarChunk" min="0" max="24576" step="1" placeholder="0 = automatic" /></label>
 +      </div>
 +      <div class="check-row">
 +        <label class="check"><input type="checkbox" id="setKeepLoaded" /> <span>Keep models loaded between songs</span></label>
@@ -11870,10 +11870,14 @@ index 0000000000000000000000000000000000000000..07678a94d559f35b424273d23bbaa590
 +            </div>
 +          </section>
 +          <section class="cover-part">
-+            <h4 class="mini">Continue a song <em>keep a section, then write more music</em></h4>
-+            <label class="field"><span class="label">Source take</span><select id="continueTake"></select></label>
-+            <label class="field"><span class="label">Start at (seconds)</span><input id="continueStart" type="number" min="0" step="0.1" value="0" /></label>
-+            <label class="field"><span class="label">End at (seconds; blank uses the whole source)</span><input id="continueEnd" type="number" min="0" step="0.1" /></label>
++            <h4 class="mini">Continue a song <span class="info" tabindex="0" role="img" aria-label="About song continuation" data-tip="Keep a section of a saved take or the recording selected above, then write more music after it.">i</span>
++              <em>keep a section, then write more music</em></h4>
++            <label class="field"><span class="label">Source take <span class="info" tabindex="0" role="img" aria-label="About the source take" data-tip="Choose the saved take that supplies the starting music.">i</span></span>
++              <select id="continueTake"></select></label>
++            <label class="field"><span class="label">Start at (seconds) <span class="info" tabindex="0" role="img" aria-label="About the start time" data-tip="The position in the source where the retained section starts. Zero starts at the beginning.">i</span></span>
++              <input id="continueStart" type="number" min="0" step="0.1" value="0" /></label>
++            <label class="field"><span class="label">End at (seconds) <span class="info" tabindex="0" role="img" aria-label="About the end time" data-tip="The position where the retained section ends and new music begins. Leave it blank to keep through the end of the source.">i</span></span>
++              <input id="continueEnd" type="number" min="0" step="0.1" /></label>
 +            <div class="cover-act">
 +              <button type="button" class="btn ghost" id="continueFromTake">Continue this take</button>
 +              <button type="button" class="btn ghost" id="continueFromAudio" disabled>Continue the chosen recording</button>

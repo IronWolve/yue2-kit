@@ -1,7 +1,7 @@
 yue2-kit v13
 Release candidate date: 2026-11-19
 Engine base: e646d5228911ae1b81ac2a261115a255848ce85f
-Packaged engine changes: 135153b35fe522e18d75f10ae48989812b804732
+Packaged engine changes: 956ae177a54e33d340ed43fc6e497664681d140d
 GGML base: ef4555b7aede4467a5de803b103615e0a5f30dd8
 Packaged GGML changes: e1208b40efaab067548f230cb6c3ee1b2cd415b5
 Source tree verification: engines/cpp/BASE.txt
