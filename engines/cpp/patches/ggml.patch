@@ -1,0 +1,22 @@
+diff --git a/src/ggml-cuda/ggml-cuda.cu b/src/ggml-cuda/ggml-cuda.cu
+index fed14ddfc4a9d61ad5dd79a6375a09da076cac56..b354389bc2290507f08476a2d068eec1d1c01650 100644
+--- a/src/ggml-cuda/ggml-cuda.cu
++++ b/src/ggml-cuda/ggml-cuda.cu
+@@ -2446,6 +2446,17 @@ static bool ggml_cuda_should_fuse_mul_mat_q(const ggml_tensor * up, const ggml_t
+ static void ggml_cuda_mul_mat(ggml_backend_cuda_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+     GGML_TENSOR_BINARY_OP_LOCALS
+ 
++    // Local addition: explicit F32 sources require full mantissa products (e.g. expanded audio VAEs).
++    if (src0->type == GGML_TYPE_F32 && src1->type == GGML_TYPE_F32 && ggml_prec_get_src(dst, 1) == GGML_PREC_F32) {
++        cublasMath_t previous;
++        CUBLAS_CHECK(cublasGetMathMode(ctx.cublas_handle(), &previous));
++        CUBLAS_CHECK(cublasSetMathMode(ctx.cublas_handle(), CUBLAS_DEFAULT_MATH));
++        ggml_cuda_mul_mat_cublas_impl<GGML_TYPE_F32>(ctx, src0, src1, dst);
++        CUBLAS_CHECK(cublasSetMathMode(ctx.cublas_handle(), previous));
++        return;
++    }
++
++
+     if (ggml_cuda_op_mul_mat_use_fwht(dst) && ggml_cuda_op_fwht(ctx, src1, dst)) {
+         return;
+     }

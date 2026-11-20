@@ -14,6 +14,16 @@
       "official": false,
       "url": "https://huggingface.co/Mothersuperior/YuE2-Vae-merge-0.666",
       "about": "A community weight mix of the two official decoders: 2/3 Standard + 1/3 Legacy. Not newly trained. It sits between the clean Standard and the more musical Legacy; the real-audio LoRA's authors suggest it."
+    },
+    "rs-x3-v1": {
+      "official": false,
+      "url": "https://huggingface.co/goldhub/YuE2-RS-Finetunes#vae-rs--our-grown-decoder",
+      "about": "Expanded RS x3 v1 decoder, F32 only, three times the Standard decoder parameters. Its 60-frame halo is enforced automatically. The publisher reports fewer tonal artifacts but lower waveform fidelity and roughly twice the decode time. Standard remains available."
+    },
+    "rs-x3-v2": {
+      "official": false,
+      "url": "https://huggingface.co/goldhub/YuE2-RS-Finetunes#vae-rs--our-grown-decoder",
+      "about": "Expanded RS x3 v2 decoder, F32 only, three times the Standard decoder parameters. Its 60-frame halo is enforced automatically. The publisher reports fewer tonal artifacts but lower waveform fidelity and roughly twice the decode time. Standard remains available."
     }
   },
   "sliders": {
@@ -100,6 +110,650 @@
       "url": "https://huggingface.co/pduncan/YuE2_Deathmetalv1_lora",
       "trigger": "deathmetal",
       "about": "Melodic death metal, music half (the step-600 checkpoint). Put its trigger deathmetal in the style. The card gives no strength advice: start at 1.0 and lower it if vocals fall apart."
+    },
+    "yue2-1980s-eurodisco-lora/yue2_1980s_eurodisco_comfy-fused.safetensors": {
+      "title": "1980s Eurodisco",
+      "tag": "synth bass and vintage disco",
+      "repo": "jamespetts/yue2-1980s-eurodisco-lora",
+      "url": "https://huggingface.co/jamespetts/yue2-1980s-eurodisco-lora",
+      "trigger": "eurodisco",
+      "about": "Sound half only. Put eurodisco first in the style. Author starting strength: sound 1.0; published range 0.7 to 2.0."
+    },
+    "YuE2-phonk-lora/phonked_best.safetensors": {
+      "title": "Phonk",
+      "tag": "phonk style",
+      "repo": "supermind/YuE2-phonk-lora",
+      "url": "https://huggingface.co/supermind/YuE2-phonk-lora",
+      "trigger": "",
+      "about": "Publisher-selected best checkpoint. No trigger or preferred strength documented."
+    },
+    "comfyui_yue2_lora/anita_mui/anita_mui 300 ComfyUI.safetensors": {
+      "title": "Anita Mui",
+      "tag": "artist style, latest checkpoint",
+      "repo": "lym00/comfyui_yue2_lora",
+      "url": "https://huggingface.co/lym00/comfyui_yue2_lora",
+      "trigger": "anita_mui",
+      "about": "Latest numbered checkpoint per artist, not a verified best checkpoint. Both halves. Large rank-256 adapter; no preferred strength documented."
+    },
+    "comfyui_yue2_lora/leslie_cheung/leslie_cheung 280 ComfyUI.safetensors": {
+      "title": "Leslie Cheung",
+      "tag": "artist style, latest checkpoint",
+      "repo": "lym00/comfyui_yue2_lora",
+      "url": "https://huggingface.co/lym00/comfyui_yue2_lora",
+      "trigger": "leslie_cheung",
+      "about": "Latest numbered checkpoint per artist, not a verified best checkpoint. Both halves. Large rank-256 adapter; no preferred strength documented."
+    },
+    "comfyui_yue2_lora/teresa_teng/teresa_teng 280 ComfyUI.safetensors": {
+      "title": "Teresa Teng",
+      "tag": "artist style, latest checkpoint",
+      "repo": "lym00/comfyui_yue2_lora",
+      "url": "https://huggingface.co/lym00/comfyui_yue2_lora",
+      "trigger": "teresa_teng",
+      "about": "Latest numbered checkpoint per artist, not a verified best checkpoint. Both halves. Large rank-256 adapter; no preferred strength documented."
+    },
+    "sv-oldschoolhiphop/sv_oldschoolhiphop.safetensors": {
+      "title": "Old School Hip-Hop",
+      "tag": "boom-bap and dusty samples",
+      "repo": "atomtanstudio/lora-library",
+      "url": "https://huggingface.co/atomtanstudio/lora-library",
+      "trigger": "sv_oldschoolhiphop",
+      "about": "Both halves. Direct mode, music 1.0, sound 1.0, guidance 1.0 and 32 sound steps are the author's starting settings."
+    },
+    "yue2-qtstrm-quiet-storm/qtstrm_afterhours.safetensors": {
+      "title": "Quiet Storm Afterhours",
+      "tag": "late-night R&B and soul",
+      "repo": "becausereasons/yue2-qtstrm-quiet-storm",
+      "url": "https://huggingface.co/becausereasons/yue2-qtstrm-quiet-storm",
+      "trigger": "qtstrm",
+      "about": "Full plan; music 1.0, sound 1.0. Velvet and Midnight are the author's preferred clean variants."
+    },
+    "yue2-qtstrm-quiet-storm/qtstrm_candlelight.safetensors": {
+      "title": "Quiet Storm Candlelight",
+      "tag": "late-night R&B and soul",
+      "repo": "becausereasons/yue2-qtstrm-quiet-storm",
+      "url": "https://huggingface.co/becausereasons/yue2-qtstrm-quiet-storm",
+      "trigger": "qtstrm",
+      "about": "Full plan; music 1.0, sound 1.0. Velvet and Midnight are the author's preferred clean variants."
+    },
+    "yue2-qtstrm-quiet-storm/qtstrm_midnight.safetensors": {
+      "title": "Quiet Storm Midnight",
+      "tag": "late-night R&B and soul",
+      "repo": "becausereasons/yue2-qtstrm-quiet-storm",
+      "url": "https://huggingface.co/becausereasons/yue2-qtstrm-quiet-storm",
+      "trigger": "qtstrm",
+      "about": "Full plan; music 1.0, sound 1.0. Velvet and Midnight are the author's preferred clean variants."
+    },
+    "yue2-qtstrm-quiet-storm/qtstrm_nocturne.safetensors": {
+      "title": "Quiet Storm Nocturne",
+      "tag": "late-night R&B and soul",
+      "repo": "becausereasons/yue2-qtstrm-quiet-storm",
+      "url": "https://huggingface.co/becausereasons/yue2-qtstrm-quiet-storm",
+      "trigger": "qtstrm",
+      "about": "Full plan; music 1.0, sound 1.0. Velvet and Midnight are the author's preferred clean variants."
+    },
+    "yue2-qtstrm-quiet-storm/qtstrm_velvet.safetensors": {
+      "title": "Quiet Storm Velvet",
+      "tag": "late-night R&B and soul",
+      "repo": "becausereasons/yue2-qtstrm-quiet-storm",
+      "url": "https://huggingface.co/becausereasons/yue2-qtstrm-quiet-storm",
+      "trigger": "qtstrm",
+      "about": "Full plan; music 1.0, sound 1.0. Velvet and Midnight are the author's preferred clean variants."
+    },
+    "yue2-grvl-raspy-rock-soul/grvl_cinder.safetensors": {
+      "title": "Rock Soul Cinder",
+      "tag": "raspy female rock and soul",
+      "repo": "becausereasons/yue2-grvl-raspy-rock-soul",
+      "url": "https://huggingface.co/becausereasons/yue2-grvl-raspy-rock-soul",
+      "trigger": "grvl",
+      "about": "Full plan; music 1.0, sound 1.0. Lower sound strength if the high end becomes thin."
+    },
+    "yue2-grvl-raspy-rock-soul/grvl_ember.safetensors": {
+      "title": "Rock Soul Ember",
+      "tag": "raspy female rock and soul",
+      "repo": "becausereasons/yue2-grvl-raspy-rock-soul",
+      "url": "https://huggingface.co/becausereasons/yue2-grvl-raspy-rock-soul",
+      "trigger": "grvl",
+      "about": "Full plan; music 1.0, sound 1.0. Lower sound strength if the high end becomes thin."
+    },
+    "yue2-grvl-raspy-rock-soul/grvl_smoulder.safetensors": {
+      "title": "Rock Soul Smoulder",
+      "tag": "raspy female rock and soul",
+      "repo": "becausereasons/yue2-grvl-raspy-rock-soul",
+      "url": "https://huggingface.co/becausereasons/yue2-grvl-raspy-rock-soul",
+      "trigger": "grvl",
+      "about": "Full plan; music 1.0, sound 1.0. Lower sound strength if the high end becomes thin."
+    },
+    "yue2-grvl-raspy-rock-soul/grvl_tempest.safetensors": {
+      "title": "Rock Soul Tempest",
+      "tag": "raspy female rock and soul",
+      "repo": "becausereasons/yue2-grvl-raspy-rock-soul",
+      "url": "https://huggingface.co/becausereasons/yue2-grvl-raspy-rock-soul",
+      "trigger": "grvl",
+      "about": "Full plan; music 1.0, sound 1.0. Lower sound strength if the high end becomes thin."
+    },
+    "yue2-grvl-raspy-rock-soul/grvl_thunder.safetensors": {
+      "title": "Rock Soul Thunder",
+      "tag": "raspy female rock and soul",
+      "repo": "becausereasons/yue2-grvl-raspy-rock-soul",
+      "url": "https://huggingface.co/becausereasons/yue2-grvl-raspy-rock-soul",
+      "trigger": "grvl",
+      "about": "Full plan; music 1.0, sound 1.0. Lower sound strength if the high end becomes thin."
+    },
+    "yue2-grvl-raspy-rock-soul/grvl_wildfire.safetensors": {
+      "title": "Rock Soul Wildfire",
+      "tag": "raspy female rock and soul",
+      "repo": "becausereasons/yue2-grvl-raspy-rock-soul",
+      "url": "https://huggingface.co/becausereasons/yue2-grvl-raspy-rock-soul",
+      "trigger": "grvl",
+      "about": "Full plan; music 1.0, sound 1.0. Lower sound strength if the high end becomes thin."
+    },
+    "yue2-trbdr-folk-troubadour/trbdr_broadside.safetensors": {
+      "title": "Folk Broadside",
+      "tag": "folk and troubadour songs",
+      "repo": "becausereasons/yue2-trbdr-folk-troubadour",
+      "url": "https://huggingface.co/becausereasons/yue2-trbdr-folk-troubadour",
+      "trigger": "trbdr",
+      "about": "Full plan; music 1.0, sound 1.0. Broadside is the latest published checkpoint; the others offer different characters."
+    },
+    "yue2-trbdr-folk-troubadour/trbdr_ferryman.safetensors": {
+      "title": "Folk Ferryman",
+      "tag": "folk and troubadour songs",
+      "repo": "becausereasons/yue2-trbdr-folk-troubadour",
+      "url": "https://huggingface.co/becausereasons/yue2-trbdr-folk-troubadour",
+      "trigger": "trbdr",
+      "about": "Full plan; music 1.0, sound 1.0. Broadside is the latest published checkpoint; the others offer different characters."
+    },
+    "yue2-trbdr-folk-troubadour/trbdr_hearth.safetensors": {
+      "title": "Folk Hearth",
+      "tag": "folk and troubadour songs",
+      "repo": "becausereasons/yue2-trbdr-folk-troubadour",
+      "url": "https://huggingface.co/becausereasons/yue2-trbdr-folk-troubadour",
+      "trigger": "trbdr",
+      "about": "Full plan; music 1.0, sound 1.0. Broadside is the latest published checkpoint; the others offer different characters."
+    },
+    "yue2-trbdr-folk-troubadour/trbdr_lantern.safetensors": {
+      "title": "Folk Lantern",
+      "tag": "folk and troubadour songs",
+      "repo": "becausereasons/yue2-trbdr-folk-troubadour",
+      "url": "https://huggingface.co/becausereasons/yue2-trbdr-folk-troubadour",
+      "trigger": "trbdr",
+      "about": "Full plan; music 1.0, sound 1.0. Broadside is the latest published checkpoint; the others offer different characters."
+    },
+    "yue2-trbdr-folk-troubadour/trbdr_porch.safetensors": {
+      "title": "Folk Porch",
+      "tag": "folk and troubadour songs",
+      "repo": "becausereasons/yue2-trbdr-folk-troubadour",
+      "url": "https://huggingface.co/becausereasons/yue2-trbdr-folk-troubadour",
+      "trigger": "trbdr",
+      "about": "Full plan; music 1.0, sound 1.0. Broadside is the latest published checkpoint; the others offer different characters."
+    },
+    "yue2-cnzn-canzone-italiana/cnzn_coro.safetensors": {
+      "title": "Italian Pop Coro",
+      "tag": "Italian ballads and pop",
+      "repo": "becausereasons/yue2-cnzn-canzone-italiana",
+      "url": "https://huggingface.co/becausereasons/yue2-cnzn-canzone-italiana",
+      "trigger": "cnzn",
+      "about": "Music 1.0, sound 1.0 for ballads; try music 0.5 for upbeat styles. Use Italian lyrics."
+    },
+    "yue2-cnzn-canzone-italiana/cnzn_notte.safetensors": {
+      "title": "Italian Pop Notte",
+      "tag": "Italian ballads and pop",
+      "repo": "becausereasons/yue2-cnzn-canzone-italiana",
+      "url": "https://huggingface.co/becausereasons/yue2-cnzn-canzone-italiana",
+      "trigger": "cnzn",
+      "about": "Music 1.0, sound 1.0 for ballads; try music 0.5 for upbeat styles. Use Italian lyrics."
+    },
+    "yue2-cnzn-canzone-italiana/cnzn_sanremo.safetensors": {
+      "title": "Italian Pop Sanremo",
+      "tag": "Italian ballads and pop",
+      "repo": "becausereasons/yue2-cnzn-canzone-italiana",
+      "url": "https://huggingface.co/becausereasons/yue2-cnzn-canzone-italiana",
+      "trigger": "cnzn",
+      "about": "Music 1.0, sound 1.0 for ballads; try music 0.5 for upbeat styles. Use Italian lyrics."
+    },
+    "yue2-cnzn-canzone-italiana/cnzn_sussurro.safetensors": {
+      "title": "Italian Pop Sussurro",
+      "tag": "Italian ballads and pop",
+      "repo": "becausereasons/yue2-cnzn-canzone-italiana",
+      "url": "https://huggingface.co/becausereasons/yue2-cnzn-canzone-italiana",
+      "trigger": "cnzn",
+      "about": "Music 1.0, sound 1.0 for ballads; try music 0.5 for upbeat styles. Use Italian lyrics."
+    },
+    "yue2-cnzn-canzone-italiana/cnzn_teatro.safetensors": {
+      "title": "Italian Pop Teatro",
+      "tag": "Italian ballads and pop",
+      "repo": "becausereasons/yue2-cnzn-canzone-italiana",
+      "url": "https://huggingface.co/becausereasons/yue2-cnzn-canzone-italiana",
+      "trigger": "cnzn",
+      "about": "Music 1.0, sound 1.0 for ballads; try music 0.5 for upbeat styles. Use Italian lyrics."
+    },
+    "yue2-chnsn-chanson-francaise/chnsn_cabaret.safetensors": {
+      "title": "Chanson Cabaret",
+      "tag": "French chanson",
+      "repo": "becausereasons/yue2-chnsn-chanson-francaise",
+      "url": "https://huggingface.co/becausereasons/yue2-chnsn-chanson-francaise",
+      "trigger": "chnsn",
+      "about": "Music 1.0, sound 1.0; try music 0.5 if a song will not end. Use French lyrics."
+    },
+    "yue2-chnsn-chanson-francaise/chnsn_grand_boulevard.safetensors": {
+      "title": "Chanson Grand Boulevard",
+      "tag": "French chanson",
+      "repo": "becausereasons/yue2-chnsn-chanson-francaise",
+      "url": "https://huggingface.co/becausereasons/yue2-chnsn-chanson-francaise",
+      "trigger": "chnsn",
+      "about": "Music 1.0, sound 1.0; try music 0.5 if a song will not end. Use French lyrics."
+    },
+    "yue2-chnsn-chanson-francaise/chnsn_montmartre.safetensors": {
+      "title": "Chanson Montmartre",
+      "tag": "French chanson",
+      "repo": "becausereasons/yue2-chnsn-chanson-francaise",
+      "url": "https://huggingface.co/becausereasons/yue2-chnsn-chanson-francaise",
+      "trigger": "chnsn",
+      "about": "Music 1.0, sound 1.0; try music 0.5 if a song will not end. Use French lyrics."
+    },
+    "yue2-chnsn-chanson-francaise/chnsn_rive_gauche.safetensors": {
+      "title": "Chanson Rive Gauche",
+      "tag": "French chanson",
+      "repo": "becausereasons/yue2-chnsn-chanson-francaise",
+      "url": "https://huggingface.co/becausereasons/yue2-chnsn-chanson-francaise",
+      "trigger": "chnsn",
+      "about": "Music 1.0, sound 1.0; try music 0.5 if a song will not end. Use French lyrics."
+    },
+    "yue2-mltnt-militant-reggae/mltnt_chanter.safetensors": {
+      "title": "Reggae Chanter",
+      "tag": "roots, steppers and dancehall",
+      "repo": "becausereasons/yue2-mltnt-militant-reggae",
+      "url": "https://huggingface.co/becausereasons/yue2-mltnt-militant-reggae",
+      "trigger": "mltnt",
+      "about": "Full plan. Steppers, Roots and Frontline: music 1.0, sound 1.0. Soundclash and Chanter can use music 0.5. Fusion: music 1.0, sound 1.5."
+    },
+    "yue2-mltnt-militant-reggae/mltnt_frontline.safetensors": {
+      "title": "Reggae Frontline",
+      "tag": "roots, steppers and dancehall",
+      "repo": "becausereasons/yue2-mltnt-militant-reggae",
+      "url": "https://huggingface.co/becausereasons/yue2-mltnt-militant-reggae",
+      "trigger": "mltnt",
+      "about": "Full plan. Steppers, Roots and Frontline: music 1.0, sound 1.0. Soundclash and Chanter can use music 0.5. Fusion: music 1.0, sound 1.5."
+    },
+    "yue2-mltnt-militant-reggae/mltnt_fusion.safetensors": {
+      "title": "Reggae Fusion",
+      "tag": "roots, steppers and dancehall",
+      "repo": "becausereasons/yue2-mltnt-militant-reggae",
+      "url": "https://huggingface.co/becausereasons/yue2-mltnt-militant-reggae",
+      "trigger": "mltnt",
+      "about": "Full plan. Steppers, Roots and Frontline: music 1.0, sound 1.0. Soundclash and Chanter can use music 0.5. Fusion: music 1.0, sound 1.5."
+    },
+    "yue2-mltnt-militant-reggae/mltnt_roots.safetensors": {
+      "title": "Reggae Roots",
+      "tag": "roots, steppers and dancehall",
+      "repo": "becausereasons/yue2-mltnt-militant-reggae",
+      "url": "https://huggingface.co/becausereasons/yue2-mltnt-militant-reggae",
+      "trigger": "mltnt",
+      "about": "Full plan. Steppers, Roots and Frontline: music 1.0, sound 1.0. Soundclash and Chanter can use music 0.5. Fusion: music 1.0, sound 1.5."
+    },
+    "yue2-mltnt-militant-reggae/mltnt_soundclash.safetensors": {
+      "title": "Reggae Soundclash",
+      "tag": "roots, steppers and dancehall",
+      "repo": "becausereasons/yue2-mltnt-militant-reggae",
+      "url": "https://huggingface.co/becausereasons/yue2-mltnt-militant-reggae",
+      "trigger": "mltnt",
+      "about": "Full plan. Steppers, Roots and Frontline: music 1.0, sound 1.0. Soundclash and Chanter can use music 0.5. Fusion: music 1.0, sound 1.5."
+    },
+    "yue2-mltnt-militant-reggae/mltnt_steppers.safetensors": {
+      "title": "Reggae Steppers",
+      "tag": "roots, steppers and dancehall",
+      "repo": "becausereasons/yue2-mltnt-militant-reggae",
+      "url": "https://huggingface.co/becausereasons/yue2-mltnt-militant-reggae",
+      "trigger": "mltnt",
+      "about": "Full plan. Steppers, Roots and Frontline: music 1.0, sound 1.0. Soundclash and Chanter can use music 0.5. Fusion: music 1.0, sound 1.5."
+    },
+    "yue2-blgr-bulgarian-voices/blgr_kargyraa.safetensors": {
+      "title": "Bulgarian Kargyraa",
+      "tag": "choir and throat voices",
+      "repo": "becausereasons/yue2-blgr-bulgarian-voices",
+      "url": "https://huggingface.co/becausereasons/yue2-blgr-bulgarian-voices",
+      "trigger": "blgr",
+      "about": "Full plan; music 1.0. Rhodope sound 1.0, Steppe 1.5, Kargyraa 1.5 to 2.0. Use the card's voice-specific prompts."
+    },
+    "yue2-blgr-bulgarian-voices/blgr_rhodope.safetensors": {
+      "title": "Bulgarian Rhodope",
+      "tag": "choir and throat voices",
+      "repo": "becausereasons/yue2-blgr-bulgarian-voices",
+      "url": "https://huggingface.co/becausereasons/yue2-blgr-bulgarian-voices",
+      "trigger": "blgr",
+      "about": "Full plan; music 1.0. Rhodope sound 1.0, Steppe 1.5, Kargyraa 1.5 to 2.0. Use the card's voice-specific prompts."
+    },
+    "yue2-blgr-bulgarian-voices/blgr_steppe.safetensors": {
+      "title": "Bulgarian Steppe",
+      "tag": "choir and throat voices",
+      "repo": "becausereasons/yue2-blgr-bulgarian-voices",
+      "url": "https://huggingface.co/becausereasons/yue2-blgr-bulgarian-voices",
+      "trigger": "blgr",
+      "about": "Full plan; music 1.0. Rhodope sound 1.0, Steppe 1.5, Kargyraa 1.5 to 2.0. Use the card's voice-specific prompts."
+    },
+    "yue2-qwwl-qawwali-sufi-tabla/drksf_midnight.safetensors": {
+      "title": "Dark Sufi Midnight",
+      "tag": "Sufi vocals and dark beats",
+      "repo": "becausereasons/yue2-qwwl-qawwali-sufi-tabla",
+      "url": "https://huggingface.co/becausereasons/yue2-qwwl-qawwali-sufi-tabla",
+      "trigger": "drksf",
+      "about": "Direct mode; music 1.0, sound 1.0."
+    },
+    "yue2-qwwl-qawwali-sufi-tabla/qwwl_mehfil.safetensors": {
+      "title": "Qawwali Mehfil",
+      "tag": "harmonium, tabla and chorus",
+      "repo": "becausereasons/yue2-qwwl-qawwali-sufi-tabla",
+      "url": "https://huggingface.co/becausereasons/yue2-qwwl-qawwali-sufi-tabla",
+      "trigger": "qwwl",
+      "about": "Direct mode; music 1.0, sound 1.0."
+    },
+    "arabmaqamrock-yue2-lora/arabmaqamrock-v3-ar.safetensors": {
+      "title": "Arab Maqam Rock Music",
+      "tag": "Arabic orchestral rock",
+      "repo": "akbargherbal/arabmaqamrock-yue2-lora",
+      "url": "https://huggingface.co/akbargherbal/arabmaqamrock-yue2-lora",
+      "trigger": "arabmaqamrock",
+      "about": "Use the paired music and sound files at 1.0. Deep male Arabic vocals with orchestral rock; see the card for score settings."
+    },
+    "arabmaqamrock-yue2-lora/arabmaqamrock-v3-nar.safetensors": {
+      "title": "Arab Maqam Rock Sound",
+      "tag": "Arabic orchestral rock",
+      "repo": "akbargherbal/arabmaqamrock-yue2-lora",
+      "url": "https://huggingface.co/akbargherbal/arabmaqamrock-yue2-lora",
+      "trigger": "arabmaqamrock",
+      "about": "Use the paired music and sound files at 1.0. Deep male Arabic vocals with orchestral rock; see the card for score settings."
+    },
+    "quran-pronunciation-yue2-lora/quran-pronunciation-ar.safetensors": {
+      "title": "Arabic Pronunciation Music",
+      "tag": "Arabic pronunciation",
+      "repo": "akbargherbal/quran-pronunciation-yue2-lora",
+      "url": "https://huggingface.co/akbargherbal/quran-pronunciation-yue2-lora",
+      "trigger": "",
+      "about": "Paired music and sound files, both 1.0, Direct mode. No trigger word. Follow the publisher's lyric and pronunciation guidance."
+    },
+    "quran-pronunciation-yue2-lora/quran-pronunciation-nar.safetensors": {
+      "title": "Arabic Pronunciation Sound",
+      "tag": "Arabic pronunciation",
+      "repo": "akbargherbal/quran-pronunciation-yue2-lora",
+      "url": "https://huggingface.co/akbargherbal/quran-pronunciation-yue2-lora",
+      "trigger": "",
+      "about": "Paired music and sound files, both 1.0, Direct mode. No trigger word. Follow the publisher's lyric and pronunciation guidance."
+    },
+    "Ethio-Music-YuE2/ethio-music-yue2-ar-lora-r64.safetensors": {
+      "title": "Ethiopian Music",
+      "tag": "Ethiopian modes and grooves",
+      "repo": "Behailut/Ethio-Music-YuE2",
+      "url": "https://huggingface.co/Behailut/Ethio-Music-YuE2",
+      "trigger": "",
+      "about": "Music half only. Loader compatible. The publisher's strongest results need its custom constrained score workflow, which is not installed here; ordinary caption-only generation is less reliable."
+    },
+    "yue2-lorn-lora/yue2_lorn_v1.safetensors": {
+      "title": "Lorn",
+      "tag": "publisher Lorn style",
+      "repo": "polinom100/yue2-lorn-lora",
+      "url": "https://huggingface.co/polinom100/yue2-lorn-lora",
+      "trigger": "",
+      "about": "Original named release. No model card or preferred settings published; sound is untested locally."
+    },
+    "earthdrone_yue2_v1/earthdrone_yue2_v1.safetensors": {
+      "title": "Earthdrone",
+      "tag": "publisher Earthdrone style",
+      "repo": "TheMindExpansionNetwork/earthdrone_yue2_v1",
+      "url": "https://huggingface.co/TheMindExpansionNetwork/earthdrone_yue2_v1",
+      "trigger": "",
+      "about": "Original named release. No model card or preferred settings published; sound is untested locally."
+    },
+    "yue2-distilled-sliders-v2/acoustic-folk_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Acoustic Folk",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/afrobeats_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Afrobeats",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/country_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Country",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/disco-funk_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Disco Funk",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/female_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Female",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/hiphop_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Hiphop",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/house_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled House",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/indie-rock_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Indie Rock",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/kpop_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Kpop",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/lofi_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Lofi",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/male_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Male",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/metal_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Metal",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/pop-punk_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Pop Punk",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/pop_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Pop",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/reggaeton_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Reggaeton",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "yue2-distilled-sliders-v2/rnb_v2_distilled_rank8_comfyui.safetensors": {
+      "title": "Distilled Rnb",
+      "tag": "standard LoRA alternative",
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "url": "https://huggingface.co/ntc-ai/yue2-particle-sliders",
+      "trigger": "",
+      "about": "Rank-8 approximation of the v2 particle slider. Music 1.0, sound 0.0. This is a separate alternative to the native particle control; it does not replace it. Avoid unintentionally applying both."
+    },
+    "sv-industrial/": {
+      "title": "Industrial v1",
+      "tag": "industrial rock, metal and dance",
+      "repo": "atomtanstudio/lora-library",
+      "url": "https://huggingface.co/atomtanstudio/lora-library/tree/main/yue2/industrial",
+      "trigger": "sv_industrial",
+      "about": "Experimental industrial style with an embedded Real Audio v9 companion. Start with music 0.7, sound 0.7, Full plan, guidance 1 and 32 sound steps. The companion stays at 1.0 automatically while this bundle is active; do not also select a separate Real Audio adapter. The publisher reports inconsistent fidelity."
+    },
+    "yue2-1980s-italo-disco-lora/yue2_1980s_italo_disco_engine_unfused.safetensors": {
+      "title": "1980s Italo Disco",
+      "trigger": "italodisco",
+      "tag": "warm bass and disco synths",
+      "about": "Sound half only. Put italodisco first in the style; sound strength 1.0 is the publisher's starting point.",
+      "repo": "jamespetts/yue2-1980s-italo-disco-lora",
+      "url": "https://huggingface.co/jamespetts/yue2-1980s-italo-disco-lora"
+    },
+    "yue2-1980s-two-tone-ska-lora/yue2_1980s_two_tone_ska_unfused.safetensors": {
+      "title": "1980s Two-Tone Ska",
+      "trigger": "twotone",
+      "tag": "ska guitars, organ and brass",
+      "about": "Sound half only. Put twotone first in the style; start at sound 1.0. Composition is still controlled by your prompt.",
+      "repo": "jamespetts/yue2-1980s-two-tone-ska-lora",
+      "url": "https://huggingface.co/jamespetts/yue2-1980s-two-tone-ska-lora"
+    },
+    "yue2-keygen-music-lora/adapter-ar/lora.safetensors": {
+      "title": "Keygen Music",
+      "trigger": "",
+      "tag": "chiptune and demoscene",
+      "about": "Paired music and sound adapters. The publisher's demo uses music 0.3 and sound 0.5. Trained on instrumental tracker music.",
+      "repo": "monsterovich/yue2-keygen-music-lora",
+      "url": "https://huggingface.co/monsterovich/yue2-keygen-music-lora"
+    },
+    "yue2-keygen-music-lora/adapter-nar/lora.safetensors": {
+      "title": "Keygen Sound",
+      "trigger": "",
+      "tag": "chiptune and demoscene",
+      "about": "Paired music and sound adapters. The publisher's demo uses music 0.3 and sound 0.5. Trained on instrumental tracker music.",
+      "repo": "monsterovich/yue2-keygen-music-lora",
+      "url": "https://huggingface.co/monsterovich/yue2-keygen-music-lora"
+    },
+    "YuE2-3B-instrumental-kto-lora/adapter.safetensors": {
+      "title": "Instrumental KTO",
+      "trigger": "",
+      "tag": "suppress vocals in music tokens",
+      "about": "Experimental instrumental adapter. Applied only during music-token generation: score planning and the sound stage use the base model. No trigger. Native alpha 32/rank 16 scaling is handled by the loader.",
+      "repo": "stevensu/YuE2-3B-instrumental-kto-lora",
+      "url": "https://huggingface.co/stevensu/YuE2-3B-instrumental-kto-lora"
+    },
+    "arabic-instrumental-yue2-lora/arabic-instrumental-ar.safetensors": {
+      "title": "Arabic Instrumental Music",
+      "trigger": "",
+      "tag": "oud, strings and percussion",
+      "about": "Paired music/sound files for Middle-Eastern instrumental fusion. No trigger. Start the style with Middle Eastern fusion, instrumental. Use section tags rather than sung lyrics.",
+      "repo": "akbargherbal/arabic-instrumental-yue2-lora",
+      "url": "https://huggingface.co/akbargherbal/arabic-instrumental-yue2-lora"
+    },
+    "arabic-instrumental-yue2-lora/arabic-instrumental-nar.safetensors": {
+      "title": "Arabic Instrumental Sound",
+      "trigger": "",
+      "tag": "oud, strings and percussion",
+      "about": "Paired music/sound files for Middle-Eastern instrumental fusion. No trigger. Start the style with Middle Eastern fusion, instrumental. Use section tags rather than sung lyrics.",
+      "repo": "akbargherbal/arabic-instrumental-yue2-lora",
+      "url": "https://huggingface.co/akbargherbal/arabic-instrumental-yue2-lora"
+    },
+    "arabmaqamrock-blend-yue2-lora/a0.1/v3instr_a0.1_ar.safetensors": {
+      "title": "Maqam Blend 0.1 Music",
+      "trigger": "arabmaqamrock",
+      "tag": "vocal rock, instrumental tint",
+      "about": "Paired music/sound blend; the donor proportion 0.1 is baked into its weights. Use both files at 1.0. Do not also stack the original carrier or donor adapters.",
+      "repo": "akbargherbal/arabmaqamrock-blend-yue2-lora",
+      "url": "https://huggingface.co/akbargherbal/arabmaqamrock-blend-yue2-lora"
+    },
+    "arabmaqamrock-blend-yue2-lora/a0.1/v3instr_a0.1_nar.safetensors": {
+      "title": "Maqam Blend 0.1 Sound",
+      "trigger": "arabmaqamrock",
+      "tag": "vocal rock, instrumental tint",
+      "about": "Paired music/sound blend; the donor proportion 0.1 is baked into its weights. Use both files at 1.0. Do not also stack the original carrier or donor adapters.",
+      "repo": "akbargherbal/arabmaqamrock-blend-yue2-lora",
+      "url": "https://huggingface.co/akbargherbal/arabmaqamrock-blend-yue2-lora"
+    },
+    "arabmaqamrock-blend-yue2-lora/a0.15/v3instr_a0.15_ar.safetensors": {
+      "title": "Maqam Blend 0.15 Music",
+      "trigger": "arabmaqamrock",
+      "tag": "vocal rock, instrumental tint",
+      "about": "Paired music/sound blend; the donor proportion 0.15 is baked into its weights. Use both files at 1.0. Do not also stack the original carrier or donor adapters.",
+      "repo": "akbargherbal/arabmaqamrock-blend-yue2-lora",
+      "url": "https://huggingface.co/akbargherbal/arabmaqamrock-blend-yue2-lora"
+    },
+    "arabmaqamrock-blend-yue2-lora/a0.15/v3instr_a0.15_nar.safetensors": {
+      "title": "Maqam Blend 0.15 Sound",
+      "trigger": "arabmaqamrock",
+      "tag": "vocal rock, instrumental tint",
+      "about": "Paired music/sound blend; the donor proportion 0.15 is baked into its weights. Use both files at 1.0. Do not also stack the original carrier or donor adapters.",
+      "repo": "akbargherbal/arabmaqamrock-blend-yue2-lora",
+      "url": "https://huggingface.co/akbargherbal/arabmaqamrock-blend-yue2-lora"
+    },
+    "arabmaqamrock-blend-yue2-lora/a0.2/v3instr_a0.2_ar.safetensors": {
+      "title": "Maqam Blend 0.2 Music",
+      "trigger": "arabmaqamrock",
+      "tag": "vocal rock, instrumental tint",
+      "about": "Paired music/sound blend; the donor proportion 0.2 is baked into its weights. Use both files at 1.0. Do not also stack the original carrier or donor adapters.",
+      "repo": "akbargherbal/arabmaqamrock-blend-yue2-lora",
+      "url": "https://huggingface.co/akbargherbal/arabmaqamrock-blend-yue2-lora"
+    },
+    "arabmaqamrock-blend-yue2-lora/a0.2/v3instr_a0.2_nar.safetensors": {
+      "title": "Maqam Blend 0.2 Sound",
+      "trigger": "arabmaqamrock",
+      "tag": "vocal rock, instrumental tint",
+      "about": "Paired music/sound blend; the donor proportion 0.2 is baked into its weights. Use both files at 1.0. Do not also stack the original carrier or donor adapters.",
+      "repo": "akbargherbal/arabmaqamrock-blend-yue2-lora",
+      "url": "https://huggingface.co/akbargherbal/arabmaqamrock-blend-yue2-lora"
+    }
+  },
+  "models": {
+    "RS-TW-2.0x0.75-BF16": {
+      "title": "Tsunami Wave 2.0 × 0.75 BF16",
+      "url": "https://huggingface.co/goldhub/YuE2-RS-Finetunes",
+      "about": "Optional full-model fine-tune. Publisher's balanced variant. Stock-model LoRAs and sliders may not transfer cleanly. Selecting this model clears existing choices; reusing them is experimental."
+    },
+    "RS-TW-2.0x0.9-BF16": {
+      "title": "Tsunami Wave 2.0 × 0.9 BF16",
+      "url": "https://huggingface.co/goldhub/YuE2-RS-Finetunes",
+      "about": "Optional full-model fine-tune. Publisher's stronger experimental variant; stability is not guaranteed. Stock-model LoRAs and sliders may not transfer cleanly. Selecting this model clears existing choices; reusing them is experimental."
     }
   }
 }

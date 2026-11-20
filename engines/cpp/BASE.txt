@@ -1,8 +1,8 @@
-# The engine these patches were made for (tools/apply-patches.sh and the install read this file)
 upstream=https://github.com/ServeurpersoCom/yue2.cpp.git
-base=f17d5268483db25c9d79a9d53967f9d31fd1ccd3
-base_date=2026-09-24
-ggml=765bc96f9bb8d4c397c91c23b4e5c52a93fcf9b0
-patches=58
-tree=41c64b6e1af2b3c7f135dea18a00517907b6c16b
-made=2026-09-28 12:00
+base=e646d5228911ae1b81ac2a261115a255848ce85f
+ggml_upstream=https://github.com/ServeurpersoCom/ggml.git
+ggml=ef4555b7aede4467a5de803b103615e0a5f30dd8
+tree=df13a20430554564541b79d34b52bb29660d3995
+ggml_tree=1d7f9e805089d595d4f6b95e436ced57ea9c7343
+local_engine=135153b35fe522e18d75f10ae48989812b804732
+local_ggml=e1208b40efaab067548f230cb6c3ee1b2cd415b5

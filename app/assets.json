@@ -1,0 +1,1458 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "repo": "Serveurperso/YuE2-GGUF",
+      "revision": "e630f2b8f6aedf8254c3186438633c1b5eeaf80a",
+      "file": "YuE2-3B-BF16.gguf",
+      "destination": "models/YuE2-3B-BF16.gguf",
+      "groups": [
+        "core"
+      ],
+      "bytes": 7166072352,
+      "sha256": "668ca9ffa4622449916aae5068b5737363e7ec186a824cd3d7a1a8a95269f166"
+    },
+    {
+      "repo": "Serveurperso/YuE2-GGUF",
+      "revision": "e630f2b8f6aedf8254c3186438633c1b5eeaf80a",
+      "file": "YuE2-3B-Q5_K_M.gguf",
+      "destination": "models/YuE2-3B-Q5_K_M.gguf",
+      "groups": [
+        "compact"
+      ],
+      "bytes": 2622936832,
+      "sha256": "cd3efd250b734a229172800f08f33a893ad1f66b521666e176cdae4a0729b281"
+    },
+    {
+      "repo": "Serveurperso/YuE2-GGUF",
+      "revision": "e630f2b8f6aedf8254c3186438633c1b5eeaf80a",
+      "file": "YuE2-Vae-F32.gguf",
+      "destination": "models/YuE2-Vae-F32.gguf",
+      "groups": [
+        "core",
+        "compact"
+      ],
+      "bytes": 530497344,
+      "sha256": "93e49dfb1970e89ad64cacb17cf13b5d05f6bb30ef7ed3adae3050bcb728638a"
+    },
+    {
+      "repo": "Serveurperso/YuE2-GGUF",
+      "revision": "e630f2b8f6aedf8254c3186438633c1b5eeaf80a",
+      "file": "SheetSage2-F32.gguf",
+      "destination": "models/engine-20261016/SheetSage2-F32.gguf",
+      "groups": [
+        "recordings"
+      ],
+      "bytes": 228738176,
+      "sha256": "4988c01b64c2812dd71eb89a9ab1937a3385ff2ba869bf495ccb69af4ec744cd"
+    },
+    {
+      "repo": "Serveurperso/YuE2-GGUF",
+      "revision": "e630f2b8f6aedf8254c3186438633c1b5eeaf80a",
+      "file": "MERT-v2-FullSong-F32.gguf",
+      "destination": "models/engine-20261016/MERT-v2-FullSong-F32.gguf",
+      "groups": [
+        "recordings"
+      ],
+      "bytes": 2529780448,
+      "sha256": "695b247660405474fffa7bab4d019227325b8d169f96aaa96bad488033fec637"
+    },
+    {
+      "repo": "Serveurperso/YuE2-GGUF",
+      "revision": "e630f2b8f6aedf8254c3186438633c1b5eeaf80a",
+      "file": "yue2-mothersuperior-realaudio-tokenizer-v4-F32.gguf",
+      "destination": "models/engine-20261016/yue2-mothersuperior-realaudio-tokenizer-v4-F32.gguf",
+      "groups": [
+        "recordings"
+      ],
+      "bytes": 171275040,
+      "sha256": "5e87c59488704ec538ec443157f65a213176e4bf8b14ba3b119148ae2099ddfd"
+    },
+    {
+      "repo": "goldhub/YuE2-RS-Finetunes",
+      "revision": "8ba3e2ce05ef2d8b712a832a1c7eb016e39931dd",
+      "file": "YuE2-3B-RS-TW-2.0x0.75-BF16.gguf",
+      "destination": "models/YuE2-3B-RS-TW-2.0x0.75-BF16.gguf",
+      "groups": [
+        "ruach"
+      ],
+      "bytes": 7166073792,
+      "sha256": "1795d9efd601a43b87c30ca16f0d31f96e66d60b5a96dafb6d640819855b2d86"
+    },
+    {
+      "repo": "goldhub/YuE2-RS-Finetunes",
+      "revision": "8ba3e2ce05ef2d8b712a832a1c7eb016e39931dd",
+      "file": "YuE2-3B-RS-TW-2.0x0.9-BF16.gguf",
+      "destination": "models/YuE2-3B-RS-TW-2.0x0.9-BF16.gguf",
+      "groups": [
+        "ruach"
+      ],
+      "bytes": 7166073760,
+      "sha256": "ad863cb714d7d64d35574e573eda433da503fe3373656a869439d23fc8ed50c4"
+    },
+    {
+      "repo": "goldhub/YuE2-RS-Finetunes",
+      "revision": "8ba3e2ce05ef2d8b712a832a1c7eb016e39931dd",
+      "file": "VAE-RS/YuE2-VAE-RS-x3_v1-F32.gguf",
+      "destination": "models/YuE2-VAE-RS-x3_v1-F32.gguf",
+      "groups": [
+        "ruach"
+      ],
+      "bytes": 803056768,
+      "sha256": "368a91278f0b25e67bc14b1a894f9e8c341c5fccb70afa880fbc1de6afdb4959"
+    },
+    {
+      "repo": "goldhub/YuE2-RS-Finetunes",
+      "revision": "8ba3e2ce05ef2d8b712a832a1c7eb016e39931dd",
+      "file": "VAE-RS/YuE2-VAE-RS-x3_v2-F32.gguf",
+      "destination": "models/YuE2-VAE-RS-x3_v2-F32.gguf",
+      "groups": [
+        "ruach"
+      ],
+      "bytes": 803056768,
+      "sha256": "93de6e8a18246670f4cf49d5f4f193aece95dda48463eda13a303e7f0d313f97"
+    },
+    {
+      "repo": "m-a-p/YuE2-Vae-legacy",
+      "revision": "d0585a9cdbb36e8b6930046974500ad7078317ca",
+      "file": "model.safetensors",
+      "destination": "checkpoints/YuE2-Vae-legacy/model.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 530512720,
+      "sha256": "b6d283628913bb41145ba99e2314eef613905ee95f690eb70e8212d5f4965044"
+    },
+    {
+      "repo": "m-a-p/YuE2-Vae-legacy",
+      "revision": "d0585a9cdbb36e8b6930046974500ad7078317ca",
+      "file": "weights_manifest.json",
+      "destination": "checkpoints/YuE2-Vae-legacy/weights_manifest.json",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 178,
+      "sha256": "92652174b1218d24303dbad37cc420058de3d90229c218e0cf9a57c1114ed0aa"
+    },
+    {
+      "repo": "Mothersuperior/YuE2-Vae-merge-0.666",
+      "revision": "b00bdfc08f6bb251ebe0fa097020eb63daf930c7",
+      "file": "model.safetensors",
+      "destination": "checkpoints/YuE2-Vae-merge-0.666/model.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 530512792,
+      "sha256": "aa2429925035a793a976c43198c54cb34fe7335718ba791db104cc28bd40acf3"
+    },
+    {
+      "repo": "Mothersuperior/YuE2-Vae-merge-0.666",
+      "revision": "b00bdfc08f6bb251ebe0fa097020eb63daf930c7",
+      "file": "weights_manifest.json",
+      "destination": "checkpoints/YuE2-Vae-merge-0.666/weights_manifest.json",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 177,
+      "sha256": "0f36ca36202db74ff7d977c623fee3c6a18712b9c7d7b967b37633c95a020ae5"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "catalog.json",
+      "destination": "checkpoints/particle-sliders/catalog.json",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 137304,
+      "sha256": "a33c4229c3fe60b65f39720f7db0a016acf3dd543cb483544fc7afcd5e23538b"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/female_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/female_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16049112,
+      "sha256": "1daba0682dcaf15d05d08637d5ccca7a1f157d298f8f491dbc6ad712ff0d0ead"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/male_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/male_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16049048,
+      "sha256": "c916db3511d8c0f436900785b722dd65b9f5a4195649d0f06ef3c807dd4527ad"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/pop_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/pop_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16048168,
+      "sha256": "36ece86ff462cc879d12b55dc0ee7ffdc8776e2fed1c9136e0772648aee7bf02"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/hiphop_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/hiphop_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16049152,
+      "sha256": "fc1104e34eb86fe86b918246358b8cb5e05e3a6e1a6d589e6e3bffff845392f0"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/rnb_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/rnb_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16048816,
+      "sha256": "b68802ad79352e3c66f3ce13ae5b7eaaca2e24f4bb307276589250db25acbdda"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/indie-rock_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/indie-rock_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16048688,
+      "sha256": "d3dabcf0b20f32c680394b72af565058099d5fb9c0aab969b96bb224a5cf5067"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/pop-punk_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/pop-punk_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16048328,
+      "sha256": "c7a1978d5a1d896a74645ba1296f664877090e9b796faf359e1e95a675c1bab5"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/metal_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/metal_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16043808,
+      "sha256": "d7b9907b46d573f20bc5919f49164648356458b219df4b81f248d0399f492aac"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/country_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/country_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16048896,
+      "sha256": "aa9cd5a4d7c5978d24d6260e0e2dc84027eb55884b6ce7126704d278cdb574d4"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/acoustic-folk_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/acoustic-folk_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16048344,
+      "sha256": "12967b7681f44d2aa7a3f4e2539d4a1e8615b38c2025292165dbd6c8c5407dbc"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/house_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/house_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16048640,
+      "sha256": "aa010f666d8f097fc9a1567f285b5a9ca96504e588e59c351f35c13f78b6d9d8"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/disco-funk_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/disco-funk_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16048760,
+      "sha256": "5141cdf3d4697f829eacc7ffab535228aa94f3d2ca9804def17abc931fc8f932"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/kpop_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/kpop_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16048800,
+      "sha256": "aa798a14da2d49670c18e6cc45a0edcf0a6c56895b7e7126adb03218778c8aa9"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/reggaeton_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/reggaeton_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16048184,
+      "sha256": "4fe2e1d879d824ea980fe4340dd6bcf8d3e64bca5474b80833f818ffd6152381"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/afrobeats_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/afrobeats_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16048960,
+      "sha256": "aff7892d6cb7f6302f8d043f6611c1db97c4dea54c30ad32815a8f46fbc45a27"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "weights/particle-gmix-1600-v2/lofi_step1600.safetensors",
+      "destination": "checkpoints/particle-sliders/weights/particle-gmix-1600-v2/lofi_step1600.safetensors",
+      "groups": [
+        "extras"
+      ],
+      "bytes": 16048600,
+      "sha256": "664fa47cede00f63e63ef8fe1ef56bfdbda9d34a61a8d1cdffb863d551af5bdf"
+    },
+    {
+      "repo": "Behailut/Ethio-Music-YuE2",
+      "revision": "941d9d0da9a59dc6d2896f5b1aadddabec37d2ee",
+      "file": "ethio-music-yue2-ar-lora-r64.safetensors",
+      "destination": "loras/Ethio-Music-YuE2/ethio-music-yue2-ar-lora-r64.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 278962344,
+      "sha256": "039d5cf3281af1d86232c09d00b3642fa03ef21a1fd3394e3eab7380687bb8b2"
+    },
+    {
+      "repo": "stevensu/YuE2-3B-instrumental-kto-lora",
+      "revision": "e41653af9f59c963238c41217be04c1dd001529b",
+      "file": "adapter.safetensors",
+      "destination": "loras/YuE2-3B-instrumental-kto-lora/adapter.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 69773128,
+      "sha256": "27643e2bc397a84eb6549eeddea3e704632b10ad02b248e951d0510ad39a829e"
+    },
+    {
+      "repo": "Mothersuperior/YuE2-instrumental-cot-full-loras",
+      "revision": "947f2f4b28978b2b6c3e316e6a87925c76bf3c4b",
+      "file": "ar_lora_inst_v3abc.bf16.safetensors",
+      "destination": "loras/YuE2-instrumental-cot-full-loras/ar_lora_inst_v3abc.bf16.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 139502088,
+      "sha256": "e408fd3148b75b1165f7ddbf63db575d83bb6402a0b5f876fcb767dbcb2c5414"
+    },
+    {
+      "repo": "supermind/YuE2-phonk-lora",
+      "revision": "159e4f973234a77aa7ccb0d1e202af970ac60284",
+      "file": "phonked_best.safetensors",
+      "destination": "loras/YuE2-phonk-lora/phonked_best.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177280040,
+      "sha256": "713370dc6c4cc4540da3c86691f0ea0e236c0f446caf51b7eedd8325c892290f"
+    },
+    {
+      "repo": "pduncan/YuE2_Deathmetalv1_lora",
+      "revision": "24853e7a81c5f59bf076fd1d4cfe7b72f30f9c60",
+      "file": "deathmetalv1_step-000600.safetensors",
+      "destination": "loras/YuE2_Deathmetalv1_lora/deathmetalv1_step-000600.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 278968264,
+      "sha256": "75f88947f5d734abf0c6291cd91cb948370192ba98cc585e8b8b3635f479166d"
+    },
+    {
+      "repo": "akbargherbal/arabic-instrumental-yue2-lora",
+      "revision": "03b5bd32755c36dcf2aed5a3bf5ed3932d412c05",
+      "file": "arabic-instrumental-ar.safetensors",
+      "destination": "loras/arabic-instrumental-yue2-lora/arabic-instrumental-ar.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 69771144,
+      "sha256": "69517eea8bbc9fec2ace47c271f1bde7058881e89eabe9f9c0b10cb91ae97edb"
+    },
+    {
+      "repo": "akbargherbal/arabic-instrumental-yue2-lora",
+      "revision": "03b5bd32755c36dcf2aed5a3bf5ed3932d412c05",
+      "file": "arabic-instrumental-nar.safetensors",
+      "destination": "loras/arabic-instrumental-yue2-lora/arabic-instrumental-nar.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 69772712,
+      "sha256": "f84fdd4e9332c8be27e2d716fec9048f3d8ea3835c5e7582d6689322b6e0ea2f"
+    },
+    {
+      "repo": "akbargherbal/arabmaqamrock-blend-yue2-lora",
+      "revision": "3319eec07081081eeeaeab40ee24daa5e4daa1d3",
+      "file": "a0.1/v3instr_a0.1_ar.safetensors",
+      "destination": "loras/arabmaqamrock-blend-yue2-lora/a0.1/v3instr_a0.1_ar.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 139501720,
+      "sha256": "d48109b3117bf7851390ac9d4de86a45c5edd99cc5d17ddb97481e5c77ef64a0"
+    },
+    {
+      "repo": "akbargherbal/arabmaqamrock-blend-yue2-lora",
+      "revision": "3319eec07081081eeeaeab40ee24daa5e4daa1d3",
+      "file": "a0.1/v3instr_a0.1_nar.safetensors",
+      "destination": "loras/arabmaqamrock-blend-yue2-lora/a0.1/v3instr_a0.1_nar.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 139503288,
+      "sha256": "88f00bcb1b60cb7638eff07d7f1a7ff1d19705e987a138bf82e0c36e84ea5b58"
+    },
+    {
+      "repo": "akbargherbal/arabmaqamrock-blend-yue2-lora",
+      "revision": "3319eec07081081eeeaeab40ee24daa5e4daa1d3",
+      "file": "a0.15/v3instr_a0.15_ar.safetensors",
+      "destination": "loras/arabmaqamrock-blend-yue2-lora/a0.15/v3instr_a0.15_ar.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 139501760,
+      "sha256": "fef2104e13560700e118af92b7be139f7711df59e2a68ddde4691a0e5a5fecc3"
+    },
+    {
+      "repo": "akbargherbal/arabmaqamrock-blend-yue2-lora",
+      "revision": "3319eec07081081eeeaeab40ee24daa5e4daa1d3",
+      "file": "a0.15/v3instr_a0.15_nar.safetensors",
+      "destination": "loras/arabmaqamrock-blend-yue2-lora/a0.15/v3instr_a0.15_nar.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 139503328,
+      "sha256": "e1696863534e330b290ad92fbe16d904b69b8e5eebf208b9ba738778447a1fb7"
+    },
+    {
+      "repo": "akbargherbal/arabmaqamrock-blend-yue2-lora",
+      "revision": "3319eec07081081eeeaeab40ee24daa5e4daa1d3",
+      "file": "a0.2/v3instr_a0.2_ar.safetensors",
+      "destination": "loras/arabmaqamrock-blend-yue2-lora/a0.2/v3instr_a0.2_ar.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 139501720,
+      "sha256": "820f1ce90ab64965606a5a57451b2dcf255072ab4b9c7be182bc14b80bd86dd6"
+    },
+    {
+      "repo": "akbargherbal/arabmaqamrock-blend-yue2-lora",
+      "revision": "3319eec07081081eeeaeab40ee24daa5e4daa1d3",
+      "file": "a0.2/v3instr_a0.2_nar.safetensors",
+      "destination": "loras/arabmaqamrock-blend-yue2-lora/a0.2/v3instr_a0.2_nar.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 139503288,
+      "sha256": "f9738e214361c02428f6baa01327ba42ce1208236d33868fd6c3d3a7b584225f"
+    },
+    {
+      "repo": "akbargherbal/arabmaqamrock-yue2-lora",
+      "revision": "4199af7af27c5dc8941a547e490ed8c4b6491539",
+      "file": "arabmaqamrock-v3-ar.safetensors",
+      "destination": "loras/arabmaqamrock-yue2-lora/arabmaqamrock-v3-ar.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 69771144,
+      "sha256": "3531bb9106d2292eefe58eabe11ec08bb7dddc69554f2b016dc9f13f711fab18"
+    },
+    {
+      "repo": "akbargherbal/arabmaqamrock-yue2-lora",
+      "revision": "4199af7af27c5dc8941a547e490ed8c4b6491539",
+      "file": "arabmaqamrock-v3-nar.safetensors",
+      "destination": "loras/arabmaqamrock-yue2-lora/arabmaqamrock-v3-nar.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 69772712,
+      "sha256": "a7eabcadb22146048bcb5e65d04828ee9454559523ca161bd38c06060deb0cae"
+    },
+    {
+      "repo": "lym00/comfyui_yue2_lora",
+      "revision": "bfee854c27033489aa63f07907775a0b927a14e3",
+      "file": "anita_mui/anita_mui 300 ComfyUI.safetensors",
+      "destination": "loras/comfyui_yue2_lora/anita_mui/anita_mui 300 ComfyUI.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 1879111176,
+      "sha256": "ebb38bce08cd9ac9550855e5f5ee87815526559d75a471602ec56d08f06965a9"
+    },
+    {
+      "repo": "lym00/comfyui_yue2_lora",
+      "revision": "bfee854c27033489aa63f07907775a0b927a14e3",
+      "file": "leslie_cheung/leslie_cheung 280 ComfyUI.safetensors",
+      "destination": "loras/comfyui_yue2_lora/leslie_cheung/leslie_cheung 280 ComfyUI.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 1879111184,
+      "sha256": "b5195126aa6b080b9d0ca1bc3535dbd1f9a4f81ce0e92abb2231258e203d284a"
+    },
+    {
+      "repo": "lym00/comfyui_yue2_lora",
+      "revision": "bfee854c27033489aa63f07907775a0b927a14e3",
+      "file": "teresa_teng/teresa_teng 280 ComfyUI.safetensors",
+      "destination": "loras/comfyui_yue2_lora/teresa_teng/teresa_teng 280 ComfyUI.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 1879111184,
+      "sha256": "d956e3fb53a64f794b656e9cf349165de374bcc6764c05f578204d44c2e9ac82"
+    },
+    {
+      "repo": "TheMindExpansionNetwork/earthdrone_yue2_v1",
+      "revision": "0f4c3a46259c0303e3d5d1606c86011979cf196e",
+      "file": "earthdrone_yue2_v1.safetensors",
+      "destination": "loras/earthdrone_yue2_v1/earthdrone_yue2_v1.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500880,
+      "sha256": "ee7e4787c1d17a8679fcca272d65d2657bd59b8cc232aadb327fd5f22a042b03"
+    },
+    {
+      "repo": "akbargherbal/quran-pronunciation-yue2-lora",
+      "revision": "2face640df1d5f46a6f0924e7c08d10b3db6c1f7",
+      "file": "quran-pronunciation-ar.safetensors",
+      "destination": "loras/quran-pronunciation-yue2-lora/quran-pronunciation-ar.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 69771128,
+      "sha256": "c9305c35798c5453a54419fd54c8a74543e9f40d8c95481e02a7af647269ce28"
+    },
+    {
+      "repo": "akbargherbal/quran-pronunciation-yue2-lora",
+      "revision": "2face640df1d5f46a6f0924e7c08d10b3db6c1f7",
+      "file": "quran-pronunciation-nar.safetensors",
+      "destination": "loras/quran-pronunciation-yue2-lora/quran-pronunciation-nar.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 69772704,
+      "sha256": "2097fd6eb9ec8728f34441e16758c71cec7df2d79ef1a449e1eba95f79408159"
+    },
+    {
+      "repo": "HaileyStorm/sv-billie-yue2-lora",
+      "revision": "94fe9fbf5dfd3e97eefeb3ef54e2801eb3b69077",
+      "file": "sv_billie.safetensors",
+      "destination": "loras/sv-billie-yue2-lora/sv_billie.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500888,
+      "sha256": "e461611cd0e9d424b1dcb163b7460ba133681e6d55d3d0156a59039615c6235f"
+    },
+    {
+      "repo": "atomtanstudio/lora-library",
+      "revision": "af2250ed6d4ba6fe3a70e12ce8500afee92fa2ff",
+      "file": "yue2/dreampop/dreampop_sv_dreampop.safetensors",
+      "destination": "loras/sv-dreampop/dreampop_sv_dreampop.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 234969024,
+      "sha256": "617852d379c66b0407879421a353233d29cda8188cca82973a94c61b512ca03d"
+    },
+    {
+      "repo": "atomtanstudio/lora-library",
+      "revision": "af2250ed6d4ba6fe3a70e12ce8500afee92fa2ff",
+      "file": "yue2/industrial/sv_industrial_step500.safetensors",
+      "destination": "loras/sv-industrial/sv_industrial_step500.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 258066232,
+      "sha256": "18459e0de71f7e1686c8d1b0a1e7d0348a26549c770032ca65d99efcb36bda0a"
+    },
+    {
+      "repo": "atomtanstudio/lora-library",
+      "revision": "af2250ed6d4ba6fe3a70e12ce8500afee92fa2ff",
+      "file": "yue2/oldschoolhiphop/sv_oldschoolhiphop.safetensors",
+      "destination": "loras/sv-oldschoolhiphop/sv_oldschoolhiphop.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 234969032,
+      "sha256": "ca176909d55998d4f78426439885ff79cc96ba4daaaaea22a9936590d6e72694"
+    },
+    {
+      "repo": "jamespetts/yue2-1980s-eurodisco-lora",
+      "revision": "cf5b6ba39f1aaf1b5855d0cace2547c4d216fcb1",
+      "file": "yue2_1980s_eurodisco_comfy-fused.safetensors",
+      "destination": "loras/yue2-1980s-eurodisco-lora/yue2_1980s_eurodisco_comfy-fused.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 106474864,
+      "sha256": "a55e21a04fdeab0d9d737ff4b83786746432a1f4bb48f4db45af679fde4d0cf8"
+    },
+    {
+      "repo": "jamespetts/yue2-1980s-italo-disco-lora",
+      "revision": "98e3d2d77b3d7f32b696248f5b8e566560772911",
+      "file": "yue2_1980s_italo_disco_engine_unfused.safetensors",
+      "destination": "loras/yue2-1980s-italo-disco-lora/yue2_1980s_italo_disco_engine_unfused.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 69772302,
+      "sha256": "d9eb8b18f0a57dc40749cacfd261be57b7df5a6d58de18c1c4e417e29715ffc3"
+    },
+    {
+      "repo": "jamespetts/yue2-1980s-two-tone-ska-lora",
+      "revision": "86d5089a0e08820354a4f5eb1b37730904130339",
+      "file": "yue2_1980s_two_tone_ska_unfused.safetensors",
+      "destination": "loras/yue2-1980s-two-tone-ska-lora/yue2_1980s_two_tone_ska_unfused.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 69772303,
+      "sha256": "65a8f7a75db38c97b20a06a40e972407b166bd4a25a1d4d3525b103e17f7da04"
+    },
+    {
+      "repo": "becausereasons/yue2-blgr-bulgarian-voices",
+      "revision": "de8ab624782e4f936383a499aca5aa38f8f719c4",
+      "file": "blgr_kargyraa.safetensors",
+      "destination": "loras/yue2-blgr-bulgarian-voices/blgr_kargyraa.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279864,
+      "sha256": "5f5e0274fa0233c7f97fc1408d67184d0dafa621508767d02c2c65f74b7e0642"
+    },
+    {
+      "repo": "becausereasons/yue2-blgr-bulgarian-voices",
+      "revision": "de8ab624782e4f936383a499aca5aa38f8f719c4",
+      "file": "blgr_rhodope.safetensors",
+      "destination": "loras/yue2-blgr-bulgarian-voices/blgr_rhodope.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279960,
+      "sha256": "e6c216c5ee55683e1d75bd4f9fa6b92c67dc5960dc52706fa98f3eeab192656d"
+    },
+    {
+      "repo": "becausereasons/yue2-blgr-bulgarian-voices",
+      "revision": "de8ab624782e4f936383a499aca5aa38f8f719c4",
+      "file": "blgr_steppe.safetensors",
+      "destination": "loras/yue2-blgr-bulgarian-voices/blgr_steppe.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279864,
+      "sha256": "adfd9dabaeb5f9cfd61f98e6dfe1a4f908e79e276fd40587c355d8634497f77d"
+    },
+    {
+      "repo": "becausereasons/yue2-chnsn-chanson-francaise",
+      "revision": "e34acbcb1a14e818855093ea0dede46bf3cb1bd6",
+      "file": "chnsn_cabaret.safetensors",
+      "destination": "loras/yue2-chnsn-chanson-francaise/chnsn_cabaret.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "0230ff0ba9f75fcf1586b36a8dcfe67f526703c193d9a63cf1c3f5de9c7f896e"
+    },
+    {
+      "repo": "becausereasons/yue2-chnsn-chanson-francaise",
+      "revision": "e34acbcb1a14e818855093ea0dede46bf3cb1bd6",
+      "file": "chnsn_grand_boulevard.safetensors",
+      "destination": "loras/yue2-chnsn-chanson-francaise/chnsn_grand_boulevard.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279864,
+      "sha256": "42527d1f61d26693905316f4392e93a2a404906309a37b884c124e38190ae101"
+    },
+    {
+      "repo": "becausereasons/yue2-chnsn-chanson-francaise",
+      "revision": "e34acbcb1a14e818855093ea0dede46bf3cb1bd6",
+      "file": "chnsn_montmartre.safetensors",
+      "destination": "loras/yue2-chnsn-chanson-francaise/chnsn_montmartre.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "bcbf1b5aebe2947b1677f87265f0d422adf868745bec12462e39ed9897c9dc65"
+    },
+    {
+      "repo": "becausereasons/yue2-chnsn-chanson-francaise",
+      "revision": "e34acbcb1a14e818855093ea0dede46bf3cb1bd6",
+      "file": "chnsn_rive_gauche.safetensors",
+      "destination": "loras/yue2-chnsn-chanson-francaise/chnsn_rive_gauche.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279864,
+      "sha256": "8421a25b6650febf8e6b7418b1830dc27d79fab57605962f2c6890be98c42ef6"
+    },
+    {
+      "repo": "becausereasons/yue2-cnzn-canzone-italiana",
+      "revision": "89508af770d21ea26215603fdd777f182ba4ecee",
+      "file": "cnzn_coro.safetensors",
+      "destination": "loras/yue2-cnzn-canzone-italiana/cnzn_coro.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "c0708785f63a7f6d582d172120aa64e8085a3f578ac5b722cb36a2c2b1e347ed"
+    },
+    {
+      "repo": "becausereasons/yue2-cnzn-canzone-italiana",
+      "revision": "89508af770d21ea26215603fdd777f182ba4ecee",
+      "file": "cnzn_notte.safetensors",
+      "destination": "loras/yue2-cnzn-canzone-italiana/cnzn_notte.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "93b87d31bbce1dfb4e83be9d1f55e155b71f3572e640eda5351e7a34f0f32527"
+    },
+    {
+      "repo": "becausereasons/yue2-cnzn-canzone-italiana",
+      "revision": "89508af770d21ea26215603fdd777f182ba4ecee",
+      "file": "cnzn_sanremo.safetensors",
+      "destination": "loras/yue2-cnzn-canzone-italiana/cnzn_sanremo.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279960,
+      "sha256": "8a0322971cfe484414d01f0765092f2454384a18cfa4167824832346451cade0"
+    },
+    {
+      "repo": "becausereasons/yue2-cnzn-canzone-italiana",
+      "revision": "89508af770d21ea26215603fdd777f182ba4ecee",
+      "file": "cnzn_sussurro.safetensors",
+      "destination": "loras/yue2-cnzn-canzone-italiana/cnzn_sussurro.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "2ec3fc4eab4413623c600015ba3f5b7ce59f5604668344912cd2eb495b0bbd63"
+    },
+    {
+      "repo": "becausereasons/yue2-cnzn-canzone-italiana",
+      "revision": "89508af770d21ea26215603fdd777f182ba4ecee",
+      "file": "cnzn_teatro.safetensors",
+      "destination": "loras/yue2-cnzn-canzone-italiana/cnzn_teatro.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "6faef04d10c20a28b311815421e12676b3abfa5c650bfbd1fff1a0c01d48f31d"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/acoustic-folk_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/acoustic-folk_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "b51c0f8a80d1001e19a2650e3184ed188c3aac97c1e2cd9cb3ec5ed03a6efef0"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/afrobeats_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/afrobeats_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "7b0be8a08aa9bb63579d3daf6f23f08f36084282c1e143be7aa2184088a86982"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/country_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/country_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "c41c13e09e0daf764808be8cdbe6970b3bce359c11460584ccb09b4d502aee2a"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/disco-funk_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/disco-funk_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "89149145bc3f69518a7b9de63672083f994786c9af66822ef11d7b521f82cb27"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/female_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/female_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "a760f6535b9be6412aec12e8ebd30c45c7886ecb01007dc900c944d57cce4a53"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/hiphop_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/hiphop_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "544481919541a7f97fa581911a71fdeace03a55ddd15172a58a60ec60b963cad"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/house_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/house_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "6149fcde75b7f959c323ebd90f760dc7994183aef1a9345482fddf530c06737a"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/indie-rock_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/indie-rock_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "bf97b12ae89317343b1498f0bb066dbf01aa547381d60b6cf9b163db05f1b5d9"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/kpop_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/kpop_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "eca99b3b12bf94e1a605122a99c42bb3123c0d32bdb93758ee9967d20fc7458c"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/lofi_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/lofi_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "14474d0273924c7abe3b3b2caae794ae9052cff9a392985ff9540f0829067db4"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/male_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/male_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "125a5e3adad5e1c541ad47bd377f1e7ff4edffc02f7552895dd6eb86dda7b5c1"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/metal_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/metal_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "8ae844629dcaf4fd55f13ed123f24ace69fa28951382e7652e169a6c9b7a4d5b"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/pop-punk_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/pop-punk_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "bb8d8e4146f872c74ade1e6982946f84be1538a618a922ff9eb9674539ec34c3"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/pop_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/pop_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "bc6642b68882fbc0f73df4a0e89a51c1ebe144bc1ded5b877b5dd157ffa48cd2"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/reggaeton_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/reggaeton_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "297623d8a2546749bfa7190acc5de7bfdb02135358156558cd7a8506f1a905ff"
+    },
+    {
+      "repo": "ntc-ai/yue2-particle-sliders",
+      "revision": "31649319eee53e6da999cc4aff3e081d213f7911",
+      "file": "distilled-rank8-v2/comfyui/rnb_v2_distilled_rank8_comfyui.safetensors",
+      "destination": "loras/yue2-distilled-sliders-v2/rnb_v2_distilled_rank8_comfyui.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 10113448,
+      "sha256": "faa89944f0d3c9a7e17f62374e29ee76d1d82f5283674060d11a811eaf9f632d"
+    },
+    {
+      "repo": "becausereasons/yue2-grvl-raspy-rock-soul",
+      "revision": "4fec3b8491bf217d9320b509c3933d5963dae5a3",
+      "file": "grvl_cinder.safetensors",
+      "destination": "loras/yue2-grvl-raspy-rock-soul/grvl_cinder.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500800,
+      "sha256": "2017b5b36c9d4232de3b017e6b007ef5120964e7543056a7b93fd622118888ad"
+    },
+    {
+      "repo": "becausereasons/yue2-grvl-raspy-rock-soul",
+      "revision": "4fec3b8491bf217d9320b509c3933d5963dae5a3",
+      "file": "grvl_ember.safetensors",
+      "destination": "loras/yue2-grvl-raspy-rock-soul/grvl_ember.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500800,
+      "sha256": "97449c739f7f503e19621ad83d8c85e8ef501a76a19dbc93b1b62bae32f54809"
+    },
+    {
+      "repo": "becausereasons/yue2-grvl-raspy-rock-soul",
+      "revision": "4fec3b8491bf217d9320b509c3933d5963dae5a3",
+      "file": "grvl_smoulder.safetensors",
+      "destination": "loras/yue2-grvl-raspy-rock-soul/grvl_smoulder.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "7edcb87dd497f0adf4d5a501efadfac89a20606199ffa19825441254d12e25a1"
+    },
+    {
+      "repo": "becausereasons/yue2-grvl-raspy-rock-soul",
+      "revision": "4fec3b8491bf217d9320b509c3933d5963dae5a3",
+      "file": "grvl_tempest.safetensors",
+      "destination": "loras/yue2-grvl-raspy-rock-soul/grvl_tempest.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "3aaf5ffbe06aa54bc431b6f60e59f157d410b63bba544601c9a0324681c9cc18"
+    },
+    {
+      "repo": "becausereasons/yue2-grvl-raspy-rock-soul",
+      "revision": "4fec3b8491bf217d9320b509c3933d5963dae5a3",
+      "file": "grvl_thunder.safetensors",
+      "destination": "loras/yue2-grvl-raspy-rock-soul/grvl_thunder.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "553f2f159600e5af193bf1f26e84939227c6ec1467a2cfb972919503c6401d53"
+    },
+    {
+      "repo": "becausereasons/yue2-grvl-raspy-rock-soul",
+      "revision": "4fec3b8491bf217d9320b509c3933d5963dae5a3",
+      "file": "grvl_wildfire.safetensors",
+      "destination": "loras/yue2-grvl-raspy-rock-soul/grvl_wildfire.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "c25ac35a717f92cceb8553fbefe0867bc589415042e885cbf864bd3169ebeb9b"
+    },
+    {
+      "repo": "monsterovich/yue2-industrial-rock-lora",
+      "revision": "a71706d59e2874f1e6db9aa10e8da5cc19e6c924",
+      "file": "adapter-ar-179/lora.safetensors",
+      "destination": "loras/yue2-industrial-rock-lora/adapter-ar-179/lora.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 34907280,
+      "sha256": "c98da92bbec50680c545c26865bb3e51e5e3a39a6ca3324789e28aed05fdf444"
+    },
+    {
+      "repo": "monsterovich/yue2-industrial-rock-lora",
+      "revision": "a71706d59e2874f1e6db9aa10e8da5cc19e6c924",
+      "file": "adapter-nar-179-v2/lora.safetensors",
+      "destination": "loras/yue2-industrial-rock-lora/adapter-nar-179-v2/lora.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 140046120,
+      "sha256": "4d99376ebe8f7ec5a83b89d121910cf3b405c1110919add9dd7f6b84cf5bf3de"
+    },
+    {
+      "repo": "storagejuju/yue2-jpop-t4-lora",
+      "revision": "16c181c15cf7d06b1b570a149624b1e78724baa6",
+      "file": "yue2_jpop_t4.safetensors",
+      "destination": "loras/yue2-jpop-t4-lora/yue2_jpop_t4.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 106474864,
+      "sha256": "8cdbe15cf1968ff586d734a8ce4f8e7c823f8a8005fe1466c5aa9f442d257d57"
+    },
+    {
+      "repo": "monsterovich/yue2-keygen-music-lora",
+      "revision": "c1ff6ec5b3907673ece0d245725addce340082ed",
+      "file": "adapter-ar/lora.safetensors",
+      "destination": "loras/yue2-keygen-music-lora/adapter-ar/lora.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 69772944,
+      "sha256": "3837637a60d64f132e8a0d6cc8b3097bc76185ba88863f939b62ffae64f3b74c"
+    },
+    {
+      "repo": "monsterovich/yue2-keygen-music-lora",
+      "revision": "c1ff6ec5b3907673ece0d245725addce340082ed",
+      "file": "adapter-nar/lora.safetensors",
+      "destination": "loras/yue2-keygen-music-lora/adapter-nar/lora.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 140046120,
+      "sha256": "f098965f5a9c91daa77ff5980d770c658bc4a85360a42b437b42a87f4dc6817b"
+    },
+    {
+      "repo": "polinom100/yue2-lorn-lora",
+      "revision": "2d54357eb8ea4ef829f777843d298b6b0183a147",
+      "file": "yue2_lorn_v1.safetensors",
+      "destination": "loras/yue2-lorn-lora/yue2_lorn_v1.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500864,
+      "sha256": "79b6d41d1a1dca948cccf98c34150cf2a446dc9d0f3f68f8b61ee427169dea65"
+    },
+    {
+      "repo": "becausereasons/yue2-mltnt-militant-reggae",
+      "revision": "a9fedc857cd1f3952be3177326c76526abcea53a",
+      "file": "mltnt_chanter.safetensors",
+      "destination": "loras/yue2-mltnt-militant-reggae/mltnt_chanter.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500816,
+      "sha256": "4aaaa42f7c61b4a3226880dd1e6f1a36bd585171d26a45358c3dba3c9d56b20c"
+    },
+    {
+      "repo": "becausereasons/yue2-mltnt-militant-reggae",
+      "revision": "a9fedc857cd1f3952be3177326c76526abcea53a",
+      "file": "mltnt_frontline.safetensors",
+      "destination": "loras/yue2-mltnt-militant-reggae/mltnt_frontline.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279880,
+      "sha256": "9c8960158db6340156cc1b44fbec1ff58d0bfabfc96e933ee5a1d14b0bc26574"
+    },
+    {
+      "repo": "becausereasons/yue2-mltnt-militant-reggae",
+      "revision": "a9fedc857cd1f3952be3177326c76526abcea53a",
+      "file": "mltnt_fusion.safetensors",
+      "destination": "loras/yue2-mltnt-militant-reggae/mltnt_fusion.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279784,
+      "sha256": "e9525b892ce625ac7491a13c21b39b7623ef132884996a87eb341370f459aa7b"
+    },
+    {
+      "repo": "becausereasons/yue2-mltnt-militant-reggae",
+      "revision": "a9fedc857cd1f3952be3177326c76526abcea53a",
+      "file": "mltnt_roots.safetensors",
+      "destination": "loras/yue2-mltnt-militant-reggae/mltnt_roots.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279888,
+      "sha256": "e829f3af1534614bc28f85e821115d48888edf35aead317e9b5cdf179a79f5f3"
+    },
+    {
+      "repo": "becausereasons/yue2-mltnt-militant-reggae",
+      "revision": "a9fedc857cd1f3952be3177326c76526abcea53a",
+      "file": "mltnt_soundclash.safetensors",
+      "destination": "loras/yue2-mltnt-militant-reggae/mltnt_soundclash.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500816,
+      "sha256": "fa43a4ddb7af26fb0e7821c1ad3386fc90db84897efd00571e0c7f27cf790537"
+    },
+    {
+      "repo": "becausereasons/yue2-mltnt-militant-reggae",
+      "revision": "a9fedc857cd1f3952be3177326c76526abcea53a",
+      "file": "mltnt_steppers.safetensors",
+      "destination": "loras/yue2-mltnt-militant-reggae/mltnt_steppers.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279888,
+      "sha256": "63094f0bbf8dd1e1fb2654a94aaba77e7360b0bef08d2254ef4a972ea8dce10e"
+    },
+    {
+      "repo": "Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4",
+      "revision": "e2e63d859f3af879baf1b4d4e9f22d1eeda6fde5",
+      "file": "nar_lora_joint_v4.bf16.safetensors",
+      "destination": "loras/yue2-mothersuperior-realaudio-tokenizer-v4/nar_lora_joint_v4.bf16.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 70301856,
+      "sha256": "e67ca682f1070d2abb45cf9ac90d542fe4ce5286b87aed97f02d9a4acd6b6f36"
+    },
+    {
+      "repo": "Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4",
+      "revision": "e2e63d859f3af879baf1b4d4e9f22d1eeda6fde5",
+      "file": "nar_lora_joint_v9.bf16.safetensors",
+      "destination": "loras/yue2-mothersuperior-realaudio-tokenizer-v4/nar_lora_joint_v9.bf16.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 70301896,
+      "sha256": "ce57f98e9e0e65c724c2a00aa23dea2568952590504a428c588d82f00bc61c55"
+    },
+    {
+      "repo": "becausereasons/yue2-qtstrm-quiet-storm",
+      "revision": "7f8ac94880f5942e358956eb270cb925638685da",
+      "file": "qtstrm_afterhours.safetensors",
+      "destination": "loras/yue2-qtstrm-quiet-storm/qtstrm_afterhours.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500816,
+      "sha256": "af83a162212b2785b563ba3e7daec747520ac0e354ee46c810534a6a2c78e670"
+    },
+    {
+      "repo": "becausereasons/yue2-qtstrm-quiet-storm",
+      "revision": "7f8ac94880f5942e358956eb270cb925638685da",
+      "file": "qtstrm_candlelight.safetensors",
+      "destination": "loras/yue2-qtstrm-quiet-storm/qtstrm_candlelight.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500816,
+      "sha256": "52a22def062bb3e6a04e4c7d7873c5b8ab989babbcab7d4776e929208a16b746"
+    },
+    {
+      "repo": "becausereasons/yue2-qtstrm-quiet-storm",
+      "revision": "7f8ac94880f5942e358956eb270cb925638685da",
+      "file": "qtstrm_midnight.safetensors",
+      "destination": "loras/yue2-qtstrm-quiet-storm/qtstrm_midnight.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "67a48492d87949acb3e7abd70021d738e103587425173074e273669fc84f2156"
+    },
+    {
+      "repo": "becausereasons/yue2-qtstrm-quiet-storm",
+      "revision": "7f8ac94880f5942e358956eb270cb925638685da",
+      "file": "qtstrm_nocturne.safetensors",
+      "destination": "loras/yue2-qtstrm-quiet-storm/qtstrm_nocturne.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "368a901367a453a4c30b74b3d6cf8cbc4b9521d75c1ff7f91b12a0ed32b06c3f"
+    },
+    {
+      "repo": "becausereasons/yue2-qtstrm-quiet-storm",
+      "revision": "7f8ac94880f5942e358956eb270cb925638685da",
+      "file": "qtstrm_velvet.safetensors",
+      "destination": "loras/yue2-qtstrm-quiet-storm/qtstrm_velvet.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500808,
+      "sha256": "5927d888c40c6354c6be272ed5ce86578fa0cbcc14fcb427c538e1d0c10c62d7"
+    },
+    {
+      "repo": "becausereasons/yue2-qwwl-qawwali-sufi-tabla",
+      "revision": "2f91d3ebff149b3661535c823e978d815097ca84",
+      "file": "drksf_midnight.safetensors",
+      "destination": "loras/yue2-qwwl-qawwali-sufi-tabla/drksf_midnight.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279760,
+      "sha256": "924076bc78c0ef29d6705341e82c4d292bf557dcc9743045b4fca9bb77e7f580"
+    },
+    {
+      "repo": "becausereasons/yue2-qwwl-qawwali-sufi-tabla",
+      "revision": "2f91d3ebff149b3661535c823e978d815097ca84",
+      "file": "qwwl_mehfil.safetensors",
+      "destination": "loras/yue2-qwwl-qawwali-sufi-tabla/qwwl_mehfil.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279760,
+      "sha256": "28132e4b545b3c57a831179553e509408fa11d6eed96811c50f0d2629ddceb2e"
+    },
+    {
+      "repo": "monsterovich/yue2-steps-from-hell",
+      "revision": "87c24692d3cccb67744d5b6cfcddb27c74feba23",
+      "file": "adapter-ar-195/lora.safetensors",
+      "destination": "loras/yue2-steps-from-hell/adapter-ar-195/lora.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 34907280,
+      "sha256": "857a1639439439af1c3c8d80f7b7891752bc40ae24cdeb0aab22d2a96dc2c3dd"
+    },
+    {
+      "repo": "monsterovich/yue2-steps-from-hell",
+      "revision": "87c24692d3cccb67744d5b6cfcddb27c74feba23",
+      "file": "adapter-nar-194/lora.safetensors",
+      "destination": "loras/yue2-steps-from-hell/adapter-nar-194/lora.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 140046120,
+      "sha256": "6fa064fc710ae057ea693fca3d1bfccc59e8903044582842af0c0197dcbdaa2d"
+    },
+    {
+      "repo": "becausereasons/yue2-trbdr-folk-troubadour",
+      "revision": "078b19e52baebaa71463ea94afac5ce13abfe29a",
+      "file": "trbdr_broadside.safetensors",
+      "destination": "loras/yue2-trbdr-folk-troubadour/trbdr_broadside.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500816,
+      "sha256": "68e3aca03e7aa7ddf8a2ee5cf46ce68c2c18fc9fe432cc60b838b9f0e9b8171f"
+    },
+    {
+      "repo": "becausereasons/yue2-trbdr-folk-troubadour",
+      "revision": "078b19e52baebaa71463ea94afac5ce13abfe29a",
+      "file": "trbdr_ferryman.safetensors",
+      "destination": "loras/yue2-trbdr-folk-troubadour/trbdr_ferryman.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279760,
+      "sha256": "1cf63a5ea51b8cb5dca91170b4a05b522cdd6f7ef06c0b867ef8dd67a4d7f86c"
+    },
+    {
+      "repo": "becausereasons/yue2-trbdr-folk-troubadour",
+      "revision": "078b19e52baebaa71463ea94afac5ce13abfe29a",
+      "file": "trbdr_hearth.safetensors",
+      "destination": "loras/yue2-trbdr-folk-troubadour/trbdr_hearth.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500816,
+      "sha256": "37ee350bc1f9dad847b349b64c0e8ab58db98dacdb9b67aeeadd94b95689af05"
+    },
+    {
+      "repo": "becausereasons/yue2-trbdr-folk-troubadour",
+      "revision": "078b19e52baebaa71463ea94afac5ce13abfe29a",
+      "file": "trbdr_lantern.safetensors",
+      "destination": "loras/yue2-trbdr-folk-troubadour/trbdr_lantern.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 117500816,
+      "sha256": "48af1d8f3aa2a77b887ec825f8c0ce1e4b73ec7fd8cae3b04f20148431874b69"
+    },
+    {
+      "repo": "becausereasons/yue2-trbdr-folk-troubadour",
+      "revision": "078b19e52baebaa71463ea94afac5ce13abfe29a",
+      "file": "trbdr_porch.safetensors",
+      "destination": "loras/yue2-trbdr-folk-troubadour/trbdr_porch.safetensors",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 177279760,
+      "sha256": "a6a9cdbb980ded2f05d08ccb23b35ef1ef949a1e8da900683816020eaeb41832"
+    },
+    {
+      "repo": "Behailut/Ethio-Music-YuE2",
+      "revision": "941d9d0da9a59dc6d2896f5b1aadddabec37d2ee",
+      "file": "adapter_config.json",
+      "destination": "loras/Ethio-Music-YuE2/adapter_config.json",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 1144,
+      "sha256": "e6babbd94b0f624e18a89328abd10361e4e1e7a6fb1b696390251f8bd165bf66"
+    },
+    {
+      "repo": "HaileyStorm/sv-billie-yue2-lora",
+      "revision": "94fe9fbf5dfd3e97eefeb3ef54e2801eb3b69077",
+      "file": "lora.json",
+      "destination": "loras/sv-billie-yue2-lora/lora.json",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 72,
+      "sha256": "3cdaf28237ac88d2293797d29f3b7a3ae99b5f479bcea2b474abb3a4809dc04a"
+    },
+    {
+      "repo": "atomtanstudio/lora-library",
+      "revision": "af2250ed6d4ba6fe3a70e12ce8500afee92fa2ff",
+      "file": "yue2/dreampop/lora.json",
+      "destination": "loras/sv-dreampop/lora.json",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 182,
+      "sha256": "b4e4242a9524cfb0688d99cb2f94bbcaefb29299068cdc11319a07c31f728797"
+    },
+    {
+      "repo": "atomtanstudio/lora-library",
+      "revision": "af2250ed6d4ba6fe3a70e12ce8500afee92fa2ff",
+      "file": "yue2/oldschoolhiphop/lora.json",
+      "destination": "loras/sv-oldschoolhiphop/lora.json",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 195,
+      "sha256": "56af47c6a6f8ed5b8cc06c0cbe80586a09975f5f32efbbb0ada16e6cd9c427f2"
+    },
+    {
+      "repo": "monsterovich/yue2-industrial-rock-lora",
+      "revision": "a71706d59e2874f1e6db9aa10e8da5cc19e6c924",
+      "file": "adapter-ar-179/adapter_config.json",
+      "destination": "loras/yue2-industrial-rock-lora/adapter-ar-179/adapter_config.json",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 267,
+      "sha256": "1096f98166746795b5dbb211778cd17bdc02f4a4767fa2996aff722e3244138d"
+    },
+    {
+      "repo": "monsterovich/yue2-industrial-rock-lora",
+      "revision": "a71706d59e2874f1e6db9aa10e8da5cc19e6c924",
+      "file": "adapter-nar-179-v2/adapter_config.json",
+      "destination": "loras/yue2-industrial-rock-lora/adapter-nar-179-v2/adapter_config.json",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 238,
+      "sha256": "b619b32978b659d475e4bcfb412e6fbe371f419faf388519f27f0437ba44655f"
+    },
+    {
+      "repo": "storagejuju/yue2-jpop-t4-lora",
+      "revision": "16c181c15cf7d06b1b570a149624b1e78724baa6",
+      "file": "training_config.json",
+      "destination": "loras/yue2-jpop-t4-lora/training_config.json",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 417,
+      "sha256": "91bccf7090c1fc1d91e162802e209f35ab7cb9de9186e0ec3e4aa8041547983b"
+    },
+    {
+      "repo": "monsterovich/yue2-keygen-music-lora",
+      "revision": "c1ff6ec5b3907673ece0d245725addce340082ed",
+      "file": "adapter-nar/adapter_config.json",
+      "destination": "loras/yue2-keygen-music-lora/adapter-nar/adapter_config.json",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 242,
+      "sha256": "4352df868aa249059ac7346396b30f66593a7d575263632d8ba692497ba4516f"
+    },
+    {
+      "repo": "monsterovich/yue2-keygen-music-lora",
+      "revision": "c1ff6ec5b3907673ece0d245725addce340082ed",
+      "file": "adapter-ar/adapter_config.json",
+      "destination": "loras/yue2-keygen-music-lora/adapter-ar/adapter_config.json",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 274,
+      "sha256": "cb598869923de3284879154eeff5585f6bb2d36f695d8d80fb7d25a443c73bd0"
+    },
+    {
+      "repo": "monsterovich/yue2-steps-from-hell",
+      "revision": "87c24692d3cccb67744d5b6cfcddb27c74feba23",
+      "file": "adapter-ar-195/adapter_config.json",
+      "destination": "loras/yue2-steps-from-hell/adapter-ar-195/adapter_config.json",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 270,
+      "sha256": "cbab21ccb14700cd047ce63d58b8a38b9c10f2061ce3cafbe44c6275d3382ac5"
+    },
+    {
+      "repo": "monsterovich/yue2-steps-from-hell",
+      "revision": "87c24692d3cccb67744d5b6cfcddb27c74feba23",
+      "file": "adapter-nar-194/adapter_config.json",
+      "destination": "loras/yue2-steps-from-hell/adapter-nar-194/adapter_config.json",
+      "groups": [
+        "loras"
+      ],
+      "bytes": 238,
+      "sha256": "971d46f9c853a20247f704c407c9c38bb69c6992931894643bf5691912f74d45"
+    }
+  ]
+}

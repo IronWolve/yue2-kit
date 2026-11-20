@@ -1,4 +1,14 @@
-# Install reference kit: changelog
+# Changelog
+
+## v13 · November 19, 2026
+
+- Update yue2.cpp and GGML while retaining the customized three-pane studio, local library, themes and per-half LoRA controls.
+- Fix a CUDA abort in acoustic attention by padding the keys and values before converting to F16.
+- Continue songs from takes or recordings. Use split SheetSage2/MERT and the audio tokenizer for recording workflows.
+- Repair incomplete score headers, retry invalid plans, cap acoustic chunks independently of the song context, and use smaller VAE tiles when a graph does not fit. Batch results can be played as they finish.
+- Offer 90 LoRAs, 16 native particle sliders, five VAEs, and optional Tsunami Wave BF16 backbones. Support fixed-strength Industrial companions and semantic-stage KTO.
+- Verify the two upstream patch trees independently and pin every downloadable asset by revision, size and SHA-256. Make the existing Apache 2.0 license and attribution visible in the kit.
+
 
 Kits v1 to v4 carry the same app: upstream yue2.cpp `f17d526` + 22 patches, tree
 `d48e6e2e4a4e9bff24f8f60c943eddd976358df1`. v5 is the first kit that changes the app itself.

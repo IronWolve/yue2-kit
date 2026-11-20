@@ -30,7 +30,7 @@ if [ -z "$QUANT" ] && [ -f "$ROOT/settings.json" ]; then
 fi
 if [ -z "$QUANT" ] || [ ! -f "$ROOT/models/YuE2-3B-$QUANT.gguf" ]; then
     wanted="$QUANT"; QUANT=""
-    for q in BF16 Q8_0 Q6_K Q5_K_M; do [ -f "$ROOT/models/YuE2-3B-$q.gguf" ] && { QUANT="$q"; break; }; done
+    for q in BF16 Q8_0 Q6_K Q5_K_M RS-TW-2.0x0.75-BF16 RS-TW-2.0x0.9-BF16; do [ -f "$ROOT/models/YuE2-3B-$q.gguf" ] && { QUANT="$q"; break; }; done
     [ -n "$wanted" ] && [ -n "$QUANT" ] && echo "${Y}no models/YuE2-3B-$wanted.gguf${X}: using $QUANT"
     [ -n "$QUANT" ] || QUANT="${wanted:-BF16}"      # nothing present: the check below names what is missing
 fi
@@ -39,8 +39,16 @@ MODEL="$ROOT/models/YuE2-3B-$QUANT.gguf"
 VAE="$ROOT/models/YuE2-Vae-F32.gguf"
 SLIDERS="$ROOT/sliders"
 OUTPUTS="$ROOT/outputs"
-TRANSCRIBER="$ROOT/models/SheetSage2-Q8_0.gguf"     # downloaded; convert-models.sh makes F32
-[ -f "$TRANSCRIBER" ] || TRANSCRIBER="$ROOT/models/SheetSage2-F32.gguf"
+# Current engine: separate transcription head and MERT encoder, kept beside each other.
+# Old combined files remain in models/ for the previous engine.
+AUX_MODELS="${YUE2CPP_AUX_MODELS:-$ROOT/models/engine-20261016}"
+TRANSCRIBER="$AUX_MODELS/SheetSage2-F32.gguf"
+TOKENIZER="$AUX_MODELS/yue2-mothersuperior-realaudio-tokenizer-v4-F32.gguf"
+MERT="$AUX_MODELS/MERT-v2-FullSong-F32.gguf"
+DEVICE="${YUE2CPP_DEVICE:-}"
+if [ -z "$DEVICE" ]; then
+    case "${GGML_BACKEND:-}" in CPU*) DEVICE=CPU ;; esac
+fi
 
 missing=0
 for f in "$BIN" "$MODEL" "$VAE"; do
@@ -54,15 +62,17 @@ if [ "$missing" = 1 ]; then
     exit 1
 fi
 
-size() { du -h "$1" 2>/dev/null | cut -f1 | tr -d ' '; }
+size() { du -hL "$1" 2>/dev/null | cut -f1 | tr -d ' '; }
 count() { wc -l | tr -d ' '; }          # macOS pads wc's number with spaces
 plural() { if [ "$1" = 1 ]; then printf '%s %s' "$1" "$2"; else printf '%s %ss' "$1" "$2"; fi; }   # plural 2 song -> 2 songs
 row() { printf '  %s%-12s%s %s\n' "$C" "$1" "$X" "$2"; }
 args=(--host 127.0.0.1 --port "$PORT" --model "$QUANT=$MODEL" --vae "standard=$VAE" --outputs "$OUTPUTS"
       --max-batch "$BATCH" --settings "$ROOT/settings.json")
+if [ -n "$DEVICE" ]; then args+=(--device "$DEVICE"); fi
+if [ -n "${YUE2CPP_NAR_CHUNK:-}" ]; then args+=(--nar-chunk "$YUE2CPP_NAR_CHUNK"); fi
 # every other backbone that is present can be picked in the page (Engine -> Model)
 models="${B}$QUANT${X} $(size "$MODEL") ${G}starts${X}"
-for q in BF16 Q8_0 Q6_K Q5_K_M; do
+for q in BF16 Q8_0 Q6_K Q5_K_M RS-TW-2.0x0.75-BF16 RS-TW-2.0x0.9-BF16; do
     if [ "$q" != "$QUANT" ] && [ -f "$ROOT/models/YuE2-3B-$q.gguf" ]; then
         args+=(--model "$q=$ROOT/models/YuE2-3B-$q.gguf")
         models="$models, ${B}$q${X} $(size "$ROOT/models/YuE2-3B-$q.gguf")"
@@ -73,6 +83,15 @@ for extra in legacy blend; do
     if [ -f "$ROOT/models/YuE2-Vae-$extra-F32.gguf" ]; then
         args+=(--vae "$extra=$ROOT/models/YuE2-Vae-$extra-F32.gguf")
         vaes="$vaes, ${B}$extra${X}"
+    fi
+done
+
+# Expanded decoders have their own F32 graph and automatically enforced 60-frame halo.
+for version in 1 2; do
+    extra="$ROOT/models/YuE2-VAE-RS-x3_v${version}-F32.gguf"
+    if [ -f "$extra" ]; then
+        args+=(--vae "rs-x3-v${version}=$extra")
+        vaes="$vaes, ${B}RS x3 v${version}${X}"
     fi
 done
 
@@ -93,7 +112,7 @@ EOF
 fi
 ON_GPU=1
 if [ "${CUDA_VISIBLE_DEVICES-all}" = "" ]; then ON_GPU=0; fi
-case "${GGML_BACKEND:-}" in CPU*) ON_GPU=0 ;; esac
+case "$DEVICE" in CPU*) ON_GPU=0 ;; esac
 FP16_MATMUL="${YUE2CPP_FP16_MATMUL:-auto}"
 why="forced by YUE2CPP_FP16_MATMUL=1"
 if [ "$FP16_MATMUL" = auto ]; then
@@ -136,11 +155,17 @@ else
 fi
 nsongs=$(find "$OUTPUTS" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | count)
 row library "${B}$nsongs${X} $([ "$nsongs" = 1 ] && echo song || echo songs) ${D}· $(du -sh "$OUTPUTS" 2>/dev/null | cut -f1 | tr -d ' ') in ${OUTPUTS#"$ROOT"/}/${X}"
-if [ -f "$TRANSCRIBER" ]; then
+if [ -f "$TRANSCRIBER" ] && [ -f "$MERT" ]; then
     args+=(--transcriber "$TRANSCRIBER")
     row transcriber "$(basename "$TRANSCRIBER") ${D}· $(size "$TRANSCRIBER") · covers from a recording${X}"
 else
     row transcriber "${Y}not downloaded${X} ${D}(covers from a recording are off)${X}"
+fi
+if [ -f "$TOKENIZER" ] && [ -f "$MERT" ]; then
+    args+=(--tokenizer "$TOKENIZER")
+    row tokenizer "audio to music codes ${D}· $(size "$TOKENIZER") · continue a recording${X}"
+else
+    row tokenizer "${Y}not available${X} ${D}(recording continuation is off)${X}"
 fi
 if [ -f "$ROOT/settings.json" ]; then
     engine=$(python3 -c '

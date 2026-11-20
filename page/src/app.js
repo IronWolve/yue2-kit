@@ -48,6 +48,7 @@
     sliderCatalog: [],
     maxBatch: 1,
     transcriber: false,
+    tokenizer: false,
     library: true,
     online: false,
     takes: [],          // the library, newest first (plus takes kept in this tab)
@@ -673,7 +674,7 @@
       notes.push(STATE.sliderChoice.length + " active; experimental, and stacking is untested by the authors.");
       if (currentCot() !== "off") notes.push("They were trained in Direct mode; here they steer the music, not the score.");
       if (on.female && on.male) notes.push("Female and Male together pull in opposite directions.");
-      if (STATE.codes) notes.push("Ignored while music codes are loaded: that music is already written.");
+      if (STATE.codes && !STATE.codes.continuation) notes.push("Ignored while music codes are loaded: that music is already written.");
     }
     $("sliderHint").textContent = notes.join(" ");
   }
@@ -731,7 +732,9 @@
     STATE.codes = codes;
     $("codesNote").classList.toggle("is-hidden", !codes);
     if (codes) {
-      $("codesNoteText").textContent = (codes.title ? "From \u201c" + codes.title + "\u201d. " : "") +
+      $("codesNoteText").textContent = codes.continuation
+        ? "Continue " + (codes.title || "the source") + " from " + codes.start + "s to " + (codes.end < 0 ? "its end" : codes.end + "s") + ". Generate keeps this section and writes more music. Edit the style and lyrics as needed."
+        : (codes.title ? "From \u201c" + codes.title + "\u201d. " : "") +
         "Generate renders that same music (" + clock(codes.frames / FRAME_RATE) + ") again; the VAE, the sound seed " +
         "and the sound settings decide how it sounds. Versions and sliders do not apply.";
     }
@@ -912,10 +915,19 @@
     var out = readOutput();
     Object.keys(out).forEach(function (key) { body[key] = out[key]; });
     if (plan) {
+      if (STATE.codes && STATE.codes.continuation) throw new Error("Drop the continuation source before making a score-only plan");
       body.plan_only = true;
     } else if (STATE.codes) {
-      body.semantic_tokens = STATE.codes.tokens;
-      if (STATE.codes.from) body.parent = STATE.codes.from;
+      if (STATE.codes.continuation) {
+        body.source_tokens = STATE.codes.tokens;
+        body.source_start = STATE.codes.start;
+        body.source_end = STATE.codes.end;
+        body.cot = "off";
+        delete body.abc;
+      } else {
+        body.semantic_tokens = STATE.codes.tokens;
+        if (STATE.codes.from) body.parent = STATE.codes.from;
+      }
     }
     return body;
   }
@@ -925,7 +937,7 @@
     var note;
     if (!STATE.online) note = "The server is not answering; runs cannot start.";
     else if (live.length) note = "A run is in progress; the next song is queued behind it.";
-    else if (STATE.codes) note = "Codes loaded: Generate renders that music again, in seconds.";
+    else if (STATE.codes) note = STATE.codes.continuation ? "Generate continues the selected source section." : "Codes loaded: Generate renders that music again, in seconds.";
     else note = "";   // nothing to say: the bar stays clean
     $("submitNote").textContent = note;
   }
@@ -995,7 +1007,7 @@
     try { body = buildRequest(false, instrumental); } catch (error) { return toast(error.message, "bad"); }
     var versions = Math.max(1, Math.min(10, parseInt($("versions").value, 10) || 1));
     if (instrumental) {
-      if (body.semantic_tokens) return toast("Loaded codes already fix the music; clear them to make an instrumental", "bad");
+      if (body.semantic_tokens || body.source_tokens) return toast("Drop the loaded source before making a new instrumental", "bad");
       if (!body.abc) return planForInstrumental(body, versions);
       try {
         var made = instrumentalBody(body);
@@ -1009,7 +1021,7 @@
   });
 
   function queueVersions(body, versions) {
-    if (body.semantic_tokens && versions > 1) {
+    if ((body.semantic_tokens || body.source_tokens) && versions > 1) {
       versions = 1;
       toast("Loaded codes render one song; use Sound variations for more takes of it");
     }
@@ -1118,6 +1130,10 @@
     var tokens = typeof req.semantic_tokens === "string" ? req.semantic_tokens.trim() : "";
     setCodes(tokens ? { tokens: tokens, from: opts.fromTake || null, title: opts.codesTitle || $("title").value,
                         frames: countCodes(tokens) } : null);
+    if (!tokens && req.source_tokens) {
+      setCodes({tokens: req.source_tokens, title: opts.codesTitle || $("title").value, frames: countCodes(req.source_tokens),
+        continuation: true, start: Number(req.source_start) || 0, end: typeof req.source_end === "number" ? req.source_end : -1});
+    }
     syncShape();
     paintOutput();
     growLyrics();
@@ -1148,7 +1164,7 @@
     var body;
     try { body = buildRequest(false); } catch (error) { return toast(error.message, "bad"); }
     var versions = Math.max(1, Math.min(STATE.maxBatch, parseInt($("versions").value, 10) || 1));
-    if (versions > 1 && !body.semantic_tokens) body.lm_batch_size = versions;
+    if (versions > 1 && !body.semantic_tokens && !body.source_tokens) body.lm_batch_size = versions;
     var name = slug(body.title);
     if (button.dataset.save === "json") downloadText(name + ".json", toJSON(body, 2) + "\n", "application/json");
     else downloadText(name + ".yaml", toYAML(body), "application/x-yaml");
@@ -1453,6 +1469,11 @@
       if (job.polling) return;
       job.polling = true;
       api("/job?id=" + encodeURIComponent(job.id)).then(function (data) {
+        if (STATE.library && data.tracks_ready > (job.tracksReady || 0)) {
+          job.tracksReady = data.tracks_ready;
+          refreshLibrary().catch(function () {});
+        }
+
         job.polling = false;
         applyStatus(job, data || {});
       }).catch(function (error) {
@@ -2277,7 +2298,8 @@
     paintStrip();
     // Transcription needs the server's transcriber.
     $("coverFromAudio").disabled = !STATE.transcriber;
-    $("coverFile").disabled = !STATE.transcriber;
+    $("continueFromAudio").disabled = !STATE.tokenizer;
+    $("coverFile").disabled = !STATE.transcriber && !STATE.tokenizer;
     $("coverTask").disabled = !STATE.transcriber;
     if (!STATE.transcriber) {
       $("coverAudioStatus").textContent = "The server runs without a transcriber: start it with --transcriber to cover a recording.";
@@ -2302,6 +2324,7 @@
     YueVaes.setSources(STATE.sources.vaes);
     STATE.maxBatch = Math.max(1, parseInt(props.max_batch, 10) || 1);
     STATE.transcriber = !!props.transcriber;
+    STATE.tokenizer = !!props.tokenizer;
     STATE.library = props.outputs !== false;
     if (props.frame_rate) FRAME_RATE = props.frame_rate;
     $("versions").max = "10";
@@ -2333,7 +2356,7 @@
     "24": { model: "BF16", max_seq: 0, keep_loaded: false, vae_core: 1024 },
     "32": { model: "BF16", max_seq: 0, keep_loaded: true, vae_core: 1024 }
   };
-  var SETTING_KEYS = ["model", "keep_loaded", "max_seq", "vae_core"];
+  var SETTING_KEYS = ["model", "keep_loaded", "max_seq", "vae_core", "nar_chunk"];
   var GIB = 1073741824;
 
   function fullContext() { return (STATE.settings && STATE.settings.max_seq_full) || (STATE.props && STATE.props.context) || 24576; }
@@ -2377,7 +2400,14 @@
   });
 
   function paintSettings(settings, force) {
+    var changedModel = !STATE.settings || STATE.settings.model !== settings.model;
     STATE.settings = settings;
+    if (changedModel && /^RS-TW-/.test(settings.model)) {
+      YueLoras.set([]);
+      STATE.sliderChoice = [];
+      paintSliders();
+      toast("RS-TW selected: base-model LoRAs and sliders cleared. Reusing them on this fine-tune is experimental.");
+    }
     paintModelPick(settings);
     // A background refresh must not wipe fields you are still editing; Save repaints them.
     if (STATE.settingsDirty && !force) {
@@ -2388,10 +2418,10 @@
     STATE.settingsDirty = false;
     var models = settings.models || [];
     $("setModel").innerHTML = models.length ? models.map(function (m) {
-      return '<option value="' + escape(m) + '">' + escape(m) + (m === "BF16" ? " (release weights)" : " (quantized)") + "</option>";
+      return '<option value="' + escape(m) + '">' + escape(m) + (/^RS-TW-/.test(m) ? " (fine-tune, BF16)" : m === "BF16" ? " (release weights)" : " (quantized)") + "</option>";
     }).join("") : '<option value="">as started</option>';
     $("setModel").value = settings.model || "";
-    [["setMaxSeq", settings.max_seq], ["setVaeCore", settings.vae_core]].forEach(function (pair) {
+    [["setMaxSeq", settings.max_seq], ["setVaeCore", settings.vae_core], ["setNarChunk", settings.nar_chunk || 0]].forEach(function (pair) {
       $(pair[0]).setAttribute("value", pair[1]);   // the step base, as with the sampling knobs
       $(pair[0]).value = pair[1];
     });
@@ -2418,6 +2448,8 @@
     }
     if (!Number.isInteger(vaeCore) || vaeCore < 64 || vaeCore > 4096) throw new Error("VAE tile frames must be between 64 and 4,096");
     var out = { keep_loaded: $("setKeepLoaded").checked, max_seq: maxSeq, vae_core: vaeCore };
+    out.nar_chunk=Number($("setNarChunk").value || 0);
+    if (!Number.isInteger(out.nar_chunk) || out.nar_chunk<0 || out.nar_chunk>24576) throw new Error("Acoustic chunk frames must be 0 through 24,576");
     if ($("setModel").value) out.model = $("setModel").value;
     return out;
   }
@@ -2435,7 +2467,7 @@
     });
   }
 
-  ["setMaxSeq", "setVaeCore", "setKeepLoaded", "setModel"].forEach(function (id) {
+  ["setMaxSeq", "setVaeCore", "setNarChunk", "setKeepLoaded", "setModel"].forEach(function (id) {
     $(id).addEventListener("input", function () { STATE.settingsDirty = true; paintComputeHint(); $("memPreset").value = ""; });
     $(id).addEventListener("change", function () { STATE.settingsDirty = true; paintComputeHint(); });
   });
@@ -2862,7 +2894,8 @@
       if (byUrl[key].names.indexOf(name) < 0) byUrl[key].names.push(name);
     });
     var loras = order.map(function (k) { return item(byUrl[k].names.join(" / "), byUrl[k].url); });
-    $("aboutAddons").innerHTML = list("Sound decoders", vaes) + list("Sliders", sliders) + list("LoRAs", loras);
+    var backbones = Object.keys(src.models || {}).map(function(k) { return item(src.models[k].title || k, src.models[k].url); });
+    $("aboutAddons").innerHTML = (backbones.length ? list("Additional models", backbones) : "") + list("Sound decoders", vaes) + list("Sliders", sliders) + list("LoRAs", loras);
   }
 
   $("metaGrid").addEventListener("click", function (event) {
@@ -2963,7 +2996,7 @@
     var take = STATE.take;
     if (!take) return;
     getRequest(take).then(function (req) {
-      var fresh = Object.assign({}, req, { abc: "", lm_seed: -1, seed: -1, semantic_tokens: "" });
+      var fresh = Object.assign({}, req, { abc: "", lm_seed: -1, seed: -1, semantic_tokens: "", source_tokens: "" });
       loadRequestIntoForm(fresh, { title: displayTitle(take) });
       $("scoreDrawer").open = false;
       show("compose");
@@ -3668,6 +3701,12 @@
   /* ---------------------------------------------------------------- cover */
 
   function paintCoverTakes() {
+    var selected = $("continueTake").value;
+    $("continueTake").innerHTML = STATE.takes.map(function(t) {
+      return '<option value="' + escape(t.name) + '">' + escape(displayTitle(t)) + '</option>';
+    }).join("") || '<option value="">no saved takes yet</option>';
+    if (STATE.takes.some(function(t) { return t.name === selected; })) $("continueTake").value = selected;
+    $("continueFromTake").disabled = !STATE.takes.length;
     var scored = STATE.takes.filter(function (t) { return t.has_score; });
     var current = $("coverTake").value;
     $("coverTake").innerHTML = scored.length
@@ -3801,6 +3840,46 @@
 
   var coverTicker = 0;
 
+  function continueCodes(tokens, title) {
+    var start = Number($("continueStart").value || 0), rawEnd = $("continueEnd").value.trim();
+    var end = rawEnd ? Number(rawEnd) : -1, seconds = countCodes(tokens) / FRAME_RATE;
+    if (!isFinite(start) || start < 0 || start >= seconds || !isFinite(end) || (rawEnd && (end <= start || end > seconds))) {
+      throw new Error("Choose a nonempty source section within " + clock(seconds));
+    }
+    $("abc").value = "";
+    setCot("off");
+    $("instrumental").checked = false;
+    setCodes({tokens: tokens, title: title, frames: countCodes(tokens), continuation: true, start: start, end: end});
+    $("continueStatus").textContent = "Source ready. Edit the style and lyrics, then Generate to continue it.";
+  }
+  $("continueFromTake").addEventListener("click", function() {
+    var take = findTake($("continueTake").value);
+    if (!take) return;
+    getRequest(take).then(function(req) {
+      if (!req.semantic_tokens) throw new Error("This take has no saved music codes");
+      var fresh = Object.assign({}, req, {abc: "", semantic_tokens: "", source_tokens: "", lm_seed: -1, seed: -1});
+      loadRequestIntoForm(fresh, {title: displayTitle(take) + " continuation"});
+      continueCodes(req.semantic_tokens, displayTitle(take));
+      show("compose");
+    }).catch(function(error) { toast(error.message, "bad"); });
+  });
+  $("continueFromAudio").addEventListener("click", function() {
+    if (!STATE.tokenizer) return;
+    var file = $("coverFile").files[0], button = this;
+    if (!file) return toast("Choose a recording above first", "bad");
+    button.disabled = true;
+    $("continueStatus").textContent = "Encoding " + file.name + " for continuation…";
+    prepareAudio(file).then(function(blob) {
+      var form = new FormData(); form.append("audio", blob, file.name);
+      return api("/tokenize", {method: "POST", body: form});
+    }).then(function(data) {
+      registerJob(data.id, {kind: "transcribe", title: file.name, task: "tokenize", fileName: file.name}, {});
+    }).catch(function(error) {
+      $("continueStatus").textContent = error.message;
+      button.disabled = !STATE.tokenizer;
+    });
+  });
+
   $("coverFromAudio").addEventListener("click", function () {
     if (!STATE.transcriber) return toast("The server runs without a transcriber (start it with --transcriber)", "bad");
     var file = $("coverFile").files[0];
@@ -3833,6 +3912,12 @@
 
   function finishTranscription(job) {
     api("/job?id=" + encodeURIComponent(job.id) + "&result=1").then(function (data) {
+      if (job.task === "tokenize") {
+        if (!data || !data.codes) throw new Error("The audio tokenizer returned no music codes");
+        continueCodes(data.codes, job.fileName);
+        $("continueFromAudio").disabled = !STATE.tokenizer;
+        return;
+      }
       var abc = (data && data.abc) || "";
       if (!abc) throw new Error("The transcriber returned no score");
       if (job.task === "melody-vocal") abc = keepVoice(abc, "Vocal");
@@ -3853,6 +3938,11 @@
   }
 
   function transcriptionFailed(job, message) {
+    if (job.task === "tokenize") {
+      $("continueStatus").textContent = message;
+      $("continueFromAudio").disabled = !STATE.tokenizer;
+      return;
+    }
     clearInterval(coverTicker);
     delete $("coverAudioStatus").dataset.busy;
     $("coverAudioStatus").textContent = message;

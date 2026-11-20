@@ -94,6 +94,8 @@ Q6_K · 2.9 GB, Q5_K_M · 2.6 GB · smaller, less VRAM"></select>
           <input type="number" id="setMaxSeq" step="1024" placeholder="0 = whole" /></label>
         <label class="field grow"><span class="label">VAE tile frames</span>
           <input type="number" id="setVaeCore" step="64" /></label>
+        <label class="field grow"><span class="label">Acoustic chunk frames</span>
+          <input type="number" id="setNarChunk" min="0" max="24576" step="1" placeholder="0 = automatic" title="Limit sound-stage memory without reducing the song context. Zero keeps automatic sizing." /></label>
       </div>
       <div class="check-row">
         <label class="check"><input type="checkbox" id="setKeepLoaded" /> <span>Keep models loaded between songs</span></label>
@@ -408,6 +410,17 @@ Q6_K · 2.9 GB, Q5_K_M · 2.6 GB · smaller, less VRAM"></select>
               <button type="button" class="btn ghost" id="coverFromTake">Use this melody</button>
               <p class="cover-status" id="coverStatus"></p>
             </div>
+          </section>
+          <section class="cover-part">
+            <h4 class="mini">Continue a song <em>keep a section, then write more music</em></h4>
+            <label class="field"><span class="label">Source take</span><select id="continueTake"></select></label>
+            <label class="field"><span class="label">Start at (seconds)</span><input id="continueStart" type="number" min="0" step="0.1" value="0" /></label>
+            <label class="field"><span class="label">End at (seconds; blank uses the whole source)</span><input id="continueEnd" type="number" min="0" step="0.1" /></label>
+            <div class="cover-act">
+              <button type="button" class="btn ghost" id="continueFromTake">Continue this take</button>
+              <button type="button" class="btn ghost" id="continueFromAudio" disabled>Continue the chosen recording</button>
+            </div>
+            <p class="cover-status" id="continueStatus">Choose a take, or use the recording selected above. The duration limit includes the retained section.</p>
           </section>
         </div>
       </details>

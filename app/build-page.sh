@@ -18,10 +18,11 @@ G=$'\e[32m' Y=$'\e[33m' R=$'\e[31m' C=$'\e[36m' D=$'\e[2m' B=$'\e[1m' X=$'\e[0m'
 # plain text when NO_COLOR is set or the output is not a terminal (a log file, a pipe)
 if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then G="" Y="" R="" C="" D="" B="" X=""; fi
 
-SRC="$ROOT/build/tools/console"
-EXAMPLES="$ROOT/build/tools/webui/example"
+BUILD="${YUE2_BUILD_DIR:-$ROOT/build}"
+SRC="$BUILD/tools/console"
+EXAMPLES="$BUILD/tools/webui/example"
 PAGE="$TMPDIR/console.html"
-GZ="$ROOT/build/tools/public/index.html.gz"
+GZ="$BUILD/tools/public/index.html.gz"
 t0=$(python3 -c 'import time; print(time.time_ns())')      # portable: macOS date has no %N
 
 for f in index.html app.css themes.css instrumental.js help.js loras.js vaes.js themes.js app.js; do
